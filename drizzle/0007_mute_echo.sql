@@ -1,0 +1,1 @@
+ALTER TABLE "car_models" ADD COLUMN "features" text[] DEFAULT '{}' NOT NULL;

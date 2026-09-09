@@ -1,0 +1,1 @@
+ALTER TABLE "chat_conversations" ADD COLUMN "pending_unanswered" text;

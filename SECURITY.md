@@ -1,0 +1,129 @@
+# Security posture
+
+Standing rules for this project live in the team brief; this file tracks how they
+are implemented and any open items. Reviewed at the end of every phase.
+
+## Implemented (Phase 1)
+
+- **Security headers** on every response (`next.config.ts`): `Content-Security-Policy`,
+  `Strict-Transport-Security` (2y, preload), `X-Frame-Options: DENY`,
+  `X-Content-Type-Options: nosniff`, `Referrer-Policy: strict-origin-when-cross-origin`,
+  `Permissions-Policy` (camera/mic/geo/topics denied). `X-Powered-By` removed.
+- **CSP**: all directives locked to `'self'` with `object-src 'none'`, `base-uri 'self'`,
+  `form-action 'self'`, `frame-ancestors 'none'`, `upgrade-insecure-requests`.
+  Dev relaxes only for Turbopack HMR (`unsafe-eval`, `ws:`).
+- **Secrets**: `.env*` gitignored (only `.env.example` committed, placeholders only).
+  No secrets or `NEXT_PUBLIC_*` sensitive values in `src/` or the client bundle.
+- **DB/storage** behind thin layers; money as integer grosze; sensitive-doc storage
+  designed for private buckets + signed URLs (interface in `src/lib/storage`).
+
+## Implemented (Phase 2 — fleet)
+
+- **IDOR / injection**: `/fleet/[slug]` slug is regex-validated before any query and
+  looked up via a parameterized ORM query; only `published` models returned; unknown
+  slug → `notFound()`. Verified fail-closed against SQLi/XSS/traversal probes.
+
+## Implemented (Phase 3 — booking)
+
+- **No price from the client**: the booking request schema has no price fields; the
+  authoritative total is recomputed server-side (`computeQuote`) from DB prices and
+  snapshotted onto the reservation. Verified: injected `totalGrosze`/`price` are stripped.
+- **No double-booking in the DB**: Postgres `EXCLUDE USING gist (car_id, daterange)`
+  over blocking statuses (`drizzle/0001_*`). Races cannot double-book. Verified with
+  PGlite: overlapping/endpoint-touching confirmed bookings rejected; pending overlaps
+  and different cars allowed.
+- **Boundary validation**: every booking field is Zod-validated server-side (date order,
+  past dates, min/max rental, lead time, enum membership, email/phone). Unknown model/
+  location → fail closed. Verified with a validation test suite.
+- **Price engine** unit-tested (extras, per-day/per-rental, deposit variants, day flooring).
+
+## Implemented (Phase 4 — client form)
+
+- Client details (name, email, phone, date of birth, address, driver's licence no.)
+  captured with the reservation. All Zod-validated server-side: PL postcode format,
+  licence charset (rejects injection), **min-age 21** at rental start, DOB not in
+  future. Verified with a validation test suite.
+- **Document uploads and the most sensitive IDs (PESEL/passport) are deliberately
+  NOT collected/stored yet** — deferred by decision until private object storage,
+  field-level encryption at rest, and a RODO lawful basis + retention policy are in
+  place. Flagged to the client as a legal prerequisite before going live with real
+  customer data.
+
+## Implemented (Phase 5 — admin auth foundation)
+
+- **Auth.js (credentials), no public registration.** Admins created only via
+  `npm run admin:create`. Passwords hashed with **argon2id** (salted; verified).
+- **Brute-force defense:** per-account lockout (5 fails → 15 min). Login events
+  (`login.success` / `login.fail`) written to `audit_log` with IP.
+- **Generic auth failures** — same result for unknown email / wrong password /
+  locked account (no user enumeration).
+- **Defense in depth on `/admin`:** middleware bounces requests with no session
+  cookie to `/admin/login`, AND the admin layout re-verifies `auth()` server-side
+  (the cookie-presence check is not verification — the layout/actions are authoritative).
+- JWT session, httpOnly cookie, 8h expiry. Admin UI is separated from the public
+  site via the `(public)` route group so it has no public chrome.
+
+## Implemented (Phase 6 — admin management)
+
+Surfaces: reservations (list/detail/status workflow), pricing (models, fees,
+pickup fees), fleet CRUD (models + physical units), audit-log viewer.
+
+- **Authz on every mutation.** All 10 server actions call `requireAdmin()` as
+  their first statement — actions are independent POST endpoints, not covered by
+  the layout guard. `requireAdmin()` throws on any non-admin session (fails closed).
+- **Validation at the boundary.** Fleet uses Zod schemas; pricing parses money
+  server-side (PLN→grosze, non-negative, 1M ceiling) and whitelists enums; every
+  entity id is UUID-checked before it reaches the DB. Nothing from the form is
+  trusted — amounts, statuses and units are all re-validated server-side.
+- **State recomputed server-side.** Reservation status changes are gated by a
+  server-side transition graph (`canTransition`); confirming fires the Postgres
+  `EXCLUDE` constraint, and the `23P01` violation is caught and surfaced as an
+  overlap error (no double-booking possible through the admin either).
+- **Destructive ops are reference-gated.** A model with units or reservations,
+  or a unit with reservations, cannot be hard-deleted (FK `restrict` + an explicit
+  pre-check + a `23503` backstop); the UI steers to hide/park instead.
+- **Full audit trail.** Every create/update/delete/status change writes an
+  `audit_log` row (admin id, action, entity, before→after, IP). Viewer is read-only.
+- **No injection sinks.** No `dangerouslySetInnerHTML` anywhere; all admin-rendered
+  user data (customer names/emails, notes) goes through React escaping. Audit
+  before/after is rendered via `JSON.stringify` inside `<pre>`. Search/filter
+  values are bound parameters (Drizzle), and the audit category filter is whitelisted
+  before it reaches the `LIKE` pattern.
+
+## Cookie consent (RODO)
+
+- Banner offers **essential-only vs accept-all** with equal prominence; the choice
+  is stored in `localStorage` + a strictly-necessary cookie. The app sets **no**
+  non-essential cookies today — this banner is the gate any future analytics must
+  check (`aa-cookie-consent === "all"`) before loading.
+
+## Open items (tracked)
+
+- **Per-IP login rate-limiting** — TODO. Account lockout is in place; add an IP-based
+  limiter on the login endpoint (and reuse it on public write endpoints) to blunt
+  distributed brute-force. Needs a small store (in-memory for one node, or DB/Redis).
+- **2FA (TOTP)** — schema field (`admins.totp_secret`) reserved; enrollment/verification
+  deferred by decision (structure-for-later).
+
+- **CSP `script-src 'unsafe-inline'`** — TODO(security). The target is nonce/hash-based
+  `script-src` with no `unsafe-inline`. Next 16.2's automatic nonce propagation did not
+  stamp `nonce=` on framework scripts in this stack (verified: the CSP request header
+  reaches the renderer, but no nonce is emitted), and hashing RSC-payload inline scripts
+  is not viable. Re-evaluate on Next upgrades.
+  **Status:** admin surfaces now render user data (Phase 6), so this is the top open
+  item. Residual risk is held low by: React output escaping on every value, **zero**
+  `dangerouslySetInnerHTML` in the codebase, the admin being behind auth, and no
+  user-supplied HTML rendered anywhere. Harden to nonce/hash `script-src` as soon as
+  the Next nonce path works.
+- **`npm audit`** — 6 moderate, all transitive + build-time only: `esbuild` via
+  `drizzle-kit` (dev CLI, not shipped) and `postcss` bundled inside `next@16` (advisory
+  needs attacker-controlled CSS through postcss stringify — not our usage). `audit fix
+  --force` would downgrade Next to 9.x; rejected. Re-check on upstream patches.
+
+## Per-phase checklist
+
+- [ ] Threat model (3–5 lines) written before building the feature.
+- [ ] Every endpoint: Zod-validate input at the boundary; authz (ownership) check, not
+      just authn; recompute prices/state server-side; non-guessable IDs.
+- [ ] `npm audit`; check what ships to the client bundle; no secrets added.
+- [ ] Attacker walk-through of new endpoints (tamper IDs, skip steps, replay).

@@ -1,0 +1,1047 @@
+@import "tailwindcss";
+
+/*
+  A&A Corporation — design tokens (brand book §10 palette, §11 typography).
+  Ferrari-flavored: predominantly black surfaces, signal red used sparingly,
+  sharp geometry (0 radius), hairline dividers, no elevation/shadows.
+*/
+/*
+  THEMING
+  -------
+  Every themed color is a two-layer indirection: Tailwind's `--color-*` tokens
+  point at `--c-*` primitives, and the primitives are redefined per theme. So
+  `bg-void` / `text-ink` / `border-line` flip automatically wherever they appear.
+
+  Two rules keep this honest:
+    · `--color-white` is ALWAYS literal white. It means "ink on a red or
+      photographic surface" (button labels, hero copy) — those stay white in
+      both themes. For themed foreground text use `text-ink`, never `text-white`.
+    · Any subtree that must ignore the toggle sets `data-theme="dark"` itself.
+      The admin panel does this. The hero used to as well — it no longer does:
+      it swaps photo and scrims per theme instead (see the HERO block below).
+*/
+:root,
+[data-theme="dark"] {
+  --c-void: #000000;
+  --c-surface-1: #0a0a0a;
+  --c-surface-2: #111111;
+  --c-surface-3: #181818;
+  --c-ink: #ffffff;
+  /*
+    SECONDARY TEXT TONES
+    --------------------
+    These carry most of the small copy on the site — form labels, table
+    captions, spec values, footnotes. They were pitched for looks on a bright
+    desktop panel: `ink-faint` at #6a6a6a is ~3.2:1 on black, under the 4.5:1
+    that small text needs, and it disappeared outright on a phone screen in
+    daylight. Raised well past AA — the point is that this copy is *read*, not
+    that it technically passes — while staying a step below `--c-ink` so the
+    hierarchy survives.
+  */
+  --c-ink-muted: #c9c9c9;
+  --c-ink-faint: #a5a5a5;
+  --c-silver: #e2e2e2;
+  --c-line: rgba(255, 255, 255, 0.12);
+  --c-line-strong: rgba(255, 255, 255, 0.24);
+
+  /*
+    STATUS POJAZDU — jeden token na stan, ten sam dla kropki i dla NAPISU.
+
+    Kolory są motywowane, nie stałe, i nie jest to ozdoba. Żeby jedna barwa
+    dawała 4,5:1 jednocześnie na #000000 i na #ffffff, jej luminancja musiałaby
+    trafić w przedział szerokości ~1% — to za mało miejsca na pięć rozróżnialnych
+    odcieni. Wartości poniżej są sprawdzone i na tle strony, i na tle karty:
+    najgorszy przypadek w ciemnym motywie to 7,16:1, w jasnym 4,71:1.
+
+    Stopnie -400 (jaśniejsze) na czerni, -700 (ciemniejsze) na bieli.
+  */
+  --c-status-available: #34d399;
+  --c-status-rented: #38bdf8;
+  --c-status-reserved: #fb923c;
+  --c-status-blocked: #a1a1aa;
+  --c-status-service: #f87171;
+
+  /*
+    ZŁOTO GWIAZDEK — pasek opinii Google.
+
+    Motywowane z tego samego powodu, co stany pojazdu wyżej: jedna barwa nie
+    daje wymaganego kontrastu jednocześnie na czerni i na bieli. Gwiazdka jest
+    elementem graficznym, więc próg to 3:1 (WCAG 1.4.11), a nie 4,5:1 — i nawet
+    ten niższy próg wyklucza „złoto Google" #FBBC04, które na bieli daje 1,71:1
+    i po prostu znika.
+
+    Zmierzone: #E3B341 na czerni 10,17:1 · #A16207 na bieli 4,92:1. Obie barwy
+    czyta się jako złoto; ta druga jest ciemniejsza, bo musi.
+  */
+  --c-gold: #e3b341;
+}
+
+[data-theme="light"] {
+  --c-void: #ffffff;
+  --c-surface-1: #f4f4f5;
+  --c-surface-2: #ebebed;
+  --c-surface-3: #e4e4e7;
+  --c-ink: #0a0a0a;
+  /* Light theme darkens instead of lightening — same contrast goal. */
+  --c-ink-muted: #2b2b31;
+  --c-ink-faint: #43434b;
+  /* "silver" is the secondary interface tone — it has to darken, not lighten. */
+  --c-silver: #212126;
+  --c-line: rgba(0, 0, 0, 0.14);
+  --c-line-strong: rgba(0, 0, 0, 0.3);
+
+  /* Ten sam zestaw stanów, przyciemniony — patrz komentarz w motywie ciemnym. */
+  --c-status-available: #047857;
+  --c-status-rented: #0369a1;
+  --c-status-reserved: #c2410c;
+  --c-status-blocked: #52525b;
+  --c-status-service: #b91c1c;
+
+  /* Złoto przyciemnione — patrz komentarz w motywie ciemnym. */
+  --c-gold: #a16207;
+}
+
+/*
+  Re-point Tailwind's tokens at the primitives on EVERY element that declares a
+  theme, not only on :root.
+
+  `@theme` compiles `--color-void: var(--c-void)` into a :root declaration, and
+  a custom property is substituted at the element it is declared on — so
+  `--color-void` computed to the ROOT's `--c-void` once and inherited that
+  fixed value everywhere. A subtree redefining `--c-void` changed nothing,
+  which silently defeated the one place that relies on it: the admin panel
+  says `data-theme="dark"` to opt out of the visitor's toggle, and rendered in
+  the visitor's theme anyway — white panels with `text-white` values on them,
+  invisible, for anyone whose system prefers light.
+
+  Declaring them again here re-substitutes against that element's own
+  primitives, which is what subtree theming was supposed to mean.
+*/
+/*
+  ODDECH BELKI NA KOMPUTERZE — jedna skala, sześć odstępów (03.09.2026).
+
+  Zamówienie właściciela brzmiało „header ma być komfortowy, nie ściśnięty",
+  i to jest odpowiedź na nie: odstępy w belce nie są stałymi liczbami, tylko
+  rosną wraz z oknem. Punkt zerowy to 1280 px — najciaśniejsza szerokość,
+  na której pełna belka w ogóle się mieści; tam każda wartość równa się temu,
+  co stało w kodzie do dziś, więc na 1280 px NIC się nie zmienia i nic nie
+  przestaje się mieścić. Wszystko powyżej dostaje coraz więcej powietrza,
+  a rozkręcanie kończy się przy 1920 px, żeby na monitorze 2560 px belka nie
+  zamieniła się w rozstrzelony napis.
+
+  DLACZEGO `clamp`, A NIE PROGI. Progów musiałoby być sześć na każdy odstęp,
+  a i tak przy 1366 px albo 1600 px wypadałoby się między nie. `clamp` daje
+  jedną regułę na całą szerokość i — co ważniejsze — jedną regułę dla obu
+  przeglądarek: Chrome i Safari liczą `vw` tak samo, więc odstęp nie zależy
+  od tego, jak która z nich mierzy tekst.
+
+  DLACZEGO MARGINES W PROCENTACH, A NIE W `vw`. `100vw` obejmuje pasek
+  przewijania (oba silniki tak robią), a procent liczy się od szerokości
+  RODZICA, czyli od tego, co naprawdę zostało do rozdania. Na Windowsie
+  z klasycznym paskiem 15 px różnica idzie dokładnie w to miejsce, w którym
+  przy 1280 px zapasu jest najmniej.
+
+  Skala przy 1280 → 1920 px:
+
+      margines wiersza   40 → 60 px   (3,125 % szerokości; ok. 94 % na treść)
+      znak ↔ nawigacja   24 → 56 px
+      między odnośnikami 12 → 26 px
+      wewnątrz ustawień  16 → 20 px
+      między grupami     20 → 32 px   (ustawienia ↔ CTA)
+      między strefami    20 → 40 px   (CTA ↔ social ↔ opinie)
+
+  Hierarchia jest w tych liczbach i ma pozostać: odstęp WEWNĄTRZ grupy jest
+  zawsze mniejszy niż odstęp MIĘDZY grupami, a ten mniejszy niż między
+  strefami. Zmiana jednej liczby bez spojrzenia na sąsiednie psuje czytelność
+  grup, nie tylko estetykę.
+*/
+:root {
+  --belka-margines: clamp(2.5rem, 3.125%, 5rem);
+  --belka-znak: clamp(1.5rem, calc(1.5rem + (100vw - 80rem) * 0.05), 3.5rem);
+  --belka-nav: clamp(
+    0.75rem,
+    calc(0.75rem + (100vw - 80rem) * 0.021875),
+    1.75rem
+  );
+  --belka-ustawienia: clamp(
+    1rem,
+    calc(1rem + (100vw - 80rem) * 0.00625),
+    1.25rem
+  );
+  --belka-grupa: clamp(
+    1.25rem,
+    calc(1.25rem + (100vw - 80rem) * 0.01875),
+    2rem
+  );
+  --belka-strefa: clamp(
+    1.25rem,
+    calc(1.25rem + (100vw - 80rem) * 0.03125),
+    2.5rem
+  );
+}
+
+[data-theme] {
+  --color-void: var(--c-void);
+  --color-surface-1: var(--c-surface-1);
+  --color-surface-2: var(--c-surface-2);
+  --color-surface-3: var(--c-surface-3);
+  --color-ink: var(--c-ink);
+  --color-ink-muted: var(--c-ink-muted);
+  --color-ink-faint: var(--c-ink-faint);
+  --color-silver: var(--c-silver);
+  --color-line: var(--c-line);
+  --color-line-strong: var(--c-line-strong);
+  --color-status-available: var(--c-status-available);
+  --color-status-rented: var(--c-status-rented);
+  --color-status-reserved: var(--c-status-reserved);
+  --color-status-blocked: var(--c-status-blocked);
+  --color-status-service: var(--c-status-service);
+  --color-gold: var(--c-gold);
+}
+
+@theme {
+  /* Surfaces — themed via the primitives above. */
+  --color-void: var(--c-void);
+  --color-surface-1: var(--c-surface-1);
+  --color-surface-2: var(--c-surface-2);
+  --color-surface-3: var(--c-surface-3);
+
+  /*
+    Brand palette — red is constant across themes.
+
+    CZERWIEŃ #e81c24, NIE #ed1c24 (06.09.2026) — jeden kanał, pięć poziomów.
+
+    Stara wartość dawała z bielą kontrast **4,38 : 1**, czyli o włos poniżej
+    progu WCAG AA dla zwykłego tekstu (4,5 : 1). Audyt zgłaszał to w dwóch
+    postaciach naraz i za każdym razem chodziło o TĘ SAMĄ parę kolorów:
+
+      · biały napis na czerwonym przycisku („ZAREZERWUJ", filtry, `aria-current`)
+      · czerwony napis na białym tle (etykiety `text-red`, ostrzeżenia 12 px)
+
+    Kontrast jest symetryczny, więc jedna liczba naprawia oba przypadki.
+    Policzone, nie dobrane na oko: przy R = 232 kontrast wynosi **4,543 : 1**
+    z bielą i **4,623 : 1** z czernią — obie strony przechodzą z zapasem,
+    a zieleń i błękit zostają nietknięte, więc ODCIEŃ marki jest ten sam.
+    Różnica 5/255 w jednym kanale jest poniżej progu dostrzegalności; znak
+    A&A to obraz i nie zależy od tego tokenu w ogóle.
+
+    `--color-red-hover` zostaje jasny: to stan najechania kursorem, który
+    z definicji nie jest stanem spoczynkowym mierzonym przez audyt, a jego
+    przyciemnienie byłoby już zmianą widoczną gołym okiem.
+  */
+  --color-red: #e81c24;
+  --color-red-hover: #ff2a32;
+  --color-silver: var(--c-silver);
+  /* Literal white: text on red / on photography. Does NOT flip — see note above. */
+  --color-white: #ffffff;
+
+  /* Text tones */
+  --color-ink: var(--c-ink);
+  --color-ink-muted: var(--c-ink-muted);
+  --color-ink-faint: var(--c-ink-faint);
+
+  /* Stan pojazdu — jeden token daje `text-status-*` i `bg-status-*`. */
+  --color-status-available: var(--c-status-available);
+  --color-status-rented: var(--c-status-rented);
+  --color-status-reserved: var(--c-status-reserved);
+  --color-status-blocked: var(--c-status-blocked);
+  --color-status-service: var(--c-status-service);
+
+  /*
+    STAN POJAZDU NA ZDJĘCIU — te same pięć stanów, ale barwy NIE zmieniają się
+    z motywem. Dokładnie z tego powodu, co `--color-white` wyżej.
+
+    Napis na karcie leży na tle strony i motyw wie, jakie ono jest. Napis na
+    ZDJĘCIU leży na fotografii, o której motyw nie wie nic: to samo zdjęcie
+    bywa białym studiem i nocną ulicą, a w jasnym motywie ciemna zieleń
+    #047857 na ciemnej fotografii znika. Dlatego pod spodem jest stała czarna
+    przesłona, a na niej stale jasne barwy — komplet działa tak samo w obu
+    motywach, bo nie zależy od żadnego z nich.
+
+    Zmierzone na przesłonie `bg-black/80` (klasa `.status-scrim`), przypadek
+    najgorszy z możliwych, czyli fotografia CZYSTO BIAŁA pod spodem:
+    dostępny 6,57:1 · wynajęty 5,90:1 · zarezerwowany 5,58:1 ·
+    zablokowany 4,93:1 · serwis 4,57:1. Na czarnej fotografii 7,6–10,9:1.
+    Rozmycie tła jeszcze to poprawia, ale nie jest tu na nic potrzebne —
+    liczby wyżej są bez niego.
+  */
+  --color-status-media-available: #34d399;
+  --color-status-media-rented: #38bdf8;
+  --color-status-media-reserved: #fb923c;
+  --color-status-media-blocked: #a1a1aa;
+  --color-status-media-service: #f87171;
+
+  /* Złoto gwiazdek w pasku opinii — motywowane, patrz primitywy wyżej. */
+  --color-gold: var(--c-gold);
+
+  /* Hairlines instead of borders/boxes */
+  --color-line: var(--c-line);
+  --color-line-strong: var(--c-line-strong);
+
+  /* Typography — Raleway Bold (headlines) / Montserrat (body) via next/font */
+  --font-heading: var(--font-raleway), ui-sans-serif, system-ui, sans-serif;
+  --font-body: var(--font-montserrat), ui-sans-serif, system-ui, sans-serif;
+
+  /* Sharp geometry: everything square. One pill token exists for small tags. */
+  --radius-none: 0px;
+  --radius-pill: 9999px;
+}
+
+@layer base {
+  html {
+    -webkit-font-smoothing: antialiased;
+    text-rendering: optimizeLegibility;
+  }
+
+  body {
+    background: var(--color-void);
+    color: var(--color-ink);
+    font-family: var(--font-body);
+    /* Quiet body text — the cars are the loud part. */
+    font-size: 0.9375rem;
+    line-height: 1.6;
+  }
+
+  /* Every heading level, not just the first four: an h5 in the admin panel is
+     still a heading, and leaving it out let it silently render in the body
+     face — which is how the panel drifted away from the site's typography. */
+  h1,
+  h2,
+  h3,
+  h4,
+  h5,
+  h6 {
+    font-family: var(--font-heading);
+    font-weight: 700;
+    letter-spacing: -0.01em;
+    line-height: 1.05;
+  }
+
+  ::selection {
+    background: var(--color-red);
+    color: var(--color-white);
+  }
+}
+
+@layer utilities {
+  /* Interface labels, nav, buttons: uppercase, wide tracking (brand direction). */
+  .label {
+    text-transform: uppercase;
+    letter-spacing: 0.09em;
+    font-family: var(--font-body);
+    font-weight: 500;
+  }
+
+  .label-tight {
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    font-family: var(--font-body);
+  }
+
+  /* Hairline dividers */
+  .hairline {
+    border-color: var(--color-line);
+  }
+
+  /*
+    Form controls (booking panel). Mobile Safari styles native date fields and
+    selects on its own terms: the date value is centered inside the box and
+    carries its own margins, so a date field's text sat visibly off from the
+    plain text field stacked under it. Strip that and every box in the form
+    reads as the same block, with its text on the same left edge.
+  */
+  .field-box {
+    line-height: 1.2;
+  }
+
+  .field-box::-webkit-date-and-time-value {
+    text-align: left;
+    margin: 0;
+    min-height: 1.2em;
+  }
+
+  .field-box::-webkit-datetime-edit {
+    padding: 0;
+  }
+
+  /*
+    Typography for admin-authored legal documents. Used both by the rich text
+    editor in the admin panel and by the public page that renders the saved
+    HTML, so what an editor sees matches what visitors get.
+  */
+  .prose-legal h2 {
+    font-family: var(--font-heading);
+    font-weight: 700;
+    font-size: 1.125rem;
+    color: var(--color-ink);
+    margin-top: 2.5rem;
+    margin-bottom: 0.75rem;
+  }
+
+  .prose-legal h2:first-child {
+    margin-top: 0;
+  }
+
+  .prose-legal h3 {
+    font-family: var(--font-heading);
+    font-weight: 700;
+    font-size: 1rem;
+    color: var(--color-ink);
+    margin-top: 1.75rem;
+    margin-bottom: 0.5rem;
+  }
+
+  .prose-legal p {
+    font-size: 0.875rem;
+    line-height: 1.7;
+    color: var(--color-ink-muted);
+    margin-bottom: 0.75rem;
+  }
+
+  .prose-legal ul,
+  .prose-legal ol {
+    margin: 0 0 0.75rem 1.25rem;
+    font-size: 0.875rem;
+    line-height: 1.7;
+    color: var(--color-ink-muted);
+  }
+
+  .prose-legal ul {
+    list-style: disc;
+  }
+
+  .prose-legal ol {
+    list-style: decimal;
+  }
+
+  .prose-legal li {
+    margin-bottom: 0.25rem;
+  }
+
+  .prose-legal strong {
+    color: var(--color-ink);
+    font-weight: 600;
+  }
+
+  .prose-legal a {
+    color: var(--color-silver);
+    text-decoration: underline;
+    text-underline-offset: 2px;
+  }
+
+  .prose-legal a:hover {
+    color: var(--color-ink);
+  }
+
+  .prose-legal blockquote {
+    border-left: 2px solid var(--color-line-strong);
+    padding-left: 1rem;
+    font-style: italic;
+    color: var(--color-ink-faint);
+    margin-bottom: 0.75rem;
+  }
+
+  /*
+    HERO
+    ----
+    The hero holds one photograph per theme (admin-editable) plus the scrims
+    that keep the copy legible over it. The visitor's theme is resolved on the
+    client, so the server renders both photo layers and these rules reveal the
+    one that applies. `:not([data-theme="light"])` — not `[data-theme="dark"]` —
+    so a document that never got the attribute still falls back to dark, which
+    is what the palette primitives do too.
+
+    The light theme has no bundled photo: with nothing uploaded only the white
+    scrims render, and the hero is simply a light surface with dark copy.
+  */
+  html[data-theme="light"] .hero-photo--dark,
+  html[data-theme="light"] .theme-dark-only {
+    display: none;
+  }
+
+  html:not([data-theme="light"]) .hero-photo--light,
+  html:not([data-theme="light"]) .theme-light-only {
+    display: none;
+  }
+
+  /*
+    ZDJĘCIE AUTA WEDŁUG MOTYWU
+    --------------------------
+    `theme-dark-only` / `theme-light-only` to ta sama zasada co wyżej, tyle że
+    bez „hero" w nazwie — bo dotyczy też kart floty, galerii auta, zapisanych
+    i porównania. Celowo DOPISANE do tych samych reguł, a nie postawione obok
+    jako drugi komplet: jedna zasada, jedno miejsce, żaden z dwóch nie może się
+    kiedyś rozminąć z drugim.
+
+    Auto pokazuje w ciemnym motywie zdjęcie nr 1, w jasnym nr 2. Obie warstwy
+    są w odpowiedzi serwera — serwer nie wie, który motyw wybrał odwiedzający —
+    a wybiera CSS, zanim cokolwiek zostanie namalowane. Stąd zero mrugnięcia
+    i zero rozjazdu z hydracją: znacznik jest identyczny w obu motywach.
+
+    Reguła jest w `lib/fleet/zdjecie-motywu.ts`, komponent w `CarPhoto.tsx`.
+  */
+
+  /* Desktop: opaque panel on the text side, clearing to the photo on the right. */
+  .hero-scrim-x {
+    background: linear-gradient(
+      90deg,
+      rgba(0, 0, 0, 0.97) 0%,
+      rgba(0, 0, 0, 0.94) 32%,
+      rgba(0, 0, 0, 0.6) 52%,
+      rgba(0, 0, 0, 0.2) 78%,
+      rgba(0, 0, 0, 0.34) 100%
+    );
+  }
+
+  [data-theme="light"] .hero-scrim-x {
+    background: linear-gradient(
+      90deg,
+      rgba(255, 255, 255, 0.97) 0%,
+      rgba(255, 255, 255, 0.94) 32%,
+      rgba(255, 255, 255, 0.62) 52%,
+      rgba(255, 255, 255, 0.24) 78%,
+      rgba(255, 255, 255, 0.4) 100%
+    );
+  }
+
+  /* Mobile: copy stacks over the photo, so shade vertically instead. */
+  .hero-scrim-y {
+    background: linear-gradient(
+      180deg,
+      rgba(0, 0, 0, 0.86) 0%,
+      rgba(0, 0, 0, 0.72) 40%,
+      rgba(0, 0, 0, 0.38) 64%,
+      rgba(0, 0, 0, 0.58) 85%,
+      #000 100%
+    );
+  }
+
+  [data-theme="light"] .hero-scrim-y {
+    background: linear-gradient(
+      180deg,
+      rgba(255, 255, 255, 0.88) 0%,
+      rgba(255, 255, 255, 0.76) 40%,
+      rgba(255, 255, 255, 0.42) 64%,
+      rgba(255, 255, 255, 0.62) 85%,
+      #fff 100%
+    );
+  }
+
+  /* Top shading under the nav + melt the bottom into the next section. */
+  .hero-scrim-edges {
+    background: linear-gradient(
+      180deg,
+      rgba(0, 0, 0, 0.45) 0%,
+      rgba(0, 0, 0, 0) 24%,
+      rgba(0, 0, 0, 0) 60%,
+      #000 100%
+    );
+  }
+
+  [data-theme="light"] .hero-scrim-edges {
+    background: linear-gradient(
+      180deg,
+      rgba(255, 255, 255, 0.5) 0%,
+      rgba(255, 255, 255, 0) 24%,
+      rgba(255, 255, 255, 0) 60%,
+      #fff 100%
+    );
+  }
+
+  /* Faint signal-red horizon glow, low and restrained. */
+  .hero-glow {
+    background: radial-gradient(
+      60% 70% at 50% 122%,
+      rgba(237, 28, 36, 0.14),
+      transparent 70%
+    );
+  }
+
+  [data-theme="light"] .hero-glow {
+    background: radial-gradient(
+      60% 70% at 50% 122%,
+      rgba(237, 28, 36, 0.07),
+      transparent 70%
+    );
+  }
+
+  /*
+    Cele dotykowe.
+
+    Palec trafia w ~44 px, kursor w 16 px — to różnica urządzenia, nie
+    szerokości okna. Dlatego te reguły wiszą na `pointer: coarse`, a nie na
+    breakpoincie: tablet w poziomie przy 1024 px dostaje wygodne cele, a
+    desktop o tej samej szerokości nie zmienia się o piksel. Wcześniejsze
+    podejście przez `sm:` gubiło właśnie tablet.
+
+    `.tap` powiększa sam element; `.tap-area` zostawia jego wygląd nietknięty
+    i rozszerza wyłącznie pole trafienia — dla ikon w rodzaju „✕", których
+    powiększyć nie można bez zepsucia układu wiersza.
+  */
+  /*
+    Sekcja zwinięta na telefonie — patrz `components/marketing/MobileFold.tsx`.
+
+    Przycięcie wisi TUTAJ, w CSS, a nie w stanie Reacta, i to jest sedno:
+    serwer nie zna szerokości ekranu, więc gdyby o zwinięciu decydował
+    `useState`, desktop dostawałby najpierw treść przyciętą, a po hydratacji
+    rozwiniętą. Tak przycięcie po prostu nie istnieje poza dotykiem —
+    `.fold-body` bez media query nie ma ani `max-height`, ani maski, a
+    przycisk jest schowany.
+
+    Treść zostaje w DOM w całości. To nie jest optymalizacja wyglądu kosztem
+    wyszukiwarki: `max-height` niczego nie usuwa, a `content-visibility` czy
+    `display: none` — usuwa.
+  */
+  .fold-toggle {
+    display: none;
+  }
+
+  @media (pointer: coarse) {
+    .fold[data-open="false"] .fold-body {
+      max-height: var(--fold-h, 20rem);
+      overflow: hidden;
+      /*
+        Miękka krawędź zamiast ucięcia w pół wiersza. Bez niej podgląd wygląda
+        jak usterka renderowania, a nie jak zaproszenie do rozwinięcia — a to
+        różnica między „strona się zepsuła" a „jest tego więcej".
+      */
+      -webkit-mask-image: linear-gradient(
+        to bottom,
+        #000 var(--fold-fade, 65%),
+        transparent 100%
+      );
+      mask-image: linear-gradient(
+        to bottom,
+        #000 var(--fold-fade, 65%),
+        transparent 100%
+      );
+    }
+
+    .fold-toggle {
+      display: inline-flex;
+    }
+  }
+
+  @media (pointer: coarse) {
+    .tap {
+      min-height: 44px;
+      min-width: 44px;
+      display: inline-flex;
+      align-items: center;
+    }
+
+    /*
+      Dla elementów, które już są blokiem lub flexem i mają własne
+      wyrównanie — etykieta z polem wyboru, wiersz rozwijany. Ustawiamy samą
+      wysokość, żeby nie przestawiać `items-start` tam, gdzie opis ma dwie
+      linijki.
+    */
+    .tap-block {
+      min-height: 44px;
+    }
+
+    .tap-area {
+      position: relative;
+    }
+
+    .tap-area::after {
+      content: "";
+      position: absolute;
+      top: 50%;
+      left: 50%;
+      translate: -50% -50%;
+      width: max(100%, 44px);
+      height: max(100%, 44px);
+    }
+
+    /*
+      Reszta sterowań. Pola i przyciski panelu zaprojektowano pod kursor i
+      stoją na 32–42 px — pojedynczo poprawne, palcem ciasne. Podnosimy je
+      jedną regułą zamiast klasą przy każdym z kilkuset, bo to zmiana
+      wyłącznie ilościowa i wyłącznie na dotyku.
+
+      Pola wyboru i przełączniki zostają w swoim rozmiarze świadomie: rysuje
+      je system, a klikalny jest cały wiersz etykiety, który obejmuje `.tap-block`.
+    */
+    button,
+    summary,
+    select,
+    textarea,
+    [role="button"],
+    input:not([type="checkbox"]):not([type="radio"]):not([type="hidden"]):not(
+        [type="range"]
+      ) {
+      min-height: 44px;
+    }
+
+    button,
+    summary,
+    [role="button"] {
+      min-width: 44px;
+    }
+
+    /*
+      Wyjątek od reguły powyżej — i jedyny, jaki ma sens.
+
+      Reguła `min-width: 44px` jest słuszna dla POJEDYNCZEJ kontrolki, ale
+      rząd kilkunastu sąsiadujących kontrolek ona rozsadza. Kropki galerii
+      auta to dokładnie ten przypadek: dziesięć zdjęć × 44 px = 440 px, przy
+      ekranie 320–430 px. Rząd jest wyśrodkowany, więc nadmiar wychodzi po
+      OBU stronach i pierwsza oraz ostatnia kropka lądują POZA ekranem.
+      Skutkiem nie jest „za mały cel", tylko cel NIEOSIĄGALNY — a to gorzej
+      niż stan sprzed reguły.
+
+      `CarGallery` miał to policzone w komentarzu i trzymał `w-6` właśnie po
+      to. Globalna reguła dopisana później po cichu ten wybór unieważniła —
+      klasa lokalna przegrywa z regułą na elemencie. Stąd wyjątek jawny:
+      lepiej nazwać go po imieniu tutaj, niż walczyć z nim `!important`
+      w komponencie.
+
+      Wysokość zostaje pełna (44 px) — ona nikomu nie przeszkadza, a palec
+      trafia w pas, nie w punkt. Głównym gestem galerii i tak jest przesunięcie.
+    */
+    .tap-narrow {
+      min-width: 0;
+    }
+  }
+
+  /* Respect reduced motion globally for CSS transitions/animations. */
+  @media (prefers-reduced-motion: reduce) {
+    *,
+    *::before,
+    *::after {
+      animation-duration: 0.001ms !important;
+      animation-iteration-count: 1 !important;
+      transition-duration: 0.001ms !important;
+      scroll-behavior: auto !important;
+    }
+  }
+}
+
+/*
+  Print.
+
+  The admin panel is dark-only, and a dark panel sent to a printer is a page of
+  solid black that empties a toner cartridge and reads worse than the screen.
+  Anything marked `data-print="report"` is therefore re-coloured to black on
+  white for print only — the screen keeps its own palette untouched.
+
+  Scoped to the report view rather than applied globally: printing any other
+  admin page is a rare accident, and a global override would fight every
+  deliberately coloured status badge on the site.
+*/
+@media print {
+  @page {
+    size: A4;
+    margin: 14mm;
+  }
+
+  html,
+  body {
+    background: #fff !important;
+  }
+
+  [data-print="report"],
+  [data-print="report"] * {
+    background: transparent !important;
+    color: #000 !important;
+    box-shadow: none !important;
+  }
+
+  /* Keep the meaning that colour was carrying: borders stay, hairline-thin. */
+  [data-print="report"] table,
+  [data-print="report"] th,
+  [data-print="report"] td,
+  [data-print="report"] [data-print-box] {
+    border-color: #999 !important;
+  }
+
+  /* A table split mid-row across a page break is unreadable. */
+  [data-print="report"] tr,
+  [data-print="report"] [data-print-keep] {
+    break-inside: avoid;
+  }
+
+  [data-print="report"] thead {
+    display: table-header-group;
+  }
+
+  /* The bar fills carry a value, so they have to survive the colour reset. */
+  [data-print="report"] [data-print-bar] {
+    background: #000 !important;
+    print-color-adjust: exact;
+  }
+  [data-print="report"] [data-print-track] {
+    background: #ddd !important;
+    print-color-adjust: exact;
+  }
+
+  /* Podpis to obrazek na białym tle — reset kolorów wyżej zrobiłby z niego
+     przezroczystą plamę, a podpis jest jedyną rzeczą na protokole, której
+     nie da się odtworzyć z danych. */
+  [data-print="report"] img {
+    background: #fff !important;
+    print-color-adjust: exact;
+  }
+}
+
+/* ── Menu panelu: kolor niesie piktogram ──────────────────────────────────
+ *
+ * Każda sekcja panelu ma własny kolor ikony, podany w `NAV` i wstrzykiwany
+ * jako `--nav`. Trzy decyzje, które warto mieć zapisane, bo każda była
+ * świadomym wyborem, a nie domyślnym ustawieniem:
+ *
+ *   · Kolor dostaje IKONA, nie napis. Dwanaście kolorowych etykiet zamienia
+ *     menu w tęczę i pogarsza czytelność tego, po co się do menu sięga.
+ *   · Stan aktywny to tło o niskim kryciu plus kreska z lewej — nie pełny,
+ *     jaskrawy prostokąt. Pasek boczny ma zostać ciemny i spokojny.
+ *   · Na jasnym motywie te same barwy są przyciemniane, bo pastel dobrany pod
+ *     ciemne tło na białym po prostu znika. `color-mix` załatwia to jedną
+ *     regułą zamiast drugiej palety, która musiałaby być utrzymywana równolegle.
+ */
+.admin-nav-item {
+  border-left: 2px solid transparent;
+  transition:
+    background-color 180ms ease,
+    border-color 180ms ease,
+    color 180ms ease;
+}
+
+.admin-nav-icon {
+  color: var(--nav);
+  transition: color 180ms ease;
+}
+
+.admin-nav-item:hover {
+  background-color: color-mix(in srgb, var(--nav) 10%, transparent);
+}
+
+.admin-nav-item.is-active {
+  background-color: color-mix(in srgb, var(--nav) 14%, transparent);
+  border-left-color: color-mix(in srgb, var(--nav) 55%, transparent);
+}
+
+/* Na jasnym motywie pastel z ciemnego tła jest nieczytelny — przyciemniamy
+   go dokładnie tyle, żeby zachował tożsamość i zyskał kontrast. */
+[data-theme="light"] .admin-nav-icon {
+  color: color-mix(in srgb, var(--nav) 72%, black);
+}
+
+[data-theme="light"] .admin-nav-item:hover {
+  background-color: color-mix(in srgb, var(--nav) 12%, transparent);
+}
+
+[data-theme="light"] .admin-nav-item.is-active {
+  background-color: color-mix(in srgb, var(--nav) 16%, transparent);
+  border-left-color: color-mix(in srgb, var(--nav) 65%, transparent);
+}
+
+/* Kto wyłączył animacje w systemie, ten ich tutaj nie dostanie. */
+@media (prefers-reduced-motion: reduce) {
+  .admin-nav-item,
+  .admin-nav-icon {
+    transition: none;
+  }
+}
+
+/*
+  WALUTA WYŚWIETLANIA — PLN | EUR
+  --------------------------------
+  Cena w obu walutach jest w HTML-u naraz, a widoczna jest jedna. Wybór siedzi
+  w `<html data-currency>`, ustawianym przed pierwszym malowaniem tym samym
+  sposobem co motyw (`CURRENCY_INIT_SCRIPT`).
+
+  Dlaczego CSS, a nie stan w Reakcie:
+
+  · **Zero migotania.** Serwer nie wie, co klient wybrał — gdyby cenę
+    przeliczał komponent po stronie klienta, każdy powracający z EUR
+    zobaczyłby najpierw złotówki, a potem podmianę. Dokładnie ten sam problem
+    rozwiązuje tu `data-theme`.
+  · **Zero rozjazdu hydratacji.** Obie wartości są renderowane na serwerze
+    i po hydratacji się nie zmieniają, więc nie ma czego porównywać.
+  · **Zero JavaScriptu na cenie.** Przełącznik to jedyny skrypt w całym
+    mechanizmie; same ceny są statycznym HTML-em. Bez skryptu strona zostaje
+    w PLN — czyli w walucie rozliczenia.
+
+  Przeliczenie robi serwer, z jednego kursu (`lib/currency/rate`), więc karta,
+  porównanie, czat i panel nie mają jak podać dwóch różnych kwot.
+*/
+.money-eur {
+  display: none;
+}
+
+html[data-currency="eur"] .money-pln {
+  display: none;
+}
+
+html[data-currency="eur"] .money-eur {
+  display: inline;
+}
+
+/*
+  Ten sam przełącznik, ale dla treści blokowej — zdania „ceny w EUR są
+  orientacyjne" na stronie auta i w panelu rezerwacji. Osobna klasa, bo
+  `display: inline` na akapicie zlepiłoby go z sąsiednim tekstem w jedną linię.
+*/
+.money-eur-block {
+  display: none;
+}
+
+html[data-currency="eur"] .money-eur-block {
+  display: block;
+}
+
+/* Aktywna pozycja przełącznika — bez stanu w Reakcie, z tego samego atrybutu. */
+.cur-opt[data-cur="pln"] {
+  color: var(--c-ink);
+}
+
+.cur-opt[data-cur="eur"] {
+  color: var(--c-ink-faint);
+}
+
+html[data-currency="eur"] .cur-opt[data-cur="pln"] {
+  color: var(--c-ink-faint);
+}
+
+html[data-currency="eur"] .cur-opt[data-cur="eur"] {
+  color: var(--c-ink);
+}
+
+/*
+  PASEK PROPOZYCJI JĘZYKA — ta sama sztuczka co przy walucie i motywie,
+  i dokładnie z tego samego powodu (06.09.2026).
+
+  Pasek pojawiał się dopiero po hydratacji i spychał CAŁĄ stronę o 86 px
+  w dół. Zmierzone na produkcji, 412 px: `layout-shift` **0,0942** — trzy
+  czwarte całego CLS strony głównej, największa pojedyncza pozycja w audycie.
+
+  Rozstrzygnięcie „pokazać czy nie" nie wymaga jednak Reacta: zależy od
+  `navigator.languages` i dwóch kluczy w pamięci przeglądarki, a to wszystko
+  jest dostępne synchronicznie w `<head>`, PRZED pierwszym malowaniem —
+  tak samo jak motyw i waluta. Znacznik paska jedzie więc z serwera
+  (schowany), a `LOCALE_HINT_INIT_SCRIPT` ustawia `html[data-hint-jezyka]`
+  zanim cokolwiek zostanie narysowane. Pasek albo jest od pierwszej klatki,
+  albo nie ma go wcale — w obu przypadkach nic się nie przesuwa.
+
+  Komentarz w `LocaleSuggestion` mówił „nie renderujemy tego na serwerze, bo
+  rysowanie i chowanie po hydratacji dawałoby przeskok układu u WSZYSTKICH".
+  To zostaje prawdą i dlatego domyślny stan to `display: none`: chowamy przed
+  malowaniem, nie po nim, więc nikt niczego nie chowa na oczach klienta.
+
+  `display` wyłącznie tutaj, świadomie bez klasy `flex` w znaczniku —
+  dwa miejsca ustawiające tę samą właściwość rozstrzygałaby kolejność reguł
+  w arkuszu, a nie czyjaś intencja.
+*/
+[data-pasek-jezyka] {
+  display: none;
+}
+
+html[data-hint-jezyka] [data-pasek-jezyka] {
+  display: flex;
+}
+
+/*
+  PASEK ZGÓD — ta sama zasada, inny powód (06.09.2026).
+
+  Pasek jest `fixed`, więc sam nigdy niczego nie spychał. Spychał za to
+  URUCHAMIACZ ASYSTENTA, który stoi nad nim i mierzy jego wysokość: pasek
+  montował się po hydratacji, a uruchamiacz podskakiwał wtedy o 176 px
+  (`layout-shift` 0,0312). Decyzja „czy pytamy o zgody" jest jednak znana
+  przed malowaniem — leży w `localStorage` i w ciasteczku — więc znacznik
+  jedzie z serwera schowany, a `COOKIE_INIT_SCRIPT` włącza go w `<head>`.
+  Uruchamiacz mierzy wtedy stan ostateczny i nie skacze już nigdzie.
+
+  Klient, który zgody już udzielił, nie zobaczy paska ani przez klatkę:
+  bez atrybutu znacznik ma `display: none` od pierwszego malowania, a React
+  usuwa go z drzewa zaraz po hydratacji.
+*/
+[data-consent-banner] {
+  display: none;
+}
+
+html[data-zgody] [data-consent-banner] {
+  display: block;
+}
+
+/*
+  Przesłona pod napisem stanu na zdjęciu.
+
+  Czerń, nie `--c-void`: `void` przewraca się na biel w jasnym motywie, a wtedy
+  jasne barwy stanu leżałyby na jasnym tle. Krycie 80% to najmniejsze, przy
+  którym wszystkie pięć barw trzyma 4,5:1 nad białą fotografią — policzone,
+  nie dobrane na oko. Włos obramowania oddziela pigułkę od jasnego zdjęcia,
+  cień od ciemnego.
+*/
+.status-scrim {
+  background-color: rgba(0, 0, 0, 0.8);
+  border: 1px solid rgba(255, 255, 255, 0.16);
+  box-shadow: 0 1px 6px rgba(0, 0, 0, 0.35);
+  backdrop-filter: blur(6px);
+}
+
+/*
+  Jednorazowe zwrócenie uwagi na pasek „Moja rezerwacja".
+
+  Dwa spokojne pulsy i koniec — nie migotanie. Klient ma zauważyć, gdzie
+  wylądowała jego rezerwacja, a potem pasek ma zniknąć z pola uwagi i po prostu
+  tam być. Pod `prefers-reduced-motion` nie rusza się wcale; kropka i tak niesie
+  kolor, więc informacja nie zależy od ruchu.
+*/
+@keyframes aa-ping-once {
+  0% {
+    transform: scale(1);
+    opacity: 1;
+  }
+  50% {
+    transform: scale(2.2);
+    opacity: 0.35;
+  }
+  100% {
+    transform: scale(1);
+    opacity: 1;
+  }
+}
+
+.animate-ping-once {
+  animation: aa-ping-once 900ms ease-out 2;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .animate-ping-once {
+    animation: none;
+  }
+}
+
+/*
+  Widget Turnstile na ekranie węższym niż 360 px.
+
+  Cloudflare rysuje widget w ramce o STAŁEJ szerokości 300 px — `w-full` na
+  kontenerze nic tu nie zmienia, bo szerokość jest własnością ramki, nie
+  naszego diva. Przy 320 px formularz ma do dyspozycji 272 px, więc widget
+  rozpychał całą stronę w bok o 29 px. Zmierzone: 300 − 272 = 28 px plus
+  zaokrąglenie.
+
+  Dlaczego to trafiło do dziennika jako „usterka paska ciasteczek": pasek zgody
+  stoi na `fixed inset-x-0`, więc rósł razem z rozepchniętym dokumentem i to
+  jego przemiatanie wskazywało jako najszerszy element przekraczający ekran.
+  Pasek był objawem; widget był przyczyną. Dotyczyło to dokładnie `/contact`
+  i `/partnership` — jedynych dwóch tras z formularzem pod tą ochroną.
+
+  Zmieniany jest WYŁĄCZNIE rozmiar rysunku. Żaden próg, klucz witryny ani
+  wywołanie `render` nie jest tu ruszane — ochrona przed robotami działa
+  identycznie jak przedtem. Od 360 px w górę widget zostaje pełnowymiarowy,
+  bo tam mieści się bez skalowania.
+*/
+@media (max-width: 359px) {
+  .turnstile-pole > div {
+    transform: scale(0.86);
+    transform-origin: left top;
+  }
+
+  /* Skalowanie nie zmienia miejsca zajmowanego w układzie, więc bez tego pod
+     widgetem zostałaby luka wysokości 65 − 56 px. */
+  .turnstile-pole {
+    height: 56px;
+  }
+}

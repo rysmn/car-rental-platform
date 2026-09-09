@@ -1,0 +1,1 @@
+ALTER TABLE "chat_unanswered" ADD COLUMN "kind" text DEFAULT 'unanswered' NOT NULL;

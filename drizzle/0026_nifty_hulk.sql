@@ -1,0 +1,1 @@
+ALTER TABLE "chat_conversations" ADD COLUMN "booking_form_started" boolean DEFAULT false NOT NULL;
