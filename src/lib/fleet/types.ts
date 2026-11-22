@@ -1,7 +1,15 @@
 import type { FleetSegment } from "./segments";
 import type { DriverClass } from "./driver-class";
 
-export type CarCategory = "suv" | "sedan" | "van";
+export type CarCategory =
+  | "mini"
+  | "economy"
+  | "compact"
+  | "intermediate"
+  | "estate"
+  | "convertible"
+  | "suv"
+  | "van";
 export type Gearbox = "automatic" | "manual";
 export type Fuel = "petrol" | "diesel" | "hybrid" | "electric";
 export type CarStatus = "available" | "rented" | "service" | "damaged";

@@ -173,7 +173,12 @@
     "category": {
       "label": "Typ",
       "suv": "SUV",
-      "sedan": "Limuzyna",
+      "mini": "Mini",
+      "economy": "Ekonomiczny",
+      "compact": "Kompakt",
+      "intermediate": "Średni",
+      "estate": "Kombi",
+      "convertible": "Kabriolet",
       "van": "Bus 9-osobowy"
     },
     "availabilityTitle": "Dostępność",
@@ -195,7 +200,12 @@
     "segmentEmpty": "Brak aut spełniających te kryteria. Zmień klasę lub daty — albo napisz do nas, czasem znajdziemy rozwiązanie.",
     "segment": {
       "suv": "SUV",
-      "sedan": "Sedan",
+      "mini": "Mini",
+      "economy": "Ekonomiczny",
+      "compact": "Kompakt",
+      "intermediate": "Średni",
+      "estate": "Kombi",
+      "convertible": "Kabriolet",
       "van": "Bus / Van",
       "business": "Business",
       "executive": "Executive",
@@ -738,7 +748,12 @@
         "business": "Business",
         "van": "Bus / Van",
         "suv": "SUV",
-        "sedan": "Sedan"
+        "mini": "Mini",
+        "economy": "Ekonomiczny",
+        "compact": "Kompakt",
+        "intermediate": "Średni",
+        "estate": "Kombi",
+        "convertible": "Kabriolet"
       },
       "sections": {
         "revenue": "Przychód",

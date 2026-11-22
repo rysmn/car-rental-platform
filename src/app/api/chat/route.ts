@@ -239,7 +239,7 @@ const slotsSchema = z.object({
    * forgotten. Closed enums rather than free strings, for the same reason as
    * `dateIntent` below — these choose which rows a query returns.
    */
-  bodyType: z.enum(["suv", "sedan", "van"]).nullable().default(null),
+  bodyType: z.enum(["mini", "economy", "compact", "intermediate", "estate", "convertible", "suv", "van"]).nullable().default(null),
   driverClass: z
     .enum(["standard", "premium", "van_bus"])
     .nullable()

@@ -172,8 +172,8 @@ export const LANDING_ROUTES: LandingRoute[] = [
     page: LIMOUSINE,
     label: { pl: "Wynajem limuzyn Warszawa", en: "Luxury sedans Warsaw" },
     // "Limuzyna" is the saloon body style on our own car pages — the same word
-    // the category filter uses — so the strip matches on category, not segment.
-    matchCar: (car) => car.category === "sedan",
+    // the category filter uses — so the strip matches on the luxury shelf.
+    matchCar: (car) => car.segments.includes("luxury"),
     areaServed: WARSAW_CITY,
     priority: 0.7,
     related: ["wedding", "premium", "warsaw", "suv"],

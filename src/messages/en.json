@@ -173,7 +173,12 @@
     "category": {
       "label": "Type",
       "suv": "SUV",
-      "sedan": "Sedan",
+      "mini": "Mini",
+      "economy": "Economy",
+      "compact": "Compact",
+      "intermediate": "Intermediate",
+      "estate": "Estate",
+      "convertible": "Convertible",
       "van": "9-seat van"
     },
     "availabilityTitle": "Availability",
@@ -195,7 +200,12 @@
     "segmentEmpty": "No cars match these filters. Try another class or different dates — or write to us, we can often work something out.",
     "segment": {
       "suv": "SUV",
-      "sedan": "Sedan",
+      "mini": "Mini",
+      "economy": "Economy",
+      "compact": "Compact",
+      "intermediate": "Intermediate",
+      "estate": "Estate",
+      "convertible": "Convertible",
       "van": "Van",
       "business": "Business",
       "executive": "Executive",
@@ -738,7 +748,12 @@
         "business": "Business",
         "van": "Van",
         "suv": "SUV",
-        "sedan": "Sedan"
+        "mini": "Mini",
+        "economy": "Economy",
+        "compact": "Compact",
+        "intermediate": "Intermediate",
+        "estate": "Estate",
+        "convertible": "Convertible"
       },
       "sections": {
         "revenue": "Revenue",

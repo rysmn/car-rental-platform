@@ -4,12 +4,12 @@ import type { Landing } from "./types";
  * "Wynajem limuzyn Warszawa" / "luxury sedan rental Warsaw".
  *
  * The Polish query is ambiguous in a way the English one is not: "limuzyna" is
- * both the body style (a saloon, which is what `category: "sedan"` means on our
- * car pages) and the colloquial name for a chauffeur-driven wedding car. The
+ * both the body style (a saloon) and the colloquial name for a chauffeur-driven
+ * wedding car. The
  * copy says plainly, high on the page, that these are self-drive rentals —
  * ranking for a service we do not offer wastes the click and the goodwill.
  *
- * The fleet strip is filtered to `category === "sedan"`: Panamera, 740d,
+ * The fleet strip is filtered to the `luxury` shelf: Panamera, 740d,
  * Model S.
  */
 export const LIMOUSINE: Landing = {
