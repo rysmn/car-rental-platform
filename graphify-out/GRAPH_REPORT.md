@@ -1,17 +1,17 @@
 # Graph Report - car-rental-platform  (2026-11-22)
 
 ## Corpus Check
-- 527 files · ~759,526 words
+- 527 files · ~759,574 words
 - Verdict: corpus is large enough that graph structure adds value.
 - Unclassified: 8 file(s) not represented in the graph (top: (none) 4, .ttf 2, .example 1)
 
 ## Summary
-- 3301 nodes · 10999 edges · 161 communities (131 shown, 30 thin omitted)
+- 3301 nodes · 11001 edges · 159 communities (129 shown, 30 thin omitted)
 - Extraction: 99% EXTRACTED · 1% INFERRED · 0% AMBIGUOUS · INFERRED: 98 edges (avg confidence: 0.85)
 - Token cost: 0 input · 0 output
 
 ## Graph Freshness
-- Built from commit: `fc815985`
+- Built from commit: `8a2f669a`
 - Run `git rev-parse HEAD` and compare to check if the graph is stale.
 - Run `graphify update .` after code changes (no API cost).
 
@@ -29,7 +29,6 @@
 - nlu.ts
 - reservations/actions.ts
 - documents/actions.ts
-- reservations/[id]/page.tsx
 - manage.ts
 - getDb
 - damages.ts
@@ -80,7 +79,6 @@
 - (app)/inbox/actions.ts
 - handover-actions.ts
 - DeterministicProvider
-- booking/availability.ts
 - CookieConsent.tsx
 - compilerOptions
 - Link
@@ -164,8 +162,8 @@
 6. `adminActionFailed()` - 97 edges
 7. `next` - 94 edges
 8. `requirePermission()` - 93 edges
-9. `react` - 88 edges
-10. `formatPln()` - 88 edges
+9. `formatPln()` - 88 edges
+10. `react` - 88 edges
 
 ## Surprising Connections (you probably didn't know these)
 - `Implemented (Phase 3 — booking)` --references--> `computeQuote()`  [INFERRED]
@@ -176,13 +174,13 @@
   SECURITY.md → src/lib/auth/guard.ts
 - `main()` --calls--> `hashPassword()`  [EXTRACTED]
   scripts/create-admin.ts → src/lib/auth/password-core.ts
-- `generateMetadata()` --calls--> `pageMetadata()`  [EXTRACTED]
-  src/app/[locale]/(public)/about/page.tsx → src/lib/seo.ts
+- `handleSubmit()` --indirect_call--> `locale()`  [INFERRED]
+  src/components/booking/BookingPanel.tsx → src/lib/chat/deterministic.ts
 
 ## Import Cycles
 - None detected.
 
-## Communities (161 total, 30 thin omitted)
+## Communities (159 total, 30 thin omitted)
 
 ### Community 0 - "deterministic.ts"
 Cohesion: 0.09
@@ -193,8 +191,8 @@ Cohesion: 0.02
 Nodes (132): Admin, AdminRecoveryCode, adminRecoveryCodes, adminRole, admins, aiUsageDaily, AiUsageRow, alertSeverity (+124 more)
 
 ### Community 2 - "landing/index.ts"
-Cohesion: 0.07
-Nodes (51): next, generateMetadata(), KEY, VanRentalWarsawPage(), BusinessCarRentalWarsawPage(), generateMetadata(), KEY, CarRentalGdanskPage() (+43 more)
+Cohesion: 0.06
+Nodes (57): generateMetadata(), KEY, VanRentalWarsawPage(), BusinessCarRentalWarsawPage(), generateMetadata(), KEY, ChopinAirportPage(), generateMetadata() (+49 more)
 
 ### Community 3 - "settings.ts"
 Cohesion: 0.05
@@ -205,8 +203,8 @@ Cohesion: 0.09
 Nodes (31): GET(), publicExtras(), computeQuote(), DailyRateRange, dailyRateRangeGrosze(), DAYS_PER_MONTH, feeAmount(), isPriceOnRequest() (+23 more)
 
 ### Community 5 - "next"
-Cohesion: 0.12
-Nodes (37): AboutPage(), generateMetadata(), generateMetadata(), ContactPage(), generateMetadata(), FaqPage(), generateMetadata(), HowItWorksPage() (+29 more)
+Cohesion: 0.09
+Nodes (49): next, AboutPage(), generateMetadata(), generateMetadata(), ContactPage(), FaqPage(), generateMetadata(), generateMetadata() (+41 more)
 
 ### Community 6 - "getDb"
 Cohesion: 0.11
@@ -221,24 +219,20 @@ Cohesion: 0.28
 Nodes (22): deleteHeroImage(), genericError(), HERO_TEXT_FIELD_NAMES, heroSlot(), heroVariant(), revalidatePublic(), revalidateSettings(), saveHeroSet() (+14 more)
 
 ### Community 9 - "form-guard.ts"
-Cohesion: 0.12
-Nodes (18): loginAction(), LoginState, LoginForm(), AdminLoginPage(), POTRZEBNY_KOD, ZLY_KOD, PolaOchronne, poleOchronne (+10 more)
+Cohesion: 0.11
+Nodes (20): loginAction(), LoginState, LoginForm(), AdminLoginPage(), POTRZEBNY_KOD, ZLY_KOD, clientIp(), HeaderReader (+12 more)
 
 ### Community 10 - "nlu.ts"
 Cohesion: 0.05
 Nodes (55): ABROAD_TOPIC, AIRPORT_WORDS, AWAITING_POLICY, BODY_WORDS, bodyTypeOf(), BUDGET_EN, BUDGET_HAVE_EN, BUDGET_HAVE_PL (+47 more)
 
 ### Community 11 - "reservations/actions.ts"
-Cohesion: 0.09
-Nodes (37): daneKlientaDoListu(), depositInput, DepositResult, godzinyDoOdbioruZapisu(), input, MoveResult, odometerInput, oznaczNieodebranie() (+29 more)
+Cohesion: 0.07
+Nodes (55): daneKlientaDoListu(), depositInput, DepositResult, godzinyDoOdbioruZapisu(), input, MoveResult, odometerInput, oznaczNieodebranie() (+47 more)
 
 ### Community 12 - "documents/actions.ts"
 Cohesion: 0.11
 Nodes (34): DokumentForm(), EdytujDokument(), dynamic, Page(), WersjaAkcje(), WierszWersji(), updateReservationStatus(), recordAudit() (+26 more)
-
-### Community 13 - "reservations/[id]/page.tsx"
-Cohesion: 0.19
-Nodes (18): CancellationFeePanel(), DokumentyPanel(), Panel(), PriceRow(), ReservationDetailPage(), Row(), MoveCar(), Unit (+10 more)
 
 ### Community 14 - "manage.ts"
 Cohesion: 0.13
@@ -249,8 +243,8 @@ Cohesion: 0.12
 Nodes (34): bodySchema, dynamic, FAILED, hits, POST(), przypomnijSobieZalewanie(), rateLimited(), slotsSchema (+26 more)
 
 ### Community 16 - "damages.ts"
-Cohesion: 0.09
-Nodes (40): formatDateTimeLocale(), formatIsoDate(), DamageForm(), DamageDetailPage(), Figure(), asStatus(), DamagesPage(), Td() (+32 more)
+Cohesion: 0.08
+Nodes (46): ContactForm(), FlagForm(), CustomerCardPage(), Figure(), showEmail(), formatDateTimeLocale(), formatIsoDate(), DamageForm() (+38 more)
 
 ### Community 17 - "economics.ts"
 Cohesion: 0.13
@@ -289,8 +283,8 @@ Cohesion: 0.12
 Nodes (36): Chip(), Filters(), RANGES, Bars(), ChatAnalyticsPage(), DemandTable(), Empty(), Step() (+28 more)
 
 ### Community 26 - "(public)/page.tsx"
-Cohesion: 0.13
-Nodes (28): HomePage(), MobileFold(), Parallax(), activeHeroImage(), AIRPORT, B2B, CHOOSE, FAQ (+20 more)
+Cohesion: 0.10
+Nodes (38): HomePage(), CarRates(), Rate(), MobileFold(), Cena(), PricingTable(), Parallax(), activeHeroImage() (+30 more)
 
 ### Community 27 - "rental-rules.ts"
 Cohesion: 0.09
@@ -318,7 +312,7 @@ Nodes (17): policzWBazie(), posprzataj(), skrotTresci(), sprawdzSesjeCzatu(), St
 
 ### Community 33 - "dashboard.ts"
 Cohesion: 0.13
-Nodes (28): AdminDashboard(), dayColumnClass(), FLEET_DOT, OperationCell(), timeCell(), TodayActions(), AttentionItem, AttentionKind (+20 more)
+Nodes (29): AdminDashboard(), dayColumnClass(), FLEET_DOT, OperationCell(), timeCell(), TodayActions(), AttentionItem, AttentionKind (+21 more)
 
 ### Community 34 - "pricing/actions.ts"
 Cohesion: 0.27
@@ -346,7 +340,7 @@ Nodes (23): Architecture, Car Rental Platform | Booking & Operations System, Cus
 
 ### Community 40 - "DepositPanel.tsx"
 Cohesion: 0.16
-Nodes (21): asStatus(), DepositsPage(), Td(), Th(), DepositPanel(), DEPOSIT_STATUS_HINT, DEPOSIT_STATUS_LABEL, DEPOSIT_STATUS_TONE (+13 more)
+Nodes (20): asStatus(), DepositsPage(), Td(), Th(), DepositPanel(), DEPOSIT_STATUS_HINT, DEPOSIT_STATUS_LABEL, DEPOSIT_STATUS_TONE (+12 more)
 
 ### Community 41 - "chatbot-ai.ts"
 Cohesion: 0.19
@@ -361,12 +355,12 @@ Cohesion: 0.14
 Nodes (25): InboxItem(), InboxView, InboxPage(), BY_PRIORITY, CURIOSITY_ONLY, REASON_LABEL, leadReason, LeadReason (+17 more)
 
 ### Community 44 - "MyReservations.tsx"
-Cohesion: 0.15
-Nodes (25): handleSubmit(), formatRange(), MyReservations(), MyReservationsLabels, RememberReference(), AKTYWNE_STATUSY, AktywneRezerwacje, useActiveReservations() (+17 more)
+Cohesion: 0.17
+Nodes (23): formatRange(), MyReservations(), MyReservationsLabels, RememberReference(), AKTYWNE_STATUSY, AktywneRezerwacje, useActiveReservations(), lookupReservations() (+15 more)
 
 ### Community 45 - "GoogleHomeBlock.tsx"
-Cohesion: 0.13
-Nodes (29): TrustStrip(), ReviewsLink(), GoogleHomeBlock(), googleButton, GoogleReviewBar(), Stars(), BaseProps, buttonBase (+21 more)
+Cohesion: 0.19
+Nodes (21): TrustStrip(), ReviewsLink(), GoogleHomeBlock(), GoogleReviewBar(), Stars(), ArrowRightIcon(), base(), cls() (+13 more)
 
 ### Community 46 - "rate.ts"
 Cohesion: 0.14
@@ -377,12 +371,12 @@ Cohesion: 0.09
 Nodes (22): dependencies, @aws-sdk/s3-request-presigner@^3.1175.0, drizzle-orm@^0.45.2, framer-motion@^12.42.2, lucide-react@^1.33.0, next@16.2.10, next-intl@^4.13.1, @node-rs/argon2@^2.0.2 (+14 more)
 
 ### Community 48 - "legal/page.tsx"
-Cohesion: 0.13
-Nodes (26): Doc, DOC_PATHS, LegalSettingsPage(), Loc, LOCALES, Tab(), generateMetadata(), generateMetadata() (+18 more)
+Cohesion: 0.15
+Nodes (22): Doc, DOC_PATHS, LegalSettingsPage(), Loc, LOCALES, Tab(), generateMetadata(), PrivacyPage() (+14 more)
 
 ### Community 49 - "BookingPanel.tsx"
-Cohesion: 0.24
-Nodes (15): BookingPanel(), Field(), Toggle(), BookingSummary(), AvailabilityCalendar(), HoneypotField(), getWybranyTermin(), getWybranyTerminNaSerwerze() (+7 more)
+Cohesion: 0.35
+Nodes (9): AvailabilityCalendar(), getWybranyTermin(), getWybranyTerminNaSerwerze(), listeners, PUSTY, subscribeWybranyTermin(), ustawWybranyTermin(), WybranyTermin (+1 more)
 
 ### Community 50 - "users/actions.ts"
 Cohesion: 0.15
@@ -393,8 +387,8 @@ Cohesion: 0.25
 Nodes (21): CarAnalyticsPage(), monthLabel(), Payback(), Stat(), WINDOWS, C, CostBreakdown(), DailyFlow() (+13 more)
 
 ### Community 52 - "customers/[id]/page.tsx"
-Cohesion: 0.16
-Nodes (20): ContactForm(), FlagForm(), CustomerCardPage(), Figure(), showEmail(), asStatus(), PageLink(), ReservationsPage() (+12 more)
+Cohesion: 0.17
+Nodes (18): asStatus(), PageLink(), ReservationsPage(), STATUSES, Td(), Th(), StatusBadge(), STYLES (+10 more)
 
 ### Community 53 - "alerts/repo.ts"
 Cohesion: 0.15
@@ -440,10 +434,6 @@ Nodes (11): zod, deleteHandover(), handoverInput, saveHandover(), getHandover(),
 Cohesion: 0.33
 Nodes (9): getContact(), DeterministicProvider, money(), t(), text(), Intent, Locale, ChatReply (+1 more)
 
-### Community 64 - "booking/availability.ts"
-Cohesion: 0.27
-Nodes (13): DayAvailability, FreeUnit, getFreeUnits(), getFreeUnitsByModel(), getModelDayAvailability(), rowsOf(), Alias, BUFOR (+5 more)
-
 ### Community 65 - "CookieConsent.tsx"
 Cohesion: 0.11
 Nodes (26): dynamic, PublicLayout(), GoogleAnalytics(), Choice, ConsentLabels, COOKIE_INIT_SCRIPT, COOKIE_OPEN_EVENT, CookieConsent() (+18 more)
@@ -465,16 +455,16 @@ Cohesion: 0.35
 Nodes (11): EMPTY, isSaved(), listeners, parse(), pruneSaved(), readSaved(), removeSaved(), subscribe() (+3 more)
 
 ### Community 70 - "xlsx.ts"
-Cohesion: 0.13
-Nodes (24): RFC-5987, dynamic, GET(), monthLabel(), monthsSheet(), stamp(), xlsxResponse(), totalsOf() (+16 more)
+Cohesion: 0.12
+Nodes (25): RFC-5987, dynamic, GET(), monthLabel(), monthsSheet(), stamp(), xlsxResponse(), totalsOf() (+17 more)
 
 ### Community 71 - "zasady/actions.ts"
 Cohesion: 0.36
 Nodes (12): checked(), genericError(), revalidateEverywhere(), saveDocumentRules(), saveDriverAgeRules(), saveDriverClasses(), stamp(), years() (+4 more)
 
 ### Community 72 - "proxy.ts"
-Cohesion: 0.16
-Nodes (17): clientIp(), clientIpOfRequest(), HeaderReader, DOZWOLONE_ROBOTY, NARZEDZIA, OcenaAgenta, ocenAgenta(), PROGI_SCRAPINGU (+9 more)
+Cohesion: 0.19
+Nodes (15): clientIpOfRequest(), DOZWOLONE_ROBOTY, NARZEDZIA, OcenaAgenta, ocenAgenta(), PROGI_SCRAPINGU, attempts, config (+7 more)
 
 ### Community 73 - ""public"."cars""
 Cohesion: 0.17
@@ -501,8 +491,8 @@ Cohesion: 0.15
 Nodes (12): BCP47, Locale, MESSAGES, Recognition, RecognitionCtor, recognitionCtor(), RecognitionErrorEvent, RecognitionResultEvent (+4 more)
 
 ### Community 79 - "landing/index.ts"
-Cohesion: 0.09
-Nodes (33): clamp(), dynamic, GET(), LANDING_KEYS, AIRPORT, BUSINESS, ELECTRIC, GDANSK (+25 more)
+Cohesion: 0.08
+Nodes (39): CarRentalGdanskPage(), generateMetadata(), KEY, clamp(), dynamic, GET(), LANDING_KEYS, AIRPORT (+31 more)
 
 ### Community 80 - "record.ts"
 Cohesion: 0.22
@@ -561,8 +551,8 @@ Cohesion: 0.23
 Nodes (7): createLocalStorage(), ROOT, createS3Storage(), S3Konfiguracja, s3KonfiguracjaZEnv(), PutObjectInput, StorageDriver
 
 ### Community 94 - "FormShield.tsx"
-Cohesion: 0.39
-Nodes (9): PartnerForm(), RequestForm(), OslonaPola, StanOslony, TurnstileInfo(), TurnstileWidget(), useFormShield(), Window (+1 more)
+Cohesion: 0.22
+Nodes (17): BookingPanel(), handleSubmit(), Field(), Toggle(), BookingSummary(), PartnerForm(), RequestForm(), HoneypotField() (+9 more)
 
 ### Community 95 - "hours.ts"
 Cohesion: 0.14
@@ -586,7 +576,7 @@ Nodes (8): AuditPage(), AuditRow(), JsonBlock(), AUDIT_CATEGORIES, AuditCategory
 
 ### Community 100 - "booking/actions.ts"
 Cohesion: 0.13
-Nodes (24): DriverLimits, createReservation(), ReserveResult, checkDriverEligibility(), completedYears(), EligibilityIssue, parseIsoDate(), chwilaWarszawska() (+16 more)
+Nodes (24): DriverLimits, createReservation(), ReserveResult, okresPytania(), checkDriverEligibility(), completedYears(), EligibilityIssue, parseIsoDate() (+16 more)
 
 ### Community 101 - "DriverAgeForm.tsx"
 Cohesion: 0.39
@@ -626,11 +616,11 @@ Nodes (12): csp, gaConfigured, nextConfig, securityHeaders, withNextIntl, next-i
 
 ### Community 110 - "[slug]/page.tsx"
 Cohesion: 0.12
-Nodes (30): CarDetailPage(), dynamic, FLEET_HREF(), generateMetadata(), validDate(), dynamic, sitemap(), MobileBookingBar() (+22 more)
+Nodes (26): CarDetailPage(), dynamic, FLEET_HREF(), generateMetadata(), validDate(), dynamic, sitemap(), MobileBookingBar() (+18 more)
 
 ### Community 111 - "format.ts"
-Cohesion: 0.13
-Nodes (23): DateRangeForm(), ComparePage(), one(), Money(), MoneyRange(), CarRates(), Rate(), Cena() (+15 more)
+Cohesion: 0.24
+Nodes (12): DateRangeForm(), ComparePage(), one(), Money(), MoneyRange(), CompareCar, ComparePricing, compareRange() (+4 more)
 
 ### Community 112 - "0000_narrow_riptide.sql"
 Cohesion: 0.50
@@ -661,8 +651,8 @@ Cohesion: 0.16
 Nodes (20): ContactResult, createCustomer(), customerInputSchema(), CustomerResult, flagInput, setCustomerFlag(), Tr, updateCustomerContact() (+12 more)
 
 ### Community 149 - "booking/repo.ts"
-Cohesion: 0.16
-Nodes (14): EXCLUSION_VIOLATION, getDashboardStats(), ReservationFilters, FEE_DEFAULTS, LOCATION_DEFAULTS, LocationOption, PublicExtra, BookingExtras (+6 more)
+Cohesion: 0.24
+Nodes (10): FEE_DEFAULTS, LOCATION_DEFAULTS, LocationOption, PublicExtra, BookingExtras, DepositVariant, Fee, FeeCatalog (+2 more)
 
 ### Community 150 - "getStorage"
 Cohesion: 0.20
@@ -673,8 +663,8 @@ Cohesion: 0.16
 Nodes (17): BRANDS, Demand, DEMAND_SEGMENTS, DemandKind, detectDemand(), findBrand(), FUEL_LABEL, GEARBOX_WORDS (+9 more)
 
 ### Community 152 - "faq-live.ts"
-Cohesion: 0.18
-Nodes (15): OpeningHours, PhoneHours, Locale, ServiceHoursCopy, ServiceHoursInput, t(), dedupe(), FaqItem (+7 more)
+Cohesion: 0.16
+Nodes (20): generateMetadata(), generateMetadata(), getSetting(), getServiceHours(), OpeningHours, PhoneHours, Locale, serviceHours() (+12 more)
 
 ### Community 153 - ".mileage"
 Cohesion: 0.23
@@ -709,24 +699,24 @@ Cohesion: 0.50
 Nodes (4): FleetPage(), listFleet(), Category, CATEGORY_LABEL
 
 ## Knowledge Gaps
-- **4 isolated node(s):** `RFC-5987`, `RFC-6238`, `RFC-4226`, `{ GET, POST }`
+- **4 isolated node(s):** `{ GET, POST }`, `RFC-4226`, `RFC-6238`, `RFC-5987`
   These have ≤1 connection - possible missing edges or undocumented components. (Counts symbols only; 878 node(s) total have ≤1 connection when file, concept and rationale nodes are included.)
 - **30 thin communities (<3 nodes) omitted from report** — run `graphify query` to explore isolated nodes.
 
 ## Suggested Questions
 _Questions this graph is uniquely positioned to answer:_
 
-- **Why does `getDb()` connect `getDb` to `landing/index.ts`, `settings.ts`, `chat/data.ts`, `next`, `insights.ts`, `settings/actions.ts`, `reservations/actions.ts`, `documents/actions.ts`, `reservations/[id]/page.tsx`, `manage.ts`, `getDb`, `damages.ts`, `analytics/page.tsx`, `finanse/actions.ts`, `economics.ts`, `requirePermission`, `two-factor-actions.ts`, `fleet/ExpenseManager.tsx`, `finanse/page.tsx`, `booking/repo.ts`, `analityka/page.tsx`, `BlockManager.tsx`, `email/notify.ts`, `chatbot/actions.ts`, `db/index.ts`, `guard.ts`, `ModelForm.tsx`, `bezpieczenstwo/page.tsx`, `dashboard.ts`, `(app)/fleet/page.tsx`, `pricing/actions.ts`, `events.ts`, `critical.ts`, `lib/inbox/actions.ts`, `DepositPanel.tsx`, `chatbot-ai.ts`, `Bilingual`, `MyReservations.tsx`, `users/actions.ts`, `customers/[id]/page.tsx`, `alerts/repo.ts`, `guardPage`, `UsersManager.tsx`, `(app)/inbox/actions.ts`, `handover-actions.ts`, `booking/availability.ts`, `zasady/actions.ts`, `(app)/chatbot/page.tsx`, `pytania/page.tsx`, `szkody/actions.ts`, `record.ts`, `DeadlineManager.tsx`, `adminActionFailed`, `alerts/health.ts`, `audit/page.tsx`, `booking/actions.ts`, `i18n-pick.ts`, `[slug]/page.tsx`, `getStorage`, `faq-live.ts`?**
-  _High betweenness centrality (0.138) - this node is a cross-community bridge._
-- **What connects `RFC-5987`, `RFC-6238`, `RFC-4226` to the rest of the system?**
+- **Why does `next-intl` connect `next-intl` to `.mileage`, `landing/index.ts`, `(public)/page.tsx`, `next`, `getDb`, `insights.ts`, `settings/actions.ts`, `form-guard.ts`, `reservations/actions.ts`, `documents/actions.ts`, `manage.ts`, `damages.ts`, `analytics/page.tsx`, `economics.ts`, `finanse/actions.ts`, `two-factor-actions.ts`, `requirePermission`, `fleet/ExpenseManager.tsx`, `finanse/page.tsx`, `NewReservationForm.tsx`, `analityka/page.tsx`, `BlockManager.tsx`, `package.json`, `chatbot/actions.ts`, `getStorage`, `db/index.ts`, `ModelForm.tsx`, `(app)/fleet/page.tsx`, `dashboard.ts`, `pricing/actions.ts`, `bezpieczenstwo/page.tsx`, `ChatbotForm.tsx`, `critical.ts`, `status.ts`, `DepositPanel.tsx`, `Bilingual`, `dependencies`, `legal/page.tsx`, `BookingPanel.tsx`, `users/actions.ts`, `[carId]/page.tsx`, `customers/[id]/page.tsx`, `alerts/repo.ts`, `driver-class.ts`, `guardPage`, `UsersManager.tsx`, `react`, `(app)/inbox/actions.ts`, `handover-actions.ts`, `CookieConsent.tsx`, `Link`, `zasady/actions.ts`, `proxy.ts`, `(app)/chatbot/page.tsx`, `pytania/page.tsx`, `szkody/actions.ts`, `landing/index.ts`, `DeadlineManager.tsx`, `zasady/page.tsx`, `adminActionFailed`, `FormShield.tsx`, `LegalEditor.tsx`, `audit/page.tsx`, `DriverAgeForm.tsx`, `SettingsForms.tsx`, `next-intl`, `i18n-pick.ts`, `[slug]/page.tsx`, `format.ts`?**
+  _High betweenness centrality (0.140) - this node is a cross-community bridge._
+- **What connects `{ GET, POST }`, `RFC-4226`, `RFC-6238` to the rest of the system?**
   _4 weakly-connected nodes found - possible documentation gaps or missing edges._
 - **Should `deterministic.ts` be split into smaller, more focused modules?**
   _Cohesion score 0.08637873754152824 - nodes in this community are weakly interconnected._
-- **Why does `next-intl` connect `next-intl` to `.mileage`, `landing/index.ts`, `(public)/page.tsx`, `next`, `getDb`, `insights.ts`, `settings/actions.ts`, `form-guard.ts`, `reservations/actions.ts`, `documents/actions.ts`, `reservations/[id]/page.tsx`, `manage.ts`, `damages.ts`, `analytics/page.tsx`, `economics.ts`, `finanse/actions.ts`, `two-factor-actions.ts`, `requirePermission`, `fleet/ExpenseManager.tsx`, `finanse/page.tsx`, `NewReservationForm.tsx`, `analityka/page.tsx`, `BlockManager.tsx`, `package.json`, `chatbot/actions.ts`, `getStorage`, `db/index.ts`, `ModelForm.tsx`, `(app)/fleet/page.tsx`, `dashboard.ts`, `pricing/actions.ts`, `bezpieczenstwo/page.tsx`, `ChatbotForm.tsx`, `critical.ts`, `status.ts`, `DepositPanel.tsx`, `Bilingual`, `dependencies`, `legal/page.tsx`, `BookingPanel.tsx`, `users/actions.ts`, `[carId]/page.tsx`, `customers/[id]/page.tsx`, `alerts/repo.ts`, `driver-class.ts`, `guardPage`, `UsersManager.tsx`, `react`, `(app)/inbox/actions.ts`, `handover-actions.ts`, `CookieConsent.tsx`, `Link`, `zasady/actions.ts`, `proxy.ts`, `(app)/chatbot/page.tsx`, `pytania/page.tsx`, `szkody/actions.ts`, `DeadlineManager.tsx`, `zasady/page.tsx`, `adminActionFailed`, `FormShield.tsx`, `LegalEditor.tsx`, `audit/page.tsx`, `DriverAgeForm.tsx`, `SettingsForms.tsx`, `next-intl`, `i18n-pick.ts`, `[slug]/page.tsx`, `format.ts`?**
-  _High betweenness centrality (0.121) - this node is a cross-community bridge._
+- **Why does `getDb()` connect `getDb` to `landing/index.ts`, `settings.ts`, `chat/data.ts`, `insights.ts`, `settings/actions.ts`, `reservations/actions.ts`, `documents/actions.ts`, `manage.ts`, `getDb`, `damages.ts`, `analytics/page.tsx`, `finanse/actions.ts`, `economics.ts`, `requirePermission`, `two-factor-actions.ts`, `fleet/ExpenseManager.tsx`, `finanse/page.tsx`, `faq-live.ts`, `analityka/page.tsx`, `BlockManager.tsx`, `booking/repo.ts`, `chatbot/actions.ts`, `db/index.ts`, `guard.ts`, `ModelForm.tsx`, `bezpieczenstwo/page.tsx`, `dashboard.ts`, `(app)/fleet/page.tsx`, `pricing/actions.ts`, `events.ts`, `critical.ts`, `lib/inbox/actions.ts`, `DepositPanel.tsx`, `chatbot-ai.ts`, `Bilingual`, `MyReservations.tsx`, `users/actions.ts`, `customers/[id]/page.tsx`, `alerts/repo.ts`, `guardPage`, `UsersManager.tsx`, `(app)/inbox/actions.ts`, `handover-actions.ts`, `zasady/actions.ts`, `(app)/chatbot/page.tsx`, `pytania/page.tsx`, `szkody/actions.ts`, `record.ts`, `DeadlineManager.tsx`, `adminActionFailed`, `alerts/health.ts`, `email/notify.ts`, `audit/page.tsx`, `booking/actions.ts`, `i18n-pick.ts`, `[slug]/page.tsx`, `getStorage`?**
+  _High betweenness centrality (0.112) - this node is a cross-community bridge._
 - **Should `db/schema.ts` be split into smaller, more focused modules?**
   _Cohesion score 0.015037593984962405 - nodes in this community are weakly interconnected._
-- **Why does `next` connect `landing/index.ts` to `next`, `getDb`, `settings/actions.ts`, `form-guard.ts`, `reservations/actions.ts`, `documents/actions.ts`, `reservations/[id]/page.tsx`, `getDb`, `damages.ts`, `economics.ts`, `finanse/actions.ts`, `two-factor-actions.ts`, `requirePermission`, `next-intl`, `NewReservationForm.tsx`, `BlockManager.tsx`, `package.json`, `chatbot/actions.ts`, `db/index.ts`, `guard.ts`, `ModelForm.tsx`, `(public)/page.tsx`, `dashboard.ts`, `lib/inbox/actions.ts`, `critical.ts`, `dependencies`, `legal/page.tsx`, `users/actions.ts`, `[carId]/page.tsx`, `customers/[id]/page.tsx`, `guardPage`, `UsersManager.tsx`, `react`, `(app)/inbox/actions.ts`, `handover-actions.ts`, `CookieConsent.tsx`, `Link`, `ChatWidget.tsx`, `xlsx.ts`, `zasady/actions.ts`, `proxy.ts`, `szkody/actions.ts`, `landing/index.ts`, `record.ts`, `media.ts`, `adminActionFailed`, `invoice/[...path]/route.ts`, `booking/actions.ts`, `next-intl`, `[slug]/page.tsx`?**
-  _High betweenness centrality (0.065) - this node is a cross-community bridge._
+- **Why does `next` connect `next` to `landing/index.ts`, `getDb`, `settings/actions.ts`, `form-guard.ts`, `reservations/actions.ts`, `documents/actions.ts`, `getDb`, `damages.ts`, `economics.ts`, `finanse/actions.ts`, `two-factor-actions.ts`, `requirePermission`, `next-intl`, `NewReservationForm.tsx`, `BlockManager.tsx`, `package.json`, `chatbot/actions.ts`, `db/index.ts`, `guard.ts`, `ModelForm.tsx`, `(public)/page.tsx`, `dashboard.ts`, `lib/inbox/actions.ts`, `critical.ts`, `dependencies`, `legal/page.tsx`, `users/actions.ts`, `[carId]/page.tsx`, `customers/[id]/page.tsx`, `guardPage`, `UsersManager.tsx`, `react`, `(app)/inbox/actions.ts`, `handover-actions.ts`, `CookieConsent.tsx`, `Link`, `ChatWidget.tsx`, `xlsx.ts`, `zasady/actions.ts`, `proxy.ts`, `szkody/actions.ts`, `landing/index.ts`, `record.ts`, `media.ts`, `adminActionFailed`, `invoice/[...path]/route.ts`, `booking/actions.ts`, `next-intl`, `[slug]/page.tsx`?**
+  _High betweenness centrality (0.072) - this node is a cross-community bridge._
 - **Should `landing/index.ts` be split into smaller, more focused modules?**
-  _Cohesion score 0.06804214223002635 - nodes in this community are weakly interconnected._
+  _Cohesion score 0.0624048706240487 - nodes in this community are weakly interconnected._
