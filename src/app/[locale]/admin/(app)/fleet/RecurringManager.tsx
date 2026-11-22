@@ -11,6 +11,7 @@ import {
 } from "@/lib/admin/recurring-options";
 import { EXPENSE_GROUPS, EXPENSE_LABEL } from "@/lib/admin/expense-options";
 import { formatPln } from "@/lib/format";
+import { SHOP_CURRENCY } from "@/lib/currency/shop";
 
 const inputCls =
   "h-10 w-full border border-line-strong bg-surface-1 px-3 text-sm text-ink placeholder:text-ink-faint";
@@ -24,9 +25,9 @@ function todayValue(): string {
 /** Symbol waluty w bieżącym locale (pl: „zł”, en: „PLN”). */
 function currencySymbol(locale: string) {
   return (
-    new Intl.NumberFormat(locale, { style: "currency", currency: "PLN" })
+    new Intl.NumberFormat(locale, { style: "currency", currency: SHOP_CURRENCY })
       .formatToParts(0)
-      .find((p) => p.type === "currency")?.value ?? "PLN"
+      .find((p) => p.type === "currency")?.value ?? SHOP_CURRENCY
   );
 }
 

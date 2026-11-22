@@ -20,6 +20,7 @@ import {
   DRIVER_CLASSES,
   DRIVER_CLASS_LABEL,
 } from "@/lib/fleet/driver-class";
+import { SHOP_CURRENCY } from "@/lib/currency/shop";
 
 type Action = (
   prev: FormResult | null,
@@ -43,9 +44,9 @@ function pln(grosze: number): string {
 /** Symbol waluty w bieżącym locale (pl: „zł”, en: „PLN”). */
 function currencySymbol(locale: string) {
   return (
-    new Intl.NumberFormat(locale, { style: "currency", currency: "PLN" })
+    new Intl.NumberFormat(locale, { style: "currency", currency: SHOP_CURRENCY })
       .formatToParts(0)
-      .find((p) => p.type === "currency")?.value ?? "PLN"
+      .find((p) => p.type === "currency")?.value ?? SHOP_CURRENCY
   );
 }
 
