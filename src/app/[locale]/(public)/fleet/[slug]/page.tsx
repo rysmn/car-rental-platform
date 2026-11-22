@@ -40,6 +40,7 @@ import { getVisiblePublicModelStates } from "@/lib/fleet/status-repo";
 import { Money, MoneyRange } from "@/components/currency/Money";
 import { priceOnRequestLabel } from "@/lib/format";
 import { siteConfig } from "@/lib/config/site";
+import { SHOP_CURRENCY } from "@/lib/currency/shop";
 import { getSetting } from "@/lib/admin/settings";
 
 /**
@@ -324,7 +325,7 @@ export default async function CarDetailPage({
      */
     offers: {
       "@type": "Offer",
-      priceCurrency: "PLN",
+      priceCurrency: SHOP_CURRENCY,
       /*
         Kto wynajmuje. Wskazanie przez `@id` na węzeł `AutoRental` ze strony
         głównej — nazwa i adres jadą obok, bo ten węzeł nie stoi na TEJ
@@ -371,7 +372,7 @@ export default async function CarDetailPage({
             price: (fromDailyGrosze / 100).toFixed(2),
             priceSpecification: {
               "@type": "UnitPriceSpecification",
-              priceCurrency: "PLN",
+              priceCurrency: SHOP_CURRENCY,
               price: (fromDailyGrosze / 100).toFixed(2),
               unitCode: "DAY",
               /*
