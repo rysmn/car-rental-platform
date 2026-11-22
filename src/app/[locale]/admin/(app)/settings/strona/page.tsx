@@ -1,6 +1,7 @@
-import { setRequestLocale } from "next-intl/server";
+import { setRequestLocale, getTranslations } from "next-intl/server";
 import { Link } from "@/i18n/navigation";
 import { getSetting, HERO_FALLBACK_IMAGE } from "@/lib/admin/settings";
+import { PublicStatusToggle } from "./PublicStatusToggle";
 import {
   SocialLinksForm,
   PageVisibilityForm,
@@ -34,13 +35,17 @@ export default async function SettingsPage({
 }) {
   const { locale } = await params;
   setRequestLocale(locale);
+  const t = await getTranslations("Admin.settings.site");
+  const tc = await getTranslations("Admin.settings.common");
+  const tp = await getTranslations("Admin.publicStatus");
 
-  const [social, hero, pages, company, heroText] = await Promise.all([
+  const [social, hero, pages, company, heroText, publicStatus] = await Promise.all([
     getSetting("social"),
     getSetting("hero"),
     getSetting("pages"),
     getSetting("company"),
     getSetting("heroText"),
+    getSetting("publicStatus"),
   ]);
 
   return (
@@ -49,36 +54,28 @@ export default async function SettingsPage({
         href="/admin/settings"
         className="label-tight text-ink-faint hover:text-ink -my-2 inline-flex min-h-11 items-center text-[10px]"
       >
-        ← Ustawienia
+        {tc("back")}
       </Link>
       <header className="mt-4 mb-8">
         <h1 className="font-heading text-ink text-2xl font-bold">
-          Strona publiczna
+          {t("title")}
         </h1>
-        <p className="text-silver mt-1 text-sm">
-          Treści i elementy strony publicznej. Zmiany są widoczne od razu po
-          zapisaniu.
-        </p>
+        <p className="text-silver mt-1 text-sm">{t("subtitle")}</p>
       </header>
 
-      <Section
-        title="Dane firmy i kontakt"
-        subtitle="Telefony, e-mail, adres, NIP/REGON/KRS i godziny pracy — widoczne w stopce, na stronie kontaktowej i w danych strukturalnych (SEO)"
-      >
+      <Section title={tp("title")} subtitle={tp("note")}>
+        <PublicStatusToggle enabled={publicStatus.enabled} />
+      </Section>
+
+      <Section title={t("company.title")} subtitle={t("company.subtitle")}>
         <CompanyInfoForm initial={company} />
       </Section>
 
-      <Section
-        title="Treść sekcji hero (strona główna)"
-        subtitle="Nagłówek, podtytuł, przyciski i cechy pod nagłówkiem — osobno dla polskiej i angielskiej wersji"
-      >
+      <Section title={t("heroText.title")} subtitle={t("heroText.subtitle")}>
         <HeroTextForm initial={heroText} />
       </Section>
 
-      <Section
-        title="Zdjęcia tła (hero) — motyw ciemny"
-        subtitle="Do trzech zdjęć na stronie startowej dla ciemnego motywu. Na stronie widać jedno — to oznaczone jako aktywne."
-      >
+      <Section title={t("heroDark.title")} subtitle={t("heroDark.subtitle")}>
         <HeroImageForm
           variant="dark"
           set={hero.dark}
@@ -86,10 +83,7 @@ export default async function SettingsPage({
         />
       </Section>
 
-      <Section
-        title="Zdjęcia tła (hero) — motyw jasny"
-        subtitle="Osobne zdjęcia dla jasnego motywu. Bez zdjęcia sekcja startowa ma jednolite jasne tło."
-      >
+      <Section title={t("heroLight.title")} subtitle={t("heroLight.subtitle")}>
         <HeroImageForm variant="light" set={hero.light} fallbackImage={null} />
       </Section>
 
@@ -101,48 +95,31 @@ export default async function SettingsPage({
         Odnośnik zostaje, bo przez jakiś czas właściciel będzie ich szukał tam,
         gdzie były.
       */}
-      <Section
-        title="GOOGLE"
-        subtitle="Wizytówka, opinie, mapa i współrzędne — mają teraz własny ekran"
-      >
-        <p className="text-silver text-sm">
-          Link do wizytówki, link do opinii, link do Map, Place ID i współrzędne
-          wraz z przełącznikami tego, co widać na stronie kontaktowej.
-        </p>
+      <Section title={t("google.title")} subtitle={t("google.subtitle")}>
+        <p className="text-silver text-sm">{t("google.body")}</p>
         <Link
           href="/admin/settings/google"
           className="label border-line-strong text-ink hover:border-ink hover:bg-ink/5 tap mt-5 inline-flex h-10 items-center border px-5 text-xs transition-colors"
         >
-          Otwórz GOOGLE →
+          {t("google.open")}
         </Link>
       </Section>
 
-      <Section
-        title="Media społecznościowe"
-        subtitle="Ikony w górnym pasku strony"
-      >
+      <Section title={t("social.title")} subtitle={t("social.subtitle")}>
         <SocialLinksForm initial={social} />
       </Section>
 
-      <Section
-        title="Widoczność stron"
-        subtitle="Wyłącz strony, których nie chcesz publikować"
-      >
+      <Section title={t("pages.title")} subtitle={t("pages.subtitle")}>
         <PageVisibilityForm initial={pages} />
       </Section>
 
-      <Section
-        title="Dokumenty prawne"
-        subtitle="Regulamin i polityka prywatności"
-      >
-        <p className="text-silver text-sm">
-          Edycja treści regulaminu i polityki prywatności w obu językach.
-        </p>
+      <Section title={t("legal.title")} subtitle={t("legal.subtitle")}>
+        <p className="text-silver text-sm">{t("legal.body")}</p>
         <Link
           href="/admin/settings/legal"
           className="label border-line-strong text-ink hover:border-ink hover:bg-ink/5 tap mt-5 inline-flex h-10 items-center border px-5 text-xs transition-colors"
         >
-          Edytuj dokumenty →
+          {t("legal.edit")}
         </Link>
       </Section>
     </div>

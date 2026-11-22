@@ -1,4 +1,5 @@
-import { setRequestLocale } from "next-intl/server";
+import { useLocale, useTranslations } from "next-intl";
+import { getTranslations, setRequestLocale } from "next-intl/server";
 import { guardPage } from "@/lib/auth/guard";
 import { Link } from "@/i18n/navigation";
 import {
@@ -15,8 +16,13 @@ import {
 } from "@/lib/admin/economics";
 import { getBookingAnalytics, statusLabel } from "@/lib/admin/bookings";
 import { DocumentAlerts } from "@/components/admin/DocumentAlerts";
-import { SalesTrend, formatPct } from "@/components/admin/economics-charts";
-import { formatPln, formatPlnPrecise, pluralPl } from "@/lib/format";
+import {
+  SalesTrend,
+  formatDay,
+  formatPct,
+  intlLocale,
+} from "@/components/admin/economics-charts";
+import { formatPln, formatPlnPrecise } from "@/lib/format";
 import {
   resolveWindow,
   previousWindow,
@@ -34,22 +40,20 @@ import { InsightSections } from "./InsightSections";
 import { getDb, schema } from "@/lib/db";
 import { asc, eq } from "drizzle-orm";
 import { FLEET_SEGMENTS } from "@/lib/fleet/segments";
+import { pick } from "@/lib/i18n-pick";
 
-/**
- * Segment names for the filter. The public site reads these from the message
- * catalogue per locale; the panel is Polish-only, so they live here rather
- * than dragging the whole i18n runtime into an admin page.
- */
-const SEGMENT_LABEL: Record<string, string> = {
-  luxury: "Luxury",
-  executive: "Executive",
-  "premium-suv": "Premium SUV",
-  electric: "Elektryczne",
-  business: "Business",
-  van: "Bus / Van",
-};
+/** Segments that have a translated label under `segments.*`. */
+const TRANSLATED_SEGMENTS = new Set<string>(FLEET_SEGMENTS);
 
-export const metadata = { title: "Analityka" };
+export async function generateMetadata({
+  params,
+}: {
+  params: Promise<{ locale: string }>;
+}) {
+  const { locale } = await params;
+  const t = await getTranslations({ locale, namespace: "Admin.analytics" });
+  return { title: t("metaTitle") };
+}
 
 /**
  * Stated on the page so nobody has to read the deployment config to find out
@@ -97,19 +101,14 @@ function RecoveryBar({ value }: { value: number }) {
   );
 }
 
-/** "2026-08" → "sierpień 2026". */
-function monthLabel(month: string): string {
+/** "2026-08" → "August 2026" / "sierpień 2026". */
+function monthLabel(month: string, locale: string): string {
   const [y, m] = month.split("-").map(Number);
-  return new Intl.DateTimeFormat("pl-PL", {
+  return new Intl.DateTimeFormat(intlLocale(locale), {
     month: "long",
     year: "numeric",
+    timeZone: "UTC",
   }).format(new Date(Date.UTC(y, m - 1, 1)));
-}
-
-/** Polish short date; the panel is Polish-only. */
-function formatPl(iso: string): string {
-  const [y, m, d] = iso.split("-");
-  return `${d}.${m}.${y}`;
 }
 
 /**
@@ -124,18 +123,21 @@ function DocumentCell({
   daysLeft,
   // A missing inspection date is a gap in the paperwork; a missing service
   // date only means none is booked yet. Same cell, different sentence.
-  missingLabel = "Brak daty",
+  missing = "noDate",
 }: {
   date: string | null;
   daysLeft: number | null;
-  missingLabel?: string;
+  missing?: "noDate" | "notScheduled";
 }) {
+  const t = useTranslations("Admin.analytics");
+  const locale = useLocale();
+
   if (!date || daysLeft === null) {
     return (
       <span className="text-ink-faint text-xs">
-        {missingLabel}
+        {t(`documents.${missing}`)}
         <span className="border-line text-ink-faint ml-2 border px-1.5 py-0.5 text-[10px]">
-          uzupełnij
+          {t("documents.fillIn")}
         </span>
       </span>
     );
@@ -150,13 +152,15 @@ function DocumentCell({
 
   return (
     <span className="flex items-center gap-2 whitespace-nowrap">
-      <span className="text-silver tabular-nums">{formatPl(date)}</span>
+      <span className="text-silver tabular-nums">{formatDay(date, locale)}</span>
       <span className={`label-tight px-1.5 py-0.5 text-[10px] ${tone}`}>
         {daysLeft < 0
-          ? `po terminie ${Math.abs(daysLeft)} dni`
+          ? t("documents.overdue", {
+              duration: t("units.days", { count: Math.abs(daysLeft) }),
+            })
           : daysLeft === 0
-            ? "wygasa dziś"
-            : `${daysLeft} dni`}
+            ? t("documents.expiresToday")
+            : t("units.days", { count: daysLeft })}
       </span>
     </span>
   );
@@ -179,6 +183,7 @@ export default async function AnalyticsPage({
 
   const { locale } = await params;
   setRequestLocale(locale);
+  const t = await getTranslations("Admin.analytics");
 
   // Filters live in the URL, so a filtered view is a link somebody can send.
   const q = await searchParams;
@@ -261,36 +266,43 @@ export default async function AnalyticsPage({
   // twelve months.
   const monthByKey = new Map(months.map((m) => [m.month, m]));
 
+  const money = (grosze: number) => formatPln(grosze, locale);
+
   const cards = [
     {
-      label: "Przychód (całość)",
-      value: formatPln(totals.revenueGrosze, "pl"),
-      hint: `${analytics.totals.rentals} ${pluralPl(analytics.totals.rentals, "wynajem", "wynajmy", "wynajmów")}`,
+      label: t("cards.revenueTotal"),
+      value: money(totals.revenueGrosze),
+      hint: t("units.rentals", { count: analytics.totals.rentals }),
     },
     {
-      label: "Wydatki (całość)",
-      value: formatPln(totals.expensesGrosze, "pl"),
-      hint: "serwis, koszty stałe, eksploatacja",
+      label: t("cards.expensesTotal"),
+      value: money(totals.expensesGrosze),
+      hint: t("cards.expensesHint"),
     },
     {
-      label: "Marża",
-      value: formatPln(totals.marginGrosze, "pl"),
+      label: t("cards.margin"),
+      value: money(totals.marginGrosze),
       hint:
         totals.marginPct == null
-          ? "brak przychodu"
-          : `${Math.round(totals.marginPct * 100)}% przychodu`,
+          ? t("cards.noRevenue")
+          : t("cards.marginOfRevenue", {
+              percent: Math.round(totals.marginPct * 100),
+            }),
       tone: totals.marginGrosze >= 0 ? "good" : "bad",
     },
     {
-      label: "Zwrot z floty",
+      label: t("cards.fleetRecovery"),
       value:
         totals.recoveredPct == null
           ? "—"
           : `${Math.round(totals.recoveredPct * 100)}%`,
       hint:
         totals.investedGrosze === 0
-          ? "brak wpisanych cen zakupu"
-          : `${formatPln(totals.recoveredGrosze, "pl")} z ${formatPln(totals.investedGrosze, "pl")}`,
+          ? t("cards.noPurchasePrices")
+          : t("cards.recoveredOf", {
+              recovered: money(totals.recoveredGrosze),
+              invested: money(totals.investedGrosze),
+            }),
     },
   ] satisfies {
     label: string;
@@ -301,13 +313,8 @@ export default async function AnalyticsPage({
 
   return (
     <div>
-      <h1 className="font-heading text-3xl font-bold">Analityka</h1>
-      <p className="text-ink-muted mt-2 text-sm">
-        Przychód liczony z rezerwacji potwierdzonych i zakończonych — oczekujące
-        nie są jeszcze wynajmem. Wydatki pochodzą z kosztów wpisanych przy
-        egzemplarzach. Cena zakupu nie jest kosztem: jest celem, do którego
-        marża ma dojść.
-      </p>
+      <h1 className="font-heading text-3xl font-bold">{t("title")}</h1>
+      <p className="text-ink-muted mt-2 text-sm">{t("intro")}</p>
 
       <InsightFilters
         period={period}
@@ -322,7 +329,9 @@ export default async function AnalyticsPage({
         }))}
         segments={FLEET_SEGMENTS.map((key) => ({
           key,
-          label: SEGMENT_LABEL[key] ?? key,
+          label: TRANSLATED_SEGMENTS.has(key)
+            ? t(`segments.${key}`)
+            : key,
         }))}
         locations={locationOptions}
       />
@@ -344,7 +353,7 @@ export default async function AnalyticsPage({
           href="/admin/analytics/raport"
           className="label border-line-strong text-ink hover:border-ink hover:bg-ink/5 tap inline-flex h-9 items-center border px-4 text-xs transition-colors"
         >
-          Raport do druku / PDF
+          {t("actions.report")}
         </Link>
         {/* A plain anchor: this is a file download from a route handler, and
             the client router would try to navigate to it instead. */}
@@ -354,7 +363,7 @@ export default async function AnalyticsPage({
           href="/api/admin/report"
           className="label border-line-strong text-ink hover:border-ink hover:bg-ink/5 tap inline-flex h-9 items-center border px-4 text-xs transition-colors"
         >
-          Pobierz Excel (.xlsx)
+          {t("actions.excel")}
         </a>
       </div>
 
@@ -380,19 +389,23 @@ export default async function AnalyticsPage({
 
       <div className="border-line bg-line mt-px grid gap-px border sm:grid-cols-2 lg:grid-cols-4">
         <div className="bg-void p-6">
-          <p className="label-tight text-ink-faint text-[10px]">Amortyzacja</p>
+          <p className="label-tight text-ink-faint text-[10px]">
+            {t("cards.depreciation")}
+          </p>
           <p className="font-heading text-ink mt-3 text-2xl font-bold tabular-nums">
-            {formatPln(totals.depreciationToDateGrosze, "pl")}
+            {money(totals.depreciationToDateGrosze)}
           </p>
           <p className="text-ink-faint mt-1 text-xs">
             {totals.carsWithoutDepreciation > 0
-              ? `${totals.carsWithoutDepreciation} bez ustawionej amortyzacji`
-              : "wszystkie auta rozliczone"}
+              ? t("cards.depreciationMissing", {
+                  count: totals.carsWithoutDepreciation,
+                })
+              : t("cards.allSettled")}
           </p>
         </div>
         <div className="bg-void p-6">
           <p className="label-tight text-ink-faint text-[10px]">
-            Marża po amortyzacji
+            {t("cards.tcoMargin")}
           </p>
           <p
             className={`font-heading mt-3 text-2xl font-bold tabular-nums ${
@@ -403,79 +416,87 @@ export default async function AnalyticsPage({
           >
             {totals.tcoMarginGrosze == null
               ? "—"
-              : formatPln(totals.tcoMarginGrosze, "pl")}
+              : money(totals.tcoMarginGrosze)}
           </p>
-          <p className="text-ink-faint mt-1 text-xs">pełny koszt posiadania</p>
+          <p className="text-ink-faint mt-1 text-xs">{t("cards.fullCost")}</p>
         </div>
         <div className="bg-void p-6">
-          <p className="label-tight text-ink-faint text-[10px]">Koszt / km</p>
+          <p className="label-tight text-ink-faint text-[10px]">
+            {t("cards.costPerKm")}
+          </p>
           <p className="font-heading text-ink mt-3 text-2xl font-bold tabular-nums">
             {totals.costPerKmGrosze == null
               ? "—"
-              : formatPlnPrecise(totals.costPerKmGrosze, "pl")}
+              : formatPlnPrecise(totals.costPerKmGrosze, locale)}
           </p>
           <p className="text-ink-faint mt-1 text-xs">
             {totals.kmDriven > 0
-              ? `${totals.kmDriven.toLocaleString("pl-PL")} km ze stanów licznika`
-              : "brak stanów licznika"}
+              ? t("cards.odometer", { km: totals.kmDriven })
+              : t("cards.noOdometer")}
           </p>
         </div>
         <div className="bg-void p-6">
           <p className="label-tight text-ink-faint text-[10px]">
-            Przychód / km
+            {t("cards.revenuePerKm")}
           </p>
           <p className="font-heading text-ink mt-3 text-2xl font-bold tabular-nums">
             {totals.revenuePerKmGrosze == null
               ? "—"
-              : formatPlnPrecise(totals.revenuePerKmGrosze, "pl")}
+              : formatPlnPrecise(totals.revenuePerKmGrosze, locale)}
           </p>
-          <p className="text-ink-faint mt-1 text-xs">na przejechany kilometr</p>
+          <p className="text-ink-faint mt-1 text-xs">{t("cards.perKmBasis")}</p>
         </div>
       </div>
 
       {totals.carsWithoutPrice > 0 && (
         <p className="border-line text-ink-faint mt-4 border border-dashed px-4 py-3 text-xs">
-          {totals.carsWithoutPrice}{" "}
-          {totals.carsWithoutPrice === 1
-            ? "egzemplarz nie ma"
-            : "egzemplarzy nie ma"}{" "}
-          wpisanej ceny zakupu —{" "}
-          {totals.carsWithoutPrice === 1 ? "nie liczy" : "nie liczą"} się do
-          zwrotu z floty. Uzupełnisz je przy egzemplarzu w zakładce Flota.
+          {t("notice.noPrice", { count: totals.carsWithoutPrice })}
         </p>
       )}
 
       <section className="mt-14">
-        <h2 className="label text-ink text-xs">Opłacalność egzemplarzy</h2>
+        <h2 className="label text-ink text-xs">{t("economics.title")}</h2>
         <p className="text-ink-faint mt-1 mb-4 text-xs">
-          Każde auto osobno: co zarobiło, co kosztowało i ile z ceny zakupu już
-          oddało. Kliknij rejestrację, żeby zobaczyć analizę dzień po dniu.{" "}
-          <strong className="text-silver font-normal">Wolne</strong> to dni, w
-          których auto było dostępne i nikt go nie zarezerwował — to problem
-          sprzedaży.{" "}
-          <strong className="text-silver font-normal">Zablokowane</strong> to
-          serwis i ręczne blokady — to problem operacyjny. W całej flocie:{" "}
-          {totals.daysFree.toLocaleString("pl-PL")} wolnych i{" "}
-          {totals.daysBlocked.toLocaleString("pl-PL")} zablokowanych dni, koszt
-          postoju {formatPln(totals.idleCostGrosze, "pl")}.
+          {t.rich("economics.intro", {
+            strong: (chunks) => (
+              <strong className="text-silver font-normal">{chunks}</strong>
+            ),
+            freeDays: totals.daysFree,
+            blockedDays: totals.daysBlocked,
+            idleCost: money(totals.idleCostGrosze),
+          })}
         </p>
         <div className="overflow-x-auto">
           <table className="w-full min-w-[900px] border-collapse text-left text-sm">
             <thead>
               <tr className="border-line text-ink-faint border-y">
                 <th className="label-tight py-3 pr-6 text-[10px]">
-                  Egzemplarz
+                  {t("economics.col.unit")}
                 </th>
-                <th className="label-tight py-3 pr-6 text-[10px]">Przychód</th>
-                <th className="label-tight py-3 pr-6 text-[10px]">Wydatki</th>
-                <th className="label-tight py-3 pr-6 text-[10px]">Marża</th>
-                <th className="label-tight py-3 pr-6 text-[10px]">Na dobę</th>
-                <th className="label-tight py-3 pr-6 text-[10px]">Wolne</th>
                 <th className="label-tight py-3 pr-6 text-[10px]">
-                  Zablokowane
+                  {t("economics.col.revenue")}
                 </th>
-                <th className="label-tight py-3 pr-6 text-[10px]">Zwrot</th>
-                <th className="label-tight py-3 text-[10px]">Zwrot ok.</th>
+                <th className="label-tight py-3 pr-6 text-[10px]">
+                  {t("economics.col.expenses")}
+                </th>
+                <th className="label-tight py-3 pr-6 text-[10px]">
+                  {t("economics.col.margin")}
+                </th>
+                <th className="label-tight py-3 pr-6 text-[10px]">
+                  {t("economics.col.perDay")}
+                </th>
+                <th className="label-tight py-3 pr-6 text-[10px]">
+                  {t("economics.col.free")}
+                </th>
+                <th className="label-tight py-3 pr-6 text-[10px]">
+                  {t("economics.col.blocked")}
+                </th>
+                <th className="label-tight py-3 pr-6 text-[10px]">
+                  {t("economics.col.recovery")}
+                </th>
+                <th className="label-tight py-3 text-[10px]">
+                  {t("economics.col.recoveryOn")}
+                </th>
               </tr>
             </thead>
             <tbody>
@@ -496,17 +517,17 @@ export default async function AnalyticsPage({
                     </span>
                   </td>
                   <td className="text-silver py-4 pr-6 whitespace-nowrap tabular-nums">
-                    {formatPln(c.revenueGrosze, "pl")}
+                    {money(c.revenueGrosze)}
                   </td>
                   <td className="text-silver py-4 pr-6 whitespace-nowrap tabular-nums">
-                    {formatPln(c.expensesGrosze, "pl")}
+                    {money(c.expensesGrosze)}
                   </td>
                   <td
                     className={`py-4 pr-6 whitespace-nowrap tabular-nums ${
                       c.marginGrosze >= 0 ? "text-emerald-400" : "text-red"
                     }`}
                   >
-                    {formatPln(c.marginGrosze, "pl")}
+                    {money(c.marginGrosze)}
                     {c.marginPct != null && (
                       <span className="text-ink-faint ml-2 text-xs">
                         {Math.round(c.marginPct * 100)}%
@@ -518,7 +539,7 @@ export default async function AnalyticsPage({
                       c.netPerDayGrosze >= 0 ? "text-silver" : "text-red"
                     }`}
                   >
-                    {formatPln(c.netPerDayGrosze, "pl")}
+                    {money(c.netPerDayGrosze)}
                   </td>
                   <td className="text-silver py-4 pr-6 whitespace-nowrap tabular-nums">
                     {c.daysFree}
@@ -531,7 +552,9 @@ export default async function AnalyticsPage({
                   </td>
                   <td className="py-4 pr-6 whitespace-nowrap">
                     {c.recoveredPct == null ? (
-                      <span className="text-ink-faint text-xs">brak ceny</span>
+                      <span className="text-ink-faint text-xs">
+                        {t("economics.noPrice")}
+                      </span>
                     ) : (
                       <RecoveryBar value={c.recoveredPct} />
                     )}
@@ -540,10 +563,10 @@ export default async function AnalyticsPage({
                     {c.purchasePriceGrosze == null
                       ? "—"
                       : c.marginGrosze >= c.purchasePriceGrosze
-                        ? "zwrócone"
+                        ? t("economics.returned")
                         : c.paybackOn
-                          ? formatPl(c.paybackOn)
-                          : "nie przy tym tempie"}
+                          ? formatDay(c.paybackOn, locale)
+                          : t("economics.notAtPace")}
                   </td>
                 </tr>
               ))}
@@ -552,40 +575,35 @@ export default async function AnalyticsPage({
         </div>
         {fleetEconomics.length === 0 && (
           <p className="border-line text-silver mt-4 border px-5 py-6 text-center text-sm">
-            Brak egzemplarzy.
+            {t("empty.cars")}
           </p>
         )}
       </section>
 
       <section className="mt-14">
-        <h2 className="label text-ink text-xs">
-          Sprzedaż — miesiąc do miesiąca i rok do roku
-        </h2>
-        <p className="text-ink-faint mt-1 mb-4 text-xs">
-          Przychód z ostatnich 12 miesięcy, każdy zestawiony z tym samym
-          miesiącem rok wcześniej. Nagłówki liczą ostatni ZAMKNIĘTY miesiąc —
-          miesiąc w toku ma tyle dni, ile go minęło, i porównany z pełnym
-          miesiącem zawsze wyglądałby na załamanie.
-        </p>
+        <h2 className="label text-ink text-xs">{t("sales.title")}</h2>
+        <p className="text-ink-faint mt-1 mb-4 text-xs">{t("sales.intro")}</p>
 
         <div className="border-line bg-line grid gap-px border sm:grid-cols-2 lg:grid-cols-4">
           <div className="bg-void p-6">
             <p className="label-tight text-ink-faint text-[10px]">
               {lastClosed
-                ? `Sprzedaż — ${monthLabel(lastClosed.month)}`
-                : "Sprzedaż"}
+                ? t("sales.lastClosedTitle", {
+                    month: monthLabel(lastClosed.month, locale),
+                  })
+                : t("sales.plain")}
             </p>
             <p className="font-heading text-ink mt-3 text-2xl font-bold tabular-nums">
-              {lastClosed ? formatPln(lastClosed.revenueGrosze, "pl") : "—"}
+              {lastClosed ? money(lastClosed.revenueGrosze) : "—"}
             </p>
             <p className="text-ink-faint mt-1 text-xs">
-              ostatni zamknięty miesiąc
+              {t("sales.lastClosedHint")}
             </p>
           </div>
 
           <div className="bg-void p-6">
             <p className="label-tight text-ink-faint text-[10px]">
-              Miesiąc do miesiąca
+              {t("sales.momTitle")}
             </p>
             <p
               className={`font-heading mt-3 text-2xl font-bold tabular-nums ${
@@ -596,18 +614,20 @@ export default async function AnalyticsPage({
                     : "text-red"
               }`}
             >
-              {formatPct(lastClosed?.momPct ?? null)}
+              {formatPct(lastClosed?.momPct ?? null, locale)}
             </p>
             <p className="text-ink-faint mt-1 text-xs">
               {lastClosed?.prevMonthGrosze != null
-                ? `wobec ${formatPln(lastClosed.prevMonthGrosze, "pl")} miesiąc wcześniej`
-                : "brak miesiąca odniesienia"}
+                ? t("sales.vsPrevMonth", {
+                    amount: money(lastClosed.prevMonthGrosze),
+                  })
+                : t("sales.noPrevMonth")}
             </p>
           </div>
 
           <div className="bg-void p-6">
             <p className="label-tight text-ink-faint text-[10px]">
-              Rok do roku
+              {t("sales.yoyTitle")}
             </p>
             <p
               className={`font-heading mt-3 text-2xl font-bold tabular-nums ${
@@ -618,26 +638,30 @@ export default async function AnalyticsPage({
                     : "text-red"
               }`}
             >
-              {formatPct(lastClosed?.yoyPct ?? null)}
+              {formatPct(lastClosed?.yoyPct ?? null, locale)}
             </p>
             <p className="text-ink-faint mt-1 text-xs">
               {lastClosed?.prevYearGrosze != null
-                ? `wobec ${formatPln(lastClosed.prevYearGrosze, "pl")} rok wcześniej`
-                : "brak danych sprzed roku"}
+                ? t("sales.vsPrevYear", {
+                    amount: money(lastClosed.prevYearGrosze),
+                  })
+                : t("sales.noPrevYear")}
             </p>
           </div>
 
           <div className="bg-void p-6">
             <p className="label-tight text-ink-faint text-[10px]">
-              Miesiąc w toku
+              {t("sales.inProgress")}
             </p>
             <p className="font-heading text-ink mt-3 text-2xl font-bold tabular-nums">
-              {running ? formatPln(running.revenueGrosze, "pl") : "—"}
+              {running ? money(running.revenueGrosze) : "—"}
             </p>
             <p className="text-ink-faint mt-1 text-xs">
               {running
-                ? `${monthLabel(running.month)} — narastająco`
-                : "brak danych"}
+                ? t("sales.runningHint", {
+                    month: monthLabel(running.month, locale),
+                  })
+                : t("sales.noData")}
             </p>
           </div>
         </div>
@@ -646,23 +670,29 @@ export default async function AnalyticsPage({
       </section>
 
       <section className="mt-14">
-        <h2 className="label text-ink text-xs">Miesiąc po miesiącu</h2>
-        <p className="text-ink-faint mt-1 mb-4 text-xs">
-          Te same 12 miesięcy w liczbach — wykres pokazuje kształt, tabela
-          weryfikuje wartości. Odpowiada na pytanie, którego dzienny wykres nie
-          potrafi: czy ostatni miesiąc był słaby, czy luty zawsze taki jest.
-        </p>
+        <h2 className="label text-ink text-xs">{t("monthly.title")}</h2>
+        <p className="text-ink-faint mt-1 mb-4 text-xs">{t("monthly.intro")}</p>
         <div className="overflow-x-auto">
           <table className="w-full min-w-[560px] border-collapse text-left text-sm">
             <thead>
               <tr className="border-line text-ink-faint border-y">
-                <th className="label-tight py-3 pr-6 text-[10px]">Miesiąc</th>
-                <th className="label-tight py-3 pr-6 text-[10px]">Przychód</th>
+                <th className="label-tight py-3 pr-6 text-[10px]">
+                  {t("monthly.col.month")}
+                </th>
+                <th className="label-tight py-3 pr-6 text-[10px]">
+                  {t("monthly.col.revenue")}
+                </th>
                 <th className="label-tight py-3 pr-6 text-[10px]">m/m</th>
                 <th className="label-tight py-3 pr-6 text-[10px]">r/r</th>
-                <th className="label-tight py-3 pr-6 text-[10px]">Wydatki</th>
-                <th className="label-tight py-3 pr-6 text-[10px]">Marża</th>
-                <th className="label-tight py-3 text-[10px]">Dni wynajęte</th>
+                <th className="label-tight py-3 pr-6 text-[10px]">
+                  {t("monthly.col.expenses")}
+                </th>
+                <th className="label-tight py-3 pr-6 text-[10px]">
+                  {t("monthly.col.margin")}
+                </th>
+                <th className="label-tight py-3 text-[10px]">
+                  {t("monthly.col.daysRented")}
+                </th>
               </tr>
             </thead>
             <tbody>
@@ -672,13 +702,16 @@ export default async function AnalyticsPage({
                 return (
                   <tr key={m.month} className="border-line border-b">
                     <td className="text-ink py-3 pr-6">
-                      {monthLabel(m.month)}
+                      {monthLabel(m.month, locale)}
                       {s.partial && (
-                        <span className="text-ink-faint"> (w toku)</span>
+                        <span className="text-ink-faint">
+                          {" "}
+                          {t("monthly.partial")}
+                        </span>
                       )}
                     </td>
                     <td className="text-silver py-3 pr-6 whitespace-nowrap tabular-nums">
-                      {formatPln(m.revenueGrosze, "pl")}
+                      {money(m.revenueGrosze)}
                     </td>
                     <td
                       className={`py-3 pr-6 whitespace-nowrap tabular-nums ${
@@ -689,7 +722,7 @@ export default async function AnalyticsPage({
                             : "text-red"
                       }`}
                     >
-                      {formatPct(s.momPct)}
+                      {formatPct(s.momPct, locale)}
                     </td>
                     <td
                       className={`py-3 pr-6 whitespace-nowrap tabular-nums ${
@@ -700,17 +733,17 @@ export default async function AnalyticsPage({
                             : "text-red"
                       }`}
                     >
-                      {formatPct(s.yoyPct)}
+                      {formatPct(s.yoyPct, locale)}
                     </td>
                     <td className="text-silver py-3 pr-6 whitespace-nowrap tabular-nums">
-                      {formatPln(m.expenseGrosze, "pl")}
+                      {money(m.expenseGrosze)}
                     </td>
                     <td
                       className={`py-3 pr-6 whitespace-nowrap tabular-nums ${
                         m.marginGrosze >= 0 ? "text-silver" : "text-red"
                       }`}
                     >
-                      {formatPln(m.marginGrosze, "pl")}
+                      {money(m.marginGrosze)}
                     </td>
                     <td className="text-silver py-3 tabular-nums">
                       {m.daysRented}
@@ -724,23 +757,24 @@ export default async function AnalyticsPage({
       </section>
 
       <section className="mt-14">
-        <h2 className="label text-ink text-xs">Rezerwacje — jak kupują</h2>
+        <h2 className="label text-ink text-xs">{t("bookings.title")}</h2>
         <p className="text-ink-faint mt-1 mb-4 text-xs">
-          Ostatnie {bookings.windowDays} dni, {bookings.total} zapytań. Tu liczą
-          się WSZYSTKIE statusy — sensem tej sekcji jest właśnie to, ile zapytań
-          nie zamieniło się w wynajem.
+          {t("bookings.intro", {
+            days: bookings.windowDays,
+            total: bookings.total,
+          })}
         </p>
 
         {bookings.total === 0 ? (
           <p className="border-line text-silver border px-5 py-6 text-center text-sm">
-            Brak zapytań w tym okresie.
+            {t("empty.bookings")}
           </p>
         ) : (
           <>
             <div className="border-line bg-line grid gap-px border sm:grid-cols-2 lg:grid-cols-4">
               <div className="bg-void p-6">
                 <p className="label-tight text-ink-faint text-[10px]">
-                  Skuteczność
+                  {t("bookings.conversion")}
                 </p>
                 <p className="font-heading text-ink mt-3 text-2xl font-bold tabular-nums">
                   {bookings.conversion == null
@@ -748,50 +782,65 @@ export default async function AnalyticsPage({
                     : `${Math.round(bookings.conversion * 100)}%`}
                 </p>
                 <p className="text-ink-faint mt-1 text-xs">
-                  zapytań staje się wynajmem
+                  {t("bookings.conversionHint")}
                 </p>
               </div>
               <div className="bg-void p-6">
-                <p className="label-tight text-ink-faint text-[10px]">Odpada</p>
+                <p className="label-tight text-ink-faint text-[10px]">
+                  {t("bookings.dropOff")}
+                </p>
                 <p className="font-heading text-red mt-3 text-2xl font-bold tabular-nums">
                   {bookings.dropOff == null
                     ? "—"
                     : `${Math.round(bookings.dropOff * 100)}%`}
                 </p>
                 <p className="text-ink-faint mt-1 text-xs">
-                  anulowane i odrzucone
+                  {t("bookings.dropOffHint")}
                 </p>
               </div>
               <div className="bg-void p-6">
                 <p className="label-tight text-ink-faint text-[10px]">
-                  Wyprzedzenie
+                  {t("bookings.leadTime")}
                 </p>
                 <p className="font-heading text-ink mt-3 text-2xl font-bold tabular-nums">
                   {bookings.leadTime.median == null
                     ? "—"
-                    : `${Math.round(bookings.leadTime.median)} dni`}
+                    : t("units.days", {
+                        count: Math.round(bookings.leadTime.median),
+                      })}
                 </p>
                 <p className="text-ink-faint mt-1 text-xs">
-                  mediana; połowa mieści się w{" "}
+                  {t("bookings.leadTimeHint")}{" "}
                   {bookings.leadTime.p25 == null
                     ? "—"
-                    : `${Math.round(bookings.leadTime.p25)}–${Math.round(bookings.leadTime.p75 ?? 0)} dni`}
+                    : t("bookings.leadRange", {
+                        from: Math.round(bookings.leadTime.p25),
+                        to: Math.round(bookings.leadTime.p75 ?? 0),
+                      })}
                 </p>
               </div>
               <div className="bg-void p-6">
                 <p className="label-tight text-ink-faint text-[10px]">
-                  Długość wynajmu
+                  {t("bookings.rentalLength")}
                 </p>
                 <p className="font-heading text-ink mt-3 text-2xl font-bold tabular-nums">
                   {bookings.length.median == null
                     ? "—"
-                    : `${Math.round(bookings.length.median)} dni`}
+                    : t("units.days", {
+                        count: Math.round(bookings.length.median),
+                      })}
                 </p>
                 <p className="text-ink-faint mt-1 text-xs">
-                  mediana; średnia{" "}
+                  {t("bookings.rentalLengthHint")}{" "}
                   {bookings.length.average == null
                     ? "—"
-                    : bookings.length.average.toFixed(1)}
+                    : bookings.length.average.toLocaleString(
+                        intlLocale(locale),
+                        {
+                          minimumFractionDigits: 1,
+                          maximumFractionDigits: 1,
+                        },
+                      )}
                 </p>
               </div>
             </div>
@@ -799,7 +848,7 @@ export default async function AnalyticsPage({
             <div className="mt-6 grid gap-6 lg:grid-cols-3">
               <div className="border-line border p-5">
                 <p className="label-tight text-ink-faint mb-3 text-[10px]">
-                  Statusy
+                  {t("bookings.statuses")}
                 </p>
                 <ul className="space-y-1 text-xs">
                   {bookings.byStatus.map((s) => (
@@ -807,7 +856,7 @@ export default async function AnalyticsPage({
                       key={s.status}
                       className="text-silver flex justify-between"
                     >
-                      <span>{statusLabel(s.status)}</span>
+                      <span>{statusLabel(s.status, locale)}</span>
                       <span className="tabular-nums">{s.count}</span>
                     </li>
                   ))}
@@ -815,7 +864,7 @@ export default async function AnalyticsPage({
               </div>
               <div className="border-line border p-5">
                 <p className="label-tight text-ink-faint mb-3 text-[10px]">
-                  Dodatki (w potwierdzonych)
+                  {t("bookings.addOns")}
                 </p>
                 <ul className="space-y-1 text-xs">
                   {bookings.addOns.map((a) => (
@@ -823,14 +872,14 @@ export default async function AnalyticsPage({
                       key={a.key}
                       className="text-silver flex justify-between"
                     >
-                      <span>{a.label}</span>
+                      <span>{pick(a.label, locale)}</span>
                       <span className="tabular-nums">
                         {a.count} · {Math.round(a.share * 100)}%
                       </span>
                     </li>
                   ))}
                   <li className="text-silver flex justify-between">
-                    <span>Bez kaucji</span>
+                    <span>{t("bookings.noDeposit")}</span>
                     <span className="tabular-nums">
                       {bookings.deposit.noDeposit}
                     </span>
@@ -839,7 +888,7 @@ export default async function AnalyticsPage({
               </div>
               <div className="border-line border p-5">
                 <p className="label-tight text-ink-faint mb-3 text-[10px]">
-                  Miejsce odbioru
+                  {t("bookings.pickup")}
                 </p>
                 <ul className="space-y-1 text-xs">
                   {bookings.locations.map((l) => (
@@ -861,36 +910,37 @@ export default async function AnalyticsPage({
       </section>
 
       <section className="mt-14">
-        <h2 className="label text-ink text-xs">Przypomnienia</h2>
+        <h2 className="label text-ink text-xs">{t("reminders.title")}</h2>
         <p className="text-ink-faint mt-1 mb-4 text-xs">
-          Ubezpieczenie i przegląd — po terminie lub kończące się w ciągu 30
-          dni.
+          {t("reminders.intro")}
         </p>
         <DocumentAlerts alerts={alerts} />
       </section>
 
       <section className="mt-14">
-        <h2 className="label text-ink text-xs">
-          Przegląd, ubezpieczenie i serwis
-        </h2>
+        <h2 className="label text-ink text-xs">{t("documents.title")}</h2>
         <p className="text-ink-faint mt-1 mb-4 text-xs">
-          Stan dokumentów i planowanych serwisów każdego egzemplarza. Daty
-          edytujesz przy egzemplarzu w zakładce Flota. Na 5 dni przed każdą z
-          nich wychodzi jedno przypomnienie na {REMINDER_MAILBOX}.
+          {t("documents.intro", { mailbox: REMINDER_MAILBOX })}
         </p>
         <div className="overflow-x-auto">
           <table className="w-full min-w-[860px] border-collapse text-left text-sm">
             <thead>
               <tr className="border-line text-ink-faint border-y">
                 <th className="label-tight py-3 pr-6 text-[10px]">
-                  Egzemplarz
+                  {t("documents.col.unit")}
                 </th>
-                <th className="label-tight py-3 pr-6 text-[10px]">Przegląd</th>
                 <th className="label-tight py-3 pr-6 text-[10px]">
-                  Ubezpieczenie
+                  {t("documents.col.inspection")}
                 </th>
-                <th className="label-tight py-3 pr-6 text-[10px]">Serwis</th>
-                <th className="label-tight py-3 text-[10px]">Przebieg</th>
+                <th className="label-tight py-3 pr-6 text-[10px]">
+                  {t("documents.col.insurance")}
+                </th>
+                <th className="label-tight py-3 pr-6 text-[10px]">
+                  {t("documents.col.service")}
+                </th>
+                <th className="label-tight py-3 text-[10px]">
+                  {t("documents.col.mileage")}
+                </th>
               </tr>
             </thead>
             <tbody>
@@ -926,11 +976,11 @@ export default async function AnalyticsPage({
                     <DocumentCell
                       date={c.service.date}
                       daysLeft={c.service.daysLeft}
-                      missingLabel="Nie zaplanowano"
+                      missing="notScheduled"
                     />
                   </td>
                   <td className="text-silver py-4 whitespace-nowrap tabular-nums">
-                    {c.mileageKm.toLocaleString("pl-PL")} km
+                    {t("units.km", { km: c.mileageKm })}
                   </td>
                 </tr>
               ))}
@@ -939,26 +989,38 @@ export default async function AnalyticsPage({
         </div>
         {documents.length === 0 && (
           <p className="border-line text-silver mt-4 border px-5 py-6 text-center text-sm">
-            Brak egzemplarzy.
+            {t("empty.cars")}
           </p>
         )}
       </section>
 
       <section className="mt-14">
-        <h2 className="label text-ink text-xs">Auta</h2>
+        <h2 className="label text-ink text-xs">{t("models.title")}</h2>
         <div className="mt-4 overflow-x-auto">
           <table className="w-full min-w-[760px] border-collapse text-left text-sm">
             <thead>
               <tr className="border-line text-ink-faint border-y">
-                <th className="label-tight py-3 pr-6 text-[10px]">Model</th>
-                <th className="label-tight py-3 pr-6 text-[10px]">Egz.</th>
-                <th className="label-tight py-3 pr-6 text-[10px]">Wynajmy</th>
-                <th className="label-tight py-3 pr-6 text-[10px]">Dni</th>
-                <th className="label-tight py-3 pr-6 text-[10px]">Przychód</th>
                 <th className="label-tight py-3 pr-6 text-[10px]">
-                  Wykorzystanie
+                  {t("models.col.model")}
                 </th>
-                <th className="label-tight py-3 text-[10px]">Nadchodzące</th>
+                <th className="label-tight py-3 pr-6 text-[10px]">
+                  {t("models.col.units")}
+                </th>
+                <th className="label-tight py-3 pr-6 text-[10px]">
+                  {t("models.col.rentals")}
+                </th>
+                <th className="label-tight py-3 pr-6 text-[10px]">
+                  {t("models.col.days")}
+                </th>
+                <th className="label-tight py-3 pr-6 text-[10px]">
+                  {t("models.col.revenue")}
+                </th>
+                <th className="label-tight py-3 pr-6 text-[10px]">
+                  {t("models.col.utilisation")}
+                </th>
+                <th className="label-tight py-3 text-[10px]">
+                  {t("models.col.upcoming")}
+                </th>
               </tr>
             </thead>
             <tbody>
@@ -985,7 +1047,7 @@ export default async function AnalyticsPage({
                     {m.daysRented}
                   </td>
                   <td className="text-ink py-4 pr-6 tabular-nums">
-                    {formatPln(m.revenueGrosze, "pl")}
+                    {money(m.revenueGrosze)}
                   </td>
                   <td className="text-silver py-4 pr-6">
                     <UtilisationBar value={m.utilisation} />
@@ -1001,7 +1063,7 @@ export default async function AnalyticsPage({
 
         {analytics.models.length === 0 && (
           <p className="border-line text-silver mt-4 border px-5 py-6 text-center text-sm">
-            Brak modeli.
+            {t("empty.models")}
           </p>
         )}
       </section>

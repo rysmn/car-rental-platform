@@ -1,6 +1,8 @@
 "use client";
 
 import { useRef, useState, useTransition } from "react";
+import { useLocale, useTranslations } from "next-intl";
+import { pickFrom } from "@/lib/i18n-pick";
 import { dodajWersje, zmienOpis } from "@/lib/documents/actions";
 import { ETYKIETY_KATEGORII, KATEGORIE } from "@/lib/documents/kategorie";
 
@@ -47,6 +49,8 @@ export function EdytujDokument({
   };
   onZamknij: () => void;
 }) {
+  const t = useTranslations("Admin.documents");
+  const locale = useLocale();
   const [czeka, start] = useTransition();
   const [wynik, setWynik] = useState<{ ok: boolean; tekst: string } | null>(
     null,
@@ -60,11 +64,14 @@ export function EdytujDokument({
     <div className="border-line bg-void/60 mt-3 border p-4">
       <div className="flex flex-wrap items-baseline justify-between gap-2">
         <h3 className="font-heading text-ink text-sm font-bold">
-          Edycja: {dokument.title}
+          {t("editTitle", { title: dokument.title })}
         </h3>
         <p className="text-ink-faint text-xs">
-          {dokument.slug} · {dokument.locale.toUpperCase()} · wersja{" "}
-          {dokument.version}
+          {t("editMeta", {
+            slug: dokument.slug,
+            locale: dokument.locale.toUpperCase(),
+            version: dokument.version,
+          })}
         </p>
       </div>
 
@@ -86,7 +93,7 @@ export function EdytujDokument({
             const r = await zmienOpis(dokument.id, fd);
             setWynik(
               r.ok
-                ? { ok: true, tekst: "Zapisano zmiany opisu." }
+                ? { ok: true, tekst: t("descriptionSaved") }
                 : { ok: false, tekst: r.error },
             );
           });
@@ -96,7 +103,7 @@ export function EdytujDokument({
         <div className="grid gap-3 sm:grid-cols-2">
           <label className="block space-y-1">
             <span className="label-tight text-ink-faint text-[10px]">
-              Nazwa widoczna
+              {t("fieldTitle")}
             </span>
             <input
               name="title"
@@ -107,7 +114,7 @@ export function EdytujDokument({
           </label>
           <label className="block space-y-1">
             <span className="label-tight text-ink-faint text-[10px]">
-              Kategoria
+              {t("fieldCategory")}
             </span>
             <select
               name="category"
@@ -116,14 +123,14 @@ export function EdytujDokument({
             >
               {KATEGORIE.map((k) => (
                 <option key={k} value={k}>
-                  {ETYKIETY_KATEGORII[k]}
+                  {pickFrom(ETYKIETY_KATEGORII, k, locale)}
                 </option>
               ))}
             </select>
           </label>
           <label className="block space-y-1">
             <span className="label-tight text-ink-faint text-[10px]">
-              Obowiązuje od (opcjonalnie)
+              {t("fieldEffectiveFrom")}
             </span>
             <input
               type="date"
@@ -134,10 +141,10 @@ export function EdytujDokument({
           </label>
           <label className="block space-y-1">
             <span className="label-tight text-ink-faint text-[10px]">
-              Język
+              {t("fieldLocale")}
             </span>
             <input
-              value={dokument.locale === "en" ? "angielski" : "polski"}
+              value={t(dokument.locale === "en" ? "localeEn" : "localePl")}
               readOnly
               disabled
               className={`${POLE} opacity-60`}
@@ -153,26 +160,18 @@ export function EdytujDokument({
           />
           <span className="space-y-1">
             <span className="text-ink block text-sm font-medium">
-              Plik zawiera obie wersje językowe PL i EN
+              {t("bilingualLabel")}
             </span>
             <span className="text-ink-faint block text-xs">
-              Zaznacz tylko wtedy, gdy w samym PDF-ie jest polski i angielski
-              tekst. Taki dokument trafia do klienta w obu językach. Bez tego
-              angielski klient go nie dostanie — i tak ma być: dokument prawny
-              w języku, którego klient nie zna, jest gorszy niż jego brak.
+              {t("bilingualHelp")}
             </span>
           </span>
         </label>
-        <p className="text-ink-faint -mt-1 text-xs">
-          Języka nie da się zmienić w miejscu: dokument PL i EN to dwie osobne
-          pozycje, każda z własną numeracją wersji. Osobną wersję w drugim
-          języku wgraj jako nowy dokument — chyba że plik jest dwujęzyczny,
-          wtedy wystarczy zaznaczenie powyżej.
-        </p>
+        <p className="text-ink-faint -mt-1 text-xs">{t("languageLocked")}</p>
 
         <label className="block space-y-1">
           <span className="label-tight text-ink-faint text-[10px]">
-            Opis (opcjonalnie)
+            {t("fieldDescription")}
           </span>
           <textarea
             name="description"
@@ -188,14 +187,14 @@ export function EdytujDokument({
             disabled={czeka}
             className="label bg-red hover:bg-red-hover inline-flex h-11 items-center px-5 text-xs text-white transition-colors disabled:opacity-50"
           >
-            {czeka ? "Zapisywanie…" : "Zapisz opis"}
+            {czeka ? t("saving") : t("buttonSaveDescription")}
           </button>
           <button
             type="button"
             onClick={onZamknij}
             className="label border-line-strong text-ink hover:border-ink inline-flex h-11 items-center border px-5 text-xs transition-colors"
           >
-            Zamknij
+            {t("buttonClose")}
           </button>
         </div>
       </form>
@@ -214,7 +213,7 @@ export function EdytujDokument({
             if (r.ok) {
               setWynik({
                 ok: true,
-                tekst: `Wgrano jako wersję ${r.version}. Poprzednia wersja zostaje w historii.`,
+                tekst: t("uploadedAsVersion", { version: r.version }),
               });
               formPlik.current?.reset();
             } else {
@@ -224,16 +223,17 @@ export function EdytujDokument({
         }}
         className="border-line mt-5 space-y-3 border-t pt-4"
       >
-        <p className="text-ink text-sm font-semibold">Zastąp plik PDF</p>
+        <p className="text-ink text-sm font-semibold">{t("replaceHeading")}</p>
         <p className="text-ink-muted text-xs leading-relaxed">
-          Wgranie pliku tworzy <strong>nową wersję</strong>. Obecna wersja{" "}
-          {dokument.version} zostaje w historii razem z informacją, którzy
-          klienci ją otrzymali — nic nie jest nadpisywane.
+          {t.rich("replaceExplain", {
+            version: dokument.version,
+            strong: (chunks) => <strong>{chunks}</strong>,
+          })}
         </p>
         <div className="grid gap-3 sm:grid-cols-2">
           <label className="block space-y-1">
             <span className="label-tight text-ink-faint text-[10px]">
-              Nazwa nowej wersji
+              {t("newVersionName")}
             </span>
             <input
               name="title"
@@ -244,7 +244,7 @@ export function EdytujDokument({
           </label>
           <label className="block space-y-1">
             <span className="label-tight text-ink-faint text-[10px]">
-              Plik PDF (do 12 MB)
+              {t("fieldFile")}
             </span>
             <input
               type="file"
@@ -263,16 +263,14 @@ export function EdytujDokument({
             defaultChecked
             className="h-5 w-5"
           />
-          <span className="text-ink text-sm">
-            Nowa wersja ma od razu obowiązywać
-          </span>
+          <span className="text-ink text-sm">{t("newVersionActive")}</span>
         </label>
         <button
           type="submit"
           disabled={czeka}
           className="label border-line-strong text-ink hover:border-ink inline-flex h-11 items-center border px-5 text-xs transition-colors disabled:opacity-50"
         >
-          {czeka ? "Wgrywanie…" : "Wgraj nową wersję"}
+          {czeka ? t("uploading") : t("uploadNewVersion")}
         </button>
       </form>
     </div>

@@ -3,6 +3,8 @@
 import { revalidatePath } from "next/cache";
 import { and, eq, ne, sql } from "drizzle-orm";
 import { z } from "zod";
+import { getLocale } from "next-intl/server";
+import { type Bilingual, pick } from "@/lib/i18n-pick";
 import { getDb, schema } from "@/lib/db";
 import { requirePermission } from "@/lib/auth/guard";
 import { recordAudit } from "@/lib/auth/audit";
@@ -51,6 +53,11 @@ const wejscie = z.object({
   aktywuj: z.boolean().optional().default(false),
 });
 
+/** Komunikat dla operatora w języku jego żądania — akcje zwracają gotowy tekst. */
+async function tekst(text: Bilingual): Promise<string> {
+  return pick(text, await getLocale());
+}
+
 export type WynikDokumentu =
   { ok: true; id: string; version: number } | { ok: false; error: string };
 
@@ -75,25 +82,32 @@ export async function dodajWersje(formData: FormData): Promise<WynikDokumentu> {
     bilingual: formData.get("bilingual") === "on",
   });
   if (!parsed.success) {
-    return { ok: false, error: "Sprawdź pola formularza." };
+    return { ok: false, error: await tekst({ pl: "Sprawdź pola formularza.", en: "Please check the form fields." }) };
   }
   const d = parsed.data;
 
   const plik = formData.get("plik");
-  if (!(plik instanceof File)) return { ok: false, error: "Brak pliku." };
+  if (!(plik instanceof File)) return { ok: false, error: await tekst({ pl: "Brak pliku.", en: "No file." }) };
 
   const zapis = await saveDocument(plik);
   if (!zapis.ok) {
-    const komunikaty: Record<string, string> = {
-      empty: "Plik jest pusty.",
-      too_large: "Plik jest większy niż 12 MB.",
-      not_pdf:
-        "Przyjmujemy wyłącznie PDF — dokument ma wyglądać u każdego tak samo.",
-      write_failed: "Nie udało się zapisać pliku.",
+    const komunikaty: Record<string, Bilingual> = {
+      empty: { pl: "Plik jest pusty.", en: "The file is empty." },
+      too_large: { pl: "Plik jest większy niż 12 MB.", en: "The file is larger than 12 MB." },
+      not_pdf: {
+        pl: "Przyjmujemy wyłącznie PDF — dokument ma wyglądać u każdego tak samo.",
+        en: "Only PDF is accepted — the document has to look the same for everyone.",
+      },
+      write_failed: { pl: "Nie udało się zapisać pliku.", en: "The file could not be saved." },
     };
     return {
       ok: false,
-      error: komunikaty[zapis.error] ?? "Nie udało się wgrać pliku.",
+      error: await tekst(
+        komunikaty[zapis.error] ?? {
+          pl: "Nie udało się wgrać pliku.",
+          en: "The file could not be uploaded.",
+        },
+      ),
     };
   }
 
@@ -154,7 +168,7 @@ export async function dodajWersje(formData: FormData): Promise<WynikDokumentu> {
     return { ok: true, id, version };
   } catch (err) {
     console.error("dodajWersje:", err);
-    return { ok: false, error: "Nie udało się zapisać dokumentu." };
+    return { ok: false, error: await tekst({ pl: "Nie udało się zapisać dokumentu.", en: "The document could not be saved." }) };
   }
 }
 
@@ -162,7 +176,7 @@ export async function dodajWersje(formData: FormData): Promise<WynikDokumentu> {
 export async function ustawAktywna(id: string): Promise<WynikDokumentu> {
   const admin = await requirePermission("dokumenty.zarzadzaj");
   if (!z.string().uuid().safeParse(id).success) {
-    return { ok: false, error: "Zły identyfikator." };
+    return { ok: false, error: await tekst({ pl: "Zły identyfikator.", en: "Invalid identifier." }) };
   }
   try {
     const db = getDb();
@@ -204,7 +218,7 @@ export async function ustawAktywna(id: string): Promise<WynikDokumentu> {
     return { ok: true, id, version: d.version };
   } catch (err) {
     console.error("ustawAktywna:", err);
-    return { ok: false, error: "Nie udało się zmienić wersji obowiązującej." };
+    return { ok: false, error: await tekst({ pl: "Nie udało się zmienić wersji obowiązującej.", en: "The active version could not be changed." }) };
   }
 }
 
@@ -218,7 +232,7 @@ export async function ustawAktywna(id: string): Promise<WynikDokumentu> {
 export async function wycofaj(id: string): Promise<WynikDokumentu> {
   const admin = await requirePermission("dokumenty.zarzadzaj");
   if (!z.string().uuid().safeParse(id).success) {
-    return { ok: false, error: "Zły identyfikator." };
+    return { ok: false, error: await tekst({ pl: "Zły identyfikator.", en: "Invalid identifier." }) };
   }
   try {
     const db = getDb();
@@ -244,7 +258,7 @@ export async function wycofaj(id: string): Promise<WynikDokumentu> {
     return { ok: true, id, version: d.version };
   } catch (err) {
     console.error("wycofaj:", err);
-    return { ok: false, error: "Nie udało się wycofać dokumentu." };
+    return { ok: false, error: await tekst({ pl: "Nie udało się wycofać dokumentu.", en: "The document could not be withdrawn." }) };
   }
 }
 
@@ -267,7 +281,7 @@ export async function ustawAutoSend(
 ): Promise<WynikDokumentu> {
   const admin = await requirePermission("dokumenty.zarzadzaj");
   if (!z.string().uuid().safeParse(id).success) {
-    return { ok: false, error: "Zły identyfikator." };
+    return { ok: false, error: await tekst({ pl: "Zły identyfikator.", en: "Invalid identifier." }) };
   }
   try {
     const db = getDb();
@@ -297,7 +311,7 @@ export async function ustawAutoSend(
     return { ok: true, id, version: d.version };
   } catch (err) {
     console.error("ustawAutoSend:", err);
-    return { ok: false, error: "Nie udało się zmienić ustawienia." };
+    return { ok: false, error: await tekst({ pl: "Nie udało się zmienić ustawienia.", en: "The setting could not be changed." }) };
   }
 }
 
@@ -327,7 +341,7 @@ export async function zmienOpis(
 ): Promise<WynikDokumentu> {
   const admin = await requirePermission("dokumenty.zarzadzaj");
   if (!z.string().uuid().safeParse(id).success) {
-    return { ok: false, error: "Zły identyfikator." };
+    return { ok: false, error: await tekst({ pl: "Zły identyfikator.", en: "Invalid identifier." }) };
   }
   const parsed = opisWejscie.safeParse({
     title: formData.get("title") ?? "",
@@ -336,7 +350,7 @@ export async function zmienOpis(
     effectiveFrom: formData.get("effectiveFrom") ?? "",
     bilingual: formData.get("bilingual") === "on",
   });
-  if (!parsed.success) return { ok: false, error: "Sprawdź pola formularza." };
+  if (!parsed.success) return { ok: false, error: await tekst({ pl: "Sprawdź pola formularza.", en: "Please check the form fields." }) };
   const d = parsed.data;
 
   try {
@@ -380,7 +394,7 @@ export async function zmienOpis(
     return { ok: true, id, version: przed.version };
   } catch (err) {
     console.error("zmienOpis:", err);
-    return { ok: false, error: "Nie udało się zapisać zmian." };
+    return { ok: false, error: await tekst({ pl: "Nie udało się zapisać zmian.", en: "The changes could not be saved." }) };
   }
 }
 
@@ -405,7 +419,7 @@ export async function zmienOpis(
 export async function usunDokument(id: string): Promise<WynikDokumentu> {
   const admin = await requirePermission("dokumenty.zarzadzaj");
   if (!z.string().uuid().safeParse(id).success) {
-    return { ok: false, error: "Zły identyfikator." };
+    return { ok: false, error: await tekst({ pl: "Zły identyfikator.", en: "Invalid identifier." }) };
   }
   try {
     const db = getDb();
@@ -428,10 +442,16 @@ export async function usunDokument(id: string): Promise<WynikDokumentu> {
     if (ile > 0) {
       return {
         ok: false,
-        error:
-          `Tego dokumentu nie da się usunąć: dostało go ${ile} ${ile === 1 ? "rezerwacja" : "rezerwacji"}. ` +
-          "Usunięcie skasowałoby dowód na to, co klient otrzymał. " +
-          "Użyj „Wycofaj z obiegu” — dokument przestanie dotyczyć nowych najmów, a historia zostanie.",
+        error: await tekst({
+          pl:
+            `Tego dokumentu nie da się usunąć: dostało go ${ile} ${ile === 1 ? "rezerwacja" : "rezerwacji"}. ` +
+            "Usunięcie skasowałoby dowód na to, co klient otrzymał. " +
+            "Użyj „Wycofaj z obiegu” — dokument przestanie dotyczyć nowych najmów, a historia zostanie.",
+          en:
+            `This document cannot be deleted: ${ile} ${ile === 1 ? "reservation has" : "reservations have"} received it. ` +
+            "Deleting it would destroy proof of what the customer received. " +
+            "Use “Withdraw from circulation” — the document stops applying to new rentals and the history stays.",
+        }),
       };
     }
 
@@ -455,7 +475,7 @@ export async function usunDokument(id: string): Promise<WynikDokumentu> {
     return { ok: true, id, version: d.version };
   } catch (err) {
     console.error("usunDokument:", err);
-    return { ok: false, error: "Nie udało się usunąć dokumentu." };
+    return { ok: false, error: await tekst({ pl: "Nie udało się usunąć dokumentu.", en: "The document could not be deleted." }) };
   }
 }
 
@@ -475,7 +495,7 @@ export async function wyslijDokumentyRecznie(
 ): Promise<{ ok: boolean; komunikat: string }> {
   const admin = await requirePermission("dokumenty.zarzadzaj");
   if (!z.string().uuid().safeParse(reservationId).success) {
-    return { ok: false, komunikat: "Zły identyfikator rezerwacji." };
+    return { ok: false, komunikat: await tekst({ pl: "Zły identyfikator rezerwacji.", en: "Invalid reservation identifier." }) };
   }
   try {
     const { wyslijDokumentyRezerwacji } = await import("./wysylka");
@@ -498,19 +518,30 @@ export async function wyslijDokumentyRecznie(
     if (wynik.wyslane > 0) {
       return {
         ok: true,
-        komunikat: `Wysłano ${wynik.wyslane} ${wynik.wyslane === 1 ? "dokument" : "dokumentów"}.`,
+        komunikat: await tekst({
+          pl: `Wysłano ${wynik.wyslane} ${wynik.wyslane === 1 ? "dokument" : "dokumentów"}.`,
+          en: `Sent ${wynik.wyslane} ${wynik.wyslane === 1 ? "document" : "documents"}.`,
+        }),
       };
     }
     if (wynik.bledy.length > 0) {
-      return { ok: false, komunikat: `Nie wysłano: ${wynik.bledy[0].powod}` };
+      return {
+        ok: false,
+        komunikat: await tekst({
+          pl: `Nie wysłano: ${wynik.bledy[0].powod}`,
+          en: `Not sent: ${wynik.bledy[0].powod}`,
+        }),
+      };
     }
     return {
       ok: false,
-      komunikat:
-        "Nie było czego wysłać — wszystkie dokumenty tej rezerwacji już wyszły. Użyj „wyślij ponownie”, jeśli klient prosi o kopię.",
+      komunikat: await tekst({
+        pl: "Nie było czego wysłać — wszystkie dokumenty tej rezerwacji już wyszły. Użyj „wyślij ponownie”, jeśli klient prosi o kopię.",
+        en: "There was nothing to send — all documents of this reservation have already gone out. Use “resend” if the customer asks for a copy.",
+      }),
     };
   } catch (err) {
     console.error("wyslijDokumentyRecznie:", err);
-    return { ok: false, komunikat: "Nie udało się wysłać." };
+    return { ok: false, komunikat: await tekst({ pl: "Nie udało się wysłać.", en: "Could not send." }) };
   }
 }

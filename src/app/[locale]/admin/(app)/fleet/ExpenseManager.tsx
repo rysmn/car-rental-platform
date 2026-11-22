@@ -1,6 +1,8 @@
 "use client";
 
+import { pick } from "@/lib/i18n-pick";
 import { useActionState, useState, useTransition } from "react";
+import { useLocale, useTranslations } from "next-intl";
 import {
   createExpense,
   updateExpense,
@@ -25,15 +27,29 @@ function todayValue(): string {
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
 }
 
-function formatPl(iso: string): string {
-  const [y, m, d] = iso.split("-");
-  return `${d}.${m}.${y}`;
+/** Symbol waluty w bieżącym locale (pl: „zł”, en: „PLN”). */
+function currencySymbol(locale: string) {
+  return (
+    new Intl.NumberFormat(locale, { style: "currency", currency: "PLN" })
+      .formatToParts(0)
+      .find((p) => p.type === "currency")?.value ?? "PLN"
+  );
+}
+
+function formatDate(iso: string, locale: string): string {
+  const [y, m, d] = iso.split("-").map(Number);
+  return new Date(y, m - 1, d).toLocaleDateString(locale, {
+    day: "2-digit",
+    month: "2-digit",
+    year: "numeric",
+  });
 }
 
 function Feedback({ state }: { state: FormResult | null }) {
+  const t = useTranslations("Admin.fleet");
   if (!state) return null;
   if (state.ok)
-    return <span className="text-xs text-emerald-400">Zapisano ✓</span>;
+    return <span className="text-xs text-emerald-400">{t("saved")}</span>;
   return <span className="text-red text-xs">{state.error}</span>;
 }
 
@@ -46,19 +62,21 @@ function Feedback({ state }: { state: FormResult | null }) {
  * them in.
  */
 function CategorySelect({ value }: { value?: ExpenseCategory }) {
+  const t = useTranslations("Admin.fleet");
+  const locale = useLocale();
   return (
     <label className="flex flex-col gap-1">
-      <span className={labelCls}>Rodzaj *</span>
+      <span className={labelCls}>{t("kind")} *</span>
       <select
         name="category"
         defaultValue={value ?? "service"}
         className={inputCls}
       >
         {EXPENSE_GROUPS.map((g) => (
-          <optgroup key={g.key} label={g.label}>
+          <optgroup key={g.key} label={pick(g.label, locale)}>
             {g.categories.map((c) => (
               <option key={c} value={c}>
-                {EXPENSE_LABEL[c]}
+                {pick(EXPENSE_LABEL[c], locale)}
               </option>
             ))}
           </optgroup>
@@ -69,11 +87,13 @@ function CategorySelect({ value }: { value?: ExpenseCategory }) {
 }
 
 function ExpenseFields({ expense }: { expense?: CarExpenseRow }) {
+  const t = useTranslations("Admin.fleet");
+  const currency = currencySymbol(useLocale());
   return (
     <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
       <CategorySelect value={expense?.category} />
       <label className="flex flex-col gap-1">
-        <span className={labelCls}>Kwota (zł) *</span>
+        <span className={labelCls}>{t("amount", { currency })} *</span>
         <input
           name="amount"
           inputMode="decimal"
@@ -84,7 +104,7 @@ function ExpenseFields({ expense }: { expense?: CarExpenseRow }) {
         />
       </label>
       <label className="flex flex-col gap-1">
-        <span className={labelCls}>Data *</span>
+        <span className={labelCls}>{t("date")} *</span>
         <input
           name="incurredOn"
           type="date"
@@ -94,7 +114,7 @@ function ExpenseFields({ expense }: { expense?: CarExpenseRow }) {
         />
       </label>
       <label className="flex flex-col gap-1">
-        <span className={labelCls}>Przebieg (km)</span>
+        <span className={labelCls}>{t("mileage")}</span>
         <input
           name="odometerKm"
           type="number"
@@ -108,7 +128,7 @@ function ExpenseFields({ expense }: { expense?: CarExpenseRow }) {
           spread over the days it buys — an annual premium then shows as a
           twelfth a month instead of one cliff that distorts every comparison. */}
       <label className="flex flex-col gap-1">
-        <span className={labelCls}>Okres od (opcjonalnie)</span>
+        <span className={labelCls}>{t("periodFromOptional")}</span>
         <input
           name="periodStart"
           type="date"
@@ -117,7 +137,7 @@ function ExpenseFields({ expense }: { expense?: CarExpenseRow }) {
         />
       </label>
       <label className="flex flex-col gap-1">
-        <span className={labelCls}>Okres do</span>
+        <span className={labelCls}>{t("periodToLabel")}</span>
         <input
           name="periodEnd"
           type="date"
@@ -127,8 +147,8 @@ function ExpenseFields({ expense }: { expense?: CarExpenseRow }) {
       </label>
       <label className="flex flex-col gap-1">
         <span className={labelCls}>
-          Faktura / paragon (PDF, JPG, PNG)
-          {expense?.invoicePath ? " — wybierz plik, by podmienić" : ""}
+          {t("invoiceLabel")}
+          {expense?.invoicePath ? t("invoiceReplace") : ""}
         </span>
         <input
           type="file"
@@ -138,11 +158,11 @@ function ExpenseFields({ expense }: { expense?: CarExpenseRow }) {
         />
       </label>
       <label className="flex flex-col gap-1">
-        <span className={labelCls}>Opis</span>
+        <span className={labelCls}>{t("note")}</span>
         <input
           name="note"
           defaultValue={expense?.note ?? ""}
-          placeholder="Serwis ASO, faktura 12/2026"
+          placeholder={t("expensePlaceholder")}
           className={inputCls}
         />
       </label>
@@ -151,6 +171,8 @@ function ExpenseFields({ expense }: { expense?: CarExpenseRow }) {
 }
 
 function ExpenseRow({ expense }: { expense: CarExpenseRow }) {
+  const t = useTranslations("Admin.fleet");
+  const locale = useLocale();
   const [state, action, pending] = useActionState(updateExpense, null);
   const [editing, setEditing] = useState(false);
   const [deleting, startDelete] = useTransition();
@@ -172,17 +194,17 @@ function ExpenseRow({ expense }: { expense: CarExpenseRow }) {
     return (
       <div className="border-line/60 flex flex-wrap items-baseline gap-x-4 gap-y-1 border-b py-3 last:border-0">
         <span className="text-ink-faint w-20 shrink-0 text-xs tabular-nums">
-          {formatPl(expense.incurredOn)}
+          {formatDate(expense.incurredOn, locale)}
         </span>
         <span className="min-w-[9rem] text-sm text-ink">
-          {EXPENSE_LABEL[expense.category]}
+          {pick(EXPENSE_LABEL[expense.category], locale)}
         </span>
         <span className="text-sm text-ink tabular-nums">
-          {formatPln(expense.amountGrosze, "pl")}
+          {formatPln(expense.amountGrosze, locale)}
         </span>
         {expense.odometerKm != null && (
           <span className="text-ink-faint text-xs tabular-nums">
-            {expense.odometerKm.toLocaleString("pl-PL")} km
+            {expense.odometerKm.toLocaleString(locale)} km
           </span>
         )}
         {expense.invoicePath && (
@@ -194,17 +216,18 @@ function ExpenseRow({ expense }: { expense: CarExpenseRow }) {
             rel="noopener noreferrer"
             className="text-silver text-xs underline underline-offset-2 hover:text-ink"
           >
-            faktura
+            {t("invoice")}
           </a>
         )}
         {expense.recurringId && (
           <span className="border-line text-ink-faint border px-1.5 text-[10px]">
-            cykliczny
+            {t("recurringBadge")}
           </span>
         )}
         {expense.periodStart && expense.periodEnd && (
           <span className="text-ink-faint text-xs tabular-nums">
-            {formatPl(expense.periodStart)}–{formatPl(expense.periodEnd)}
+            {formatDate(expense.periodStart, locale)}–
+            {formatDate(expense.periodEnd, locale)}
           </span>
         )}
         {expense.note && (
@@ -216,7 +239,7 @@ function ExpenseRow({ expense }: { expense: CarExpenseRow }) {
             onClick={() => setEditing(true)}
             className="text-ink-faint text-xs hover:text-ink"
           >
-            Edytuj
+            {t("edit")}
           </button>
           {confirm ? (
             <>
@@ -226,14 +249,14 @@ function ExpenseRow({ expense }: { expense: CarExpenseRow }) {
                 disabled={deleting}
                 className="text-red text-xs disabled:opacity-50"
               >
-                {deleting ? "Usuwanie…" : "Na pewno?"}
+                {deleting ? t("deleting") : t("confirmQuestion")}
               </button>
               <button
                 type="button"
                 onClick={() => setConfirm(false)}
                 className="text-ink-faint text-xs hover:text-ink"
               >
-                Anuluj
+                {t("cancel")}
               </button>
             </>
           ) : (
@@ -242,7 +265,7 @@ function ExpenseRow({ expense }: { expense: CarExpenseRow }) {
               onClick={() => setConfirm(true)}
               className="text-ink-faint hover:text-red tap text-xs"
             >
-              Usuń
+              {t("remove")}
             </button>
           )}
         </span>
@@ -268,14 +291,14 @@ function ExpenseRow({ expense }: { expense: CarExpenseRow }) {
           disabled={pending}
           className="label border-line-strong inline-flex h-9 items-center border px-4 text-xs text-ink transition-colors hover:border-ink hover:bg-ink/5 disabled:opacity-50"
         >
-          {pending ? "Zapisywanie…" : "Zapisz"}
+          {pending ? t("saving") : t("save")}
         </button>
         <button
           type="button"
           onClick={() => setEditing(false)}
           className="text-ink-faint text-xs hover:text-ink"
         >
-          Zamknij
+          {t("close")}
         </button>
         <Feedback state={state} />
       </div>
@@ -284,6 +307,7 @@ function ExpenseRow({ expense }: { expense: CarExpenseRow }) {
 }
 
 function AddExpense({ carId }: { carId: string }) {
+  const t = useTranslations("Admin.fleet");
   const [state, action, pending] = useActionState(createExpense, null);
   const [open, setOpen] = useState(false);
 
@@ -294,7 +318,7 @@ function AddExpense({ carId }: { carId: string }) {
         onClick={() => setOpen(true)}
         className="label border-line-strong mt-3 inline-flex h-9 items-center border px-4 text-xs text-ink transition-colors hover:border-ink hover:bg-ink/5"
       >
-        + Dodaj wydatek
+        {t("addExpense")}
       </button>
     );
   }
@@ -312,7 +336,7 @@ function AddExpense({ carId }: { carId: string }) {
       className="border-line-strong bg-graphite/60 mt-3 border p-4"
     >
       <input type="hidden" name="carId" value={carId} />
-      <p className="label mb-3 text-xs text-ink">Nowy wydatek</p>
+      <p className="label mb-3 text-xs text-ink">{t("newExpense")}</p>
       <ExpenseFields />
       <div className="mt-3 flex flex-wrap items-center gap-3">
         <button
@@ -320,14 +344,14 @@ function AddExpense({ carId }: { carId: string }) {
           disabled={pending}
           className="label bg-red hover:bg-red-hover inline-flex h-9 items-center px-5 text-xs text-white transition-colors disabled:opacity-50"
         >
-          {pending ? "Dodawanie…" : "Dodaj"}
+          {pending ? t("adding") : t("add")}
         </button>
         <button
           type="button"
           onClick={() => setOpen(false)}
           className="text-ink-faint text-xs hover:text-ink"
         >
-          Zamknij
+          {t("close")}
         </button>
         <Feedback state={state} />
       </div>
@@ -351,6 +375,8 @@ export function ExpenseManager({
   plate: string;
   expenses: CarExpenseRow[];
 }) {
+  const t = useTranslations("Admin.fleet");
+  const locale = useLocale();
   const [open, setOpen] = useState(false);
   const total = expenses.reduce((n, e) => n + e.amountGrosze, 0);
 
@@ -362,13 +388,16 @@ export function ExpenseManager({
         className="tap-block flex w-full items-center justify-between gap-4 text-left"
       >
         <span className="label-tight text-ink-faint text-[10px]">
-          Wydatki — {plate}
+          {t("expensesHeading", { plate })}
         </span>
         <span className="flex items-center gap-3 text-xs">
           <span className="text-silver tabular-nums">
             {expenses.length === 0
-              ? "brak"
-              : `${expenses.length} poz. · ${formatPln(total, "pl")}`}
+              ? t("none")
+              : t("expensesSummary", {
+                  count: expenses.length,
+                  total: formatPln(total, locale),
+                })}
           </span>
           <span className="text-ink-faint">{open ? "▲" : "▼"}</span>
         </span>

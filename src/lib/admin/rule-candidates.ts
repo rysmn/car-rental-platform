@@ -1,5 +1,6 @@
 import "server-only";
 import { normalize } from "@/lib/chat/nlu";
+import type { Bilingual } from "@/lib/i18n-pick";
 
 /**
  * Which unanswered questions are worth putting in front of the owner as a
@@ -30,11 +31,11 @@ export type CandidateKind = "business" | "security" | "system";
 
 export type Classification = {
   kind: CandidateKind;
-  /** Shown to the owner, in Polish, so a judgement call can be argued with. */
-  reason: string;
+  /** Shown to the owner, so a judgement call can be argued with. */
+  reason: Bilingual;
 };
 
-const BUSINESS: Classification = { kind: "business", reason: "" };
+const BUSINESS: Classification = { kind: "business", reason: { pl: "", en: "" } };
 
 /** Word-boundary match, so "token" does not fire inside "tokenizacja". */
 function hits(text: string, needle: string): boolean {
@@ -51,9 +52,12 @@ function hits(text: string, needle: string): boolean {
  * another customer's phone number" — those are different incidents even though
  * both belong in the security log rather than in the rental terms.
  */
-const SECURITY: { reason: string; any: string[] }[] = [
+const SECURITY: { reason: Bilingual; any: string[] }[] = [
   {
-    reason: "polecenie systemowe / próba wykonania kodu",
+    reason: {
+      pl: "polecenie systemowe / próba wykonania kodu",
+      en: "system command / attempt to run code",
+    },
     any: [
       "wykonaj:",
       "execute:",
@@ -71,7 +75,10 @@ const SECURITY: { reason: string; any: string[] }[] = [
     ],
   },
   {
-    reason: "próba zapytania do bazy danych",
+    reason: {
+      pl: "próba zapytania do bazy danych",
+      en: "attempt to query the database",
+    },
     any: [
       "select * from",
       "drop table",
@@ -84,7 +91,10 @@ const SECURITY: { reason: string; any: string[] }[] = [
     ],
   },
   {
-    reason: "próba obejścia instrukcji asystenta (prompt injection)",
+    reason: {
+      pl: "próba obejścia instrukcji asystenta (prompt injection)",
+      en: "attempt to bypass the assistant's instructions (prompt injection)",
+    },
     any: [
       "ignore previous",
       "ignore all previous",
@@ -107,7 +117,10 @@ const SECURITY: { reason: string; any: string[] }[] = [
     ],
   },
   {
-    reason: "pytanie o dane innych klientów",
+    reason: {
+      pl: "pytanie o dane innych klientów",
+      en: "question about other customers' data",
+    },
     any: [
       "numer telefonu ostatniego klienta",
       "ostatniego klienta",
@@ -125,7 +138,10 @@ const SECURITY: { reason: string; any: string[] }[] = [
     ],
   },
   {
-    reason: "próba dostępu do konfiguracji lub danych logowania",
+    reason: {
+      pl: "próba dostępu do konfiguracji lub danych logowania",
+      en: "attempt to reach configuration or login credentials",
+    },
     any: [
       "api key",
       "apikey",
@@ -142,7 +158,10 @@ const SECURITY: { reason: string; any: string[] }[] = [
     ],
   },
   {
-    reason: "próba wymuszenia działania administracyjnego",
+    reason: {
+      pl: "próba wymuszenia działania administracyjnego",
+      en: "attempt to force an administrative action",
+    },
     any: [
       "wyczysc histori",
       "wyczysc histori",
@@ -240,7 +259,12 @@ const TEST_STRINGS = new Set([
  */
 export function classifyQuestion(question: string): Classification {
   const text = normalize(question);
-  if (!text) return { kind: "system", reason: "pusta wiadomość" };
+  if (!text) {
+    return {
+      kind: "system",
+      reason: { pl: "pusta wiadomość", en: "empty message" },
+    };
+  }
 
   for (const group of SECURITY) {
     if (group.any.some((needle) => hits(text, needle))) {
@@ -251,12 +275,18 @@ export function classifyQuestion(question: string): Classification {
   if (OWN_BUTTONS.has(text)) {
     return {
       kind: "system",
-      reason: "wartość przycisku asystenta, nie pytanie klienta",
+      reason: {
+        pl: "wartość przycisku asystenta, nie pytanie klienta",
+        en: "the assistant's own button value, not a customer question",
+      },
     };
   }
 
   if (TEST_STRINGS.has(text)) {
-    return { kind: "system", reason: "wiadomość testowa" };
+    return {
+      kind: "system",
+      reason: { pl: "wiadomość testowa", en: "test message" },
+    };
   }
 
   /**
@@ -264,7 +294,10 @@ export function classifyQuestion(question: string): Classification {
    * Two characters is the floor: "co?" is a real, if terse, question.
    */
   if (!/[a-z]{2,}/.test(text)) {
-    return { kind: "system", reason: "wiadomość bez treści" };
+    return {
+      kind: "system",
+      reason: { pl: "wiadomość bez treści", en: "message without content" },
+    };
   }
 
   return BUSINESS;

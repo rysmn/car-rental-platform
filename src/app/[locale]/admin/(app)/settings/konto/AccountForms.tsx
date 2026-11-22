@@ -1,6 +1,7 @@
 "use client";
 
 import { useActionState } from "react";
+import { useTranslations } from "next-intl";
 import {
   updateOwnProfile,
   changeOwnPassword,
@@ -12,11 +13,12 @@ const inputCls =
 const labelCls = "label-tight text-[10px] text-ink-faint";
 
 function Feedback({ state }: { state: ActionResult | null }) {
+  const tc = useTranslations("Admin.settings.common");
   if (!state) return null;
   if (state.ok)
     return (
       <span className="text-xs text-emerald-400">
-        {state.message ?? "Zapisano ✓"}
+        {state.message ?? tc("saved")}
       </span>
     );
   return <span className="text-red text-xs">{state.error}</span>;
@@ -32,12 +34,14 @@ export function ProfileForm({
   email: string;
 }) {
   const [state, action, pending] = useActionState(updateOwnProfile, null);
+  const t = useTranslations("Admin.settings.accountForms");
+  const tc = useTranslations("Admin.settings.common");
 
   return (
     <form action={action} className="max-w-xl">
       <div className="grid gap-3 sm:grid-cols-2">
         <label className="flex flex-col gap-1">
-          <span className={labelCls}>Imię i nazwisko</span>
+          <span className={labelCls}>{t("profile.name")}</span>
           <input
             name="name"
             defaultValue={name}
@@ -46,7 +50,7 @@ export function ProfileForm({
           />
         </label>
         <label className="flex flex-col gap-1">
-          <span className={labelCls}>Telefon</span>
+          <span className={labelCls}>{t("profile.phone")}</span>
           <input
             name="phone"
             defaultValue={phone ?? ""}
@@ -59,7 +63,7 @@ export function ProfileForm({
       {/* Shown, not editable — see the action's comment on why the login
           identifier does not change from inside an open session. */}
       <label className="mt-3 flex max-w-[calc(50%-0.375rem)] flex-col gap-1">
-        <span className={labelCls}>E-mail (login)</span>
+        <span className={labelCls}>{t("profile.email")}</span>
         <input
           value={email}
           readOnly
@@ -67,11 +71,7 @@ export function ProfileForm({
           className={`${inputCls} cursor-not-allowed opacity-60`}
         />
       </label>
-      <p className="text-ink-faint mt-2 text-xs">
-        Adres e-mail jest loginem — zmienia się go w zarządzaniu kontami, nie
-        tutaj. To celowe: gdyby dało się go zmienić z otwartej sesji, przejęta
-        sesja oznaczałaby przejęte konto.
-      </p>
+      <p className="text-ink-faint mt-2 text-xs">{t("profile.emailNote")}</p>
 
       <div className="mt-5 flex flex-wrap items-center gap-4">
         <button
@@ -79,7 +79,7 @@ export function ProfileForm({
           disabled={pending}
           className="label border-line-strong text-ink hover:border-ink hover:bg-ink/5 inline-flex h-10 items-center border px-5 text-xs transition-colors disabled:opacity-50"
         >
-          {pending ? "Zapisywanie…" : "Zapisz dane"}
+          {pending ? tc("saving") : t("profile.save")}
         </button>
         <Feedback state={state} />
       </div>
@@ -89,12 +89,13 @@ export function ProfileForm({
 
 export function PasswordForm() {
   const [state, action, pending] = useActionState(changeOwnPassword, null);
+  const t = useTranslations("Admin.settings.accountForms");
 
   return (
     <form action={action} className="max-w-xl">
       <div className="grid gap-3">
         <label className="flex flex-col gap-1">
-          <span className={labelCls}>Aktualne hasło</span>
+          <span className={labelCls}>{t("password.current")}</span>
           <input
             name="current"
             type="password"
@@ -104,7 +105,7 @@ export function PasswordForm() {
           />
         </label>
         <label className="flex flex-col gap-1">
-          <span className={labelCls}>Nowe hasło (min. 10 znaków)</span>
+          <span className={labelCls}>{t("password.new")}</span>
           <input
             name="password"
             type="password"
@@ -114,7 +115,7 @@ export function PasswordForm() {
           />
         </label>
         <label className="flex flex-col gap-1">
-          <span className={labelCls}>Powtórz nowe hasło</span>
+          <span className={labelCls}>{t("password.repeat")}</span>
           <input
             name="confirm"
             type="password"
@@ -130,7 +131,7 @@ export function PasswordForm() {
           disabled={pending}
           className="label border-line-strong text-ink hover:border-ink hover:bg-ink/5 inline-flex h-10 items-center border px-5 text-xs transition-colors disabled:opacity-50"
         >
-          {pending ? "Zmienianie…" : "Zmień hasło"}
+          {pending ? t("password.changing") : t("password.submit")}
         </button>
         <Feedback state={state} />
       </div>

@@ -1,14 +1,22 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
-import { setRequestLocale } from "next-intl/server";
+import { getTranslations, setRequestLocale } from "next-intl/server";
 import { currentAdmin } from "@/lib/auth/guard";
 import { ileKodowZostalo } from "@/lib/auth/two-factor";
 import { TwoFactorPanel } from "../(app)/settings/konto/TwoFactorPanel";
 
-export const metadata = {
-  title: "Włącz logowanie dwuskładnikowe",
-  robots: { index: false, follow: false },
-};
+export async function generateMetadata({
+  params,
+}: {
+  params: Promise<{ locale: string }>;
+}) {
+  const { locale } = await params;
+  const t = await getTranslations({ locale, namespace: "Admin.twoFactorEnrol" });
+  return {
+    title: t("enableTitle"),
+    robots: { index: false, follow: false },
+  };
+}
 
 /**
  * Ekran włączenia 2FA dla konta, które go jeszcze nie ma.
@@ -39,6 +47,7 @@ export default async function EnforceTwoFactorPage({
 }) {
   const { locale } = await params;
   setRequestLocale(locale);
+  const t = await getTranslations("Admin.twoFactorEnrol");
 
   const admin = await currentAdmin();
   if (!admin) redirect("/admin/login");
@@ -68,19 +77,13 @@ export default async function EnforceTwoFactorPage({
   return (
     <main className="mx-auto max-w-2xl px-6 py-16">
       <h1 className="font-heading text-ink text-2xl font-bold">
-        {wlaczone
-          ? "Logowanie dwuskładnikowe jest włączone"
-          : "Włącz logowanie dwuskładnikowe"}
+        {wlaczone ? t("enabledTitle") : t("enableTitle")}
       </h1>
       <p className="text-ink-muted mt-3 text-sm leading-relaxed">
-        {wlaczone
-          ? "Konto jest zabezpieczone drugim składnikiem. Jeżeli masz przed sobą kody zapasowe — zapisz je teraz; to jedyny moment, w którym są czytelne."
-          : "Panel A&A wymaga drugiego składnika przy logowaniu. Bez niego jedyną przeszkodą między obcą osobą a rezerwacjami, cennikiem i danymi klientów jest hasło — a hasła wyciekają z serwisów, w których nikt ich nie zmieniał od lat."}
+        {wlaczone ? t("enabledIntro") : t("enableIntro")}
       </p>
       <p className="text-ink-muted mt-3 text-sm leading-relaxed">
-        {wlaczone
-          ? "Kody zapasowe możesz w każdej chwili wydać na nowo w Ustawieniach → Moje konto. Wydanie nowego kompletu unieważnia poprzedni."
-          : "Zajmie to dwie minuty: aplikacja uwierzytelniająca na telefonie, jeden kod na potwierdzenie i dziesięć kodów zapasowych do schowania w bezpiecznym miejscu. Kody zapasowe są drogą powrotu, gdy telefon przepadnie."}
+        {wlaczone ? t("enabledHow") : t("enableHow")}
       </p>
 
       <div className="mt-10">
@@ -93,16 +96,16 @@ export default async function EnforceTwoFactorPage({
             href="/admin"
             className="label border-line-strong text-ink hover:border-ink hover:bg-ink/5 inline-flex h-10 items-center border px-5 text-xs transition-colors"
           >
-            Przejdź do panelu
+            {t("goToPanel")}
           </Link>
         </p>
       ) : null}
 
       <p className="text-ink-faint mt-10 text-xs leading-relaxed">
-        Zalogowano jako {admin.email}. Jeżeli nie masz teraz przy sobie telefonu,
-        2FA da się zdjąć z konsoli serwera:{" "}
-        <code className="text-silver">npx tsx scripts/wylacz-2fa.ts</code> — ale
-        do tego czasu panel pozostaje zamknięty.
+        {t.rich("footer", {
+          email: admin.email,
+          code: (chunks) => <code className="text-silver">{chunks}</code>,
+        })}
       </p>
     </main>
   );

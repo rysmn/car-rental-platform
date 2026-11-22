@@ -2,11 +2,10 @@ import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 import { NextIntlClientProvider, hasLocale } from "next-intl";
 import { getTranslations, setRequestLocale } from "next-intl/server";
-import { Raleway, Montserrat } from "next/font/google";
+import localFont from "next/font/local";
 import { routing } from "@/i18n/routing";
 import { THEME_INIT_SCRIPT } from "@/components/layout/ThemeToggle";
 import { PreferencjeHtml } from "@/components/layout/PreferencjeHtml";
-import { CURRENCY_INIT_SCRIPT } from "@/components/currency/CurrencySwitcher";
 import { LOCALE_HINT_INIT_SCRIPT } from "@/components/layout/LocaleSuggestion";
 import { COOKIE_INIT_SCRIPT } from "@/components/consent/CookieConsent";
 import { SITE_ORIGIN, pageMetadata } from "@/lib/seo";
@@ -14,16 +13,18 @@ import { siteConfig } from "@/lib/config/site";
 import "../globals.css";
 
 // latin-ext covers Polish diacritics (ł ż ó ą ę ś ć ń ź).
-const raleway = Raleway({
-  subsets: ["latin", "latin-ext"],
-  weight: ["600", "700", "800"],
+// Self-hosted (src/fonts, OFL licence next to the files). Variable fonts cover
+// Latin and Latin Extended, so Polish diacritics render without a network call.
+const raleway = localFont({
+  src: "../../fonts/Raleway-Variable.ttf",
+  weight: "600 800",
   variable: "--font-raleway",
   display: "swap",
 });
 
-const montserrat = Montserrat({
-  subsets: ["latin", "latin-ext"],
-  weight: ["400", "500", "600"],
+const montserrat = localFont({
+  src: "../../fonts/Montserrat-Variable.ttf",
+  weight: "400 600",
   variable: "--font-montserrat",
   display: "swap",
 });
@@ -108,7 +109,6 @@ export default async function LocaleLayout({
         {/* Same contract for the currency: every price is in the page twice and
             CSS shows one of them, so this attribute has to be right BEFORE the
             first paint or the visitor watches the prices change. */}
-        <script dangerouslySetInnerHTML={{ __html: CURRENCY_INIT_SCRIPT }} />
         {/* Trzeci skrypt tej samej rodziny: rozstrzyga, czy pokazać pasek
             propozycji języka. Bez niego pasek montowałby się po hydratacji
             i spychał całą stronę o 86 px — patrz `LocaleSuggestion`. */}

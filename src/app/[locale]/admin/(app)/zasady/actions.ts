@@ -1,6 +1,7 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
+import { getTranslations } from "next-intl/server";
 import { requirePermission } from "@/lib/auth/guard";
 import { recordAudit } from "@/lib/auth/audit";
 import { getSetting, setSetting } from "@/lib/admin/settings";
@@ -15,10 +16,10 @@ export type SaveResult =
   | { ok: true; message?: string }
   | { ok: false; error: string };
 
-const GENERIC_ERROR: SaveResult = {
-  ok: false,
-  error: "Nie udało się zapisać. Spróbuj ponownie.",
-};
+async function genericError(): Promise<SaveResult> {
+  const t = await getTranslations("Admin.rules");
+  return { ok: false, error: t("errors.generic") };
+}
 
 /**
  * A rule change reaches the FAQ page and the assistant on the next request, so
@@ -93,9 +94,10 @@ export async function saveDocumentRules(
     });
 
     revalidateEverywhere();
-    return { ok: true, message: "Zapisano zasady dokumentów." };
+    const t = await getTranslations("Admin.rules");
+    return { ok: true, message: t("messages.documentsSaved") };
   } catch {
-    return GENERIC_ERROR;
+    return genericError();
   }
 }
 
@@ -144,9 +146,10 @@ export async function saveDriverAgeRules(
       const ageYears = years(formData, `${key}.age.years`);
 
       if (ageOn && ageYears === null) {
+        const t = await getTranslations("Admin.rules");
         return {
           ok: false,
-          error: `Klasa ${label}: wymóg wieku jest włączony, ale pole z liczbą lat jest puste.`,
+          error: t("errors.ageEmpty", { label }),
         };
       }
       /**
@@ -158,9 +161,13 @@ export async function saveDriverAgeRules(
        * believing they lowered the age. Say no, and say why.
        */
       if (ageOn && ageYears !== null && ageYears < FALLBACK_MIN_AGE) {
+        const t = await getTranslations("Admin.rules");
         return {
           ok: false,
-          error: `Klasa ${label}: minimalny wiek nie może być niższy niż ${FALLBACK_MIN_AGE} lat. To próg bezpieczeństwa systemu, nie ustawienie panelu.`,
+          error: t("errors.ageBelowFloor", {
+            label,
+            min: FALLBACK_MIN_AGE,
+          }),
         };
       }
 
@@ -196,11 +203,13 @@ export async function saveDriverAgeRules(
         (m) => m.published && !m.driverClass,
       );
       if (unassigned.length > 0) {
+        const t = await getTranslations("Admin.rules");
         return {
           ok: false,
-          error: `Nie można włączyć egzekwowania: ${unassigned.length} opublikowanych aut nie ma klasy (${unassigned
-            .map((m) => `${m.brand} ${m.model}`)
-            .join(", ")}).`,
+          error: t("errors.enforceBlocked", {
+            count: unassigned.length,
+            cars: unassigned.map((m) => `${m.brand} ${m.model}`).join(", "),
+          }),
         };
       }
     }
@@ -234,9 +243,10 @@ export async function saveDriverAgeRules(
     });
 
     revalidateEverywhere();
-    return { ok: true, message: "Zapisano wymagania wobec kierowcy." };
+    const t = await getTranslations("Admin.rules");
+    return { ok: true, message: t("messages.driverAgeSaved") };
   } catch {
-    return GENERIC_ERROR;
+    return genericError();
   }
 }
 
@@ -265,7 +275,8 @@ export async function saveDriverClasses(
       .filter((c, i) => c.driverClass !== before[i].driverClass);
 
     if (changes.length === 0) {
-      return { ok: true, message: "Bez zmian — przypisania są takie same." };
+      const t = await getTranslations("Admin.rules");
+      return { ok: true, message: t("messages.classesUnchanged") };
     }
 
     const after = await setDriverClasses(changes);
@@ -280,11 +291,12 @@ export async function saveDriverClasses(
     });
 
     revalidateEverywhere();
+    const t = await getTranslations("Admin.rules");
     return {
       ok: true,
-      message: `Zapisano przypisanie klas (zmienionych aut: ${changes.length}).`,
+      message: t("messages.classesSaved", { count: changes.length }),
     };
   } catch {
-    return GENERIC_ERROR;
+    return genericError();
   }
 }

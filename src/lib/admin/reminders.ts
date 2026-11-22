@@ -3,6 +3,7 @@ import { sql } from "drizzle-orm";
 import { getDb } from "@/lib/db";
 import { isoDay } from "@/lib/booking/availability";
 import { DOCUMENT_KIND_LABEL, type DocumentKind } from "@/lib/admin/stats";
+import { pickFrom } from "@/lib/i18n-pick";
 import { notifyExpiringDocuments } from "@/lib/email/notify";
 
 /**
@@ -151,5 +152,9 @@ export async function runDueReminders(
   return { found: items.length, sent, items };
 }
 
-/** "OC/AC", "Przegląd", "Serwis" — one label, used by the panel and the email. */
-export const reminderLabel = (kind: DocumentKind) => DOCUMENT_KIND_LABEL[kind];
+/**
+ * "OC/AC", "Przegląd", "Serwis". The reminder mail is Polish-only (see
+ * lib/email), so this is pinned to "pl" rather than the request locale.
+ */
+export const reminderLabel = (kind: DocumentKind) =>
+  pickFrom(DOCUMENT_KIND_LABEL, kind, "pl");

@@ -1,6 +1,6 @@
-import { promises as fs } from "node:fs";
 import { NextResponse } from "next/server";
 import { currentAdmin } from "@/lib/auth/guard";
+import { getStorage } from "@/lib/storage";
 import { mimeForInvoice, resolveInvoicePath } from "@/lib/storage/invoices";
 
 /**
@@ -22,14 +22,15 @@ export async function GET(
   if (!admin) return new NextResponse("Unauthorized", { status: 401 });
 
   const { path: segments } = await params;
-  const filePath = resolveInvoicePath(segments);
-  if (!filePath) return new NextResponse("Not found", { status: 404 });
+  const key = resolveInvoicePath(segments);
+  if (!key) return new NextResponse("Not found", { status: 404 });
 
-  const contentType = mimeForInvoice(filePath);
+  const contentType = mimeForInvoice(key);
   if (!contentType) return new NextResponse("Not found", { status: 404 });
 
   try {
-    const file = await fs.readFile(filePath);
+    const file = await getStorage().get(key);
+    if (!file) return new NextResponse("Not found", { status: 404 });
     return new NextResponse(new Uint8Array(file), {
       headers: {
         "Content-Type": contentType,

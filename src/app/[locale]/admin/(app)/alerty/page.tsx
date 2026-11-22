@@ -1,25 +1,20 @@
-import { setRequestLocale } from "next-intl/server";
+import { getTranslations, setRequestLocale } from "next-intl/server";
 import { guardPage } from "@/lib/auth/guard";
 import { getAttentionItems, type AttentionItem } from "@/lib/admin/dashboard";
+import { pick } from "@/lib/i18n-pick";
 import { listAlerts } from "@/lib/alerts/repo";
 import { Link, type AppHref } from "@/i18n/navigation";
 import { SystemAlerts } from "./SystemAlerts";
 
-export const metadata = { title: "Alerty" };
-
-const KIND_LABEL: Record<AttentionItem["kind"], string> = {
-  overdue: "Zaległe zwroty",
-  decision: "Do potwierdzenia",
-  pickup: "Wydania dzisiaj",
-  return: "Zwroty dzisiaj",
-  payment: "Płatności",
-  tyres: "Opony",
-  document: "Dokumenty i badania",
-  service: "Serwis i olej",
-  cost: "Raty i opłaty",
-  deadline: "Mandaty, szkody, kaucje i inne",
-  deposit: "Kaucje",
-};
+export async function generateMetadata({
+  params,
+}: {
+  params: Promise<{ locale: string }>;
+}) {
+  const { locale } = await params;
+  const t = await getTranslations({ locale, namespace: "Admin.alerts" });
+  return { title: t("metaTitle") };
+}
 
 /**
  * Everything that needs attention, in one place.
@@ -46,6 +41,7 @@ export default async function AlertsPage({
 }) {
   const { locale } = await params;
   setRequestLocale(locale);
+  const t = await getTranslations("Admin.alerts");
   await guardPage("alerty.podglad");
 
   const { rozwiazane } = await searchParams;
@@ -74,11 +70,11 @@ export default async function AlertsPage({
 
   return (
     <div>
-      <h1 className="font-heading text-3xl font-bold">Alerty</h1>
+      <h1 className="font-heading text-3xl font-bold">{t("title")}</h1>
       <p className="text-ink-muted mt-2 max-w-2xl text-sm">
-        Dwie listy: <strong className="text-ink">awarie systemu</strong> — co się
-        zepsuło, oraz <strong className="text-ink">do zrobienia</strong> — co
-        czeka na decyzję albo na pieniądze.
+        {t.rich("intro", {
+          strong: (chunks) => <strong className="text-ink">{chunks}</strong>,
+        })}
       </p>
 
       <div className="mt-8">
@@ -86,17 +82,17 @@ export default async function AlertsPage({
       </div>
 
       <div className="border-line mt-12 border-t pt-8">
-        <h2 className="label text-ink text-xs">Do zrobienia</h2>
+        <h2 className="label text-ink text-xs">{t("todo.title")}</h2>
         <p className="text-ink-muted mt-2 max-w-2xl text-sm">
           {items.length === 0
-            ? "Nic nie wymaga uwagi."
-            : `${items.length} do przejrzenia, w tym ${urgent.length} pilnych. Pilne to te, które kosztują dziś: zwrot na dziś, pieniądze za trwający wynajem, dokument po terminie.`}
+            ? t("todo.none")
+            : t("todo.summary", { count: items.length, urgent: urgent.length })}
         </p>
       </div>
 
       {items.length === 0 ? (
         <p className="border-line bg-graphite/40 text-silver mt-8 border p-10 text-center text-sm">
-          Zwroty, płatności, dokumenty i serwisy są na bieżąco.
+          {t("todo.allCurrent")}
         </p>
       ) : (
         <div className="mt-8 flex flex-col gap-10">
@@ -106,7 +102,7 @@ export default async function AlertsPage({
             return (
               <section key={kind}>
                 <div className="mb-3 flex items-center justify-between gap-3">
-                  <h2 className="label text-ink text-xs">{KIND_LABEL[kind]}</h2>
+                  <h2 className="label text-ink text-xs">{t(`kinds.${kind}`)}</h2>
                   <span className="text-ink-faint text-[11px]">
                     {group.length}
                   </span>
@@ -117,22 +113,22 @@ export default async function AlertsPage({
                       <span className="flex flex-col gap-1 px-4 py-4 sm:flex-row sm:items-center sm:justify-between sm:gap-4 sm:px-5">
                         <span className="flex items-center gap-3">
                           <span aria-hidden>{a.urgent ? "⚠️" : "•"}</span>
-                          <span className="text-ink text-sm">{a.subject}</span>
+                          <span className="text-ink text-sm">{pick(a.subject, locale)}</span>
                         </span>
                         <span className="flex flex-col gap-1 pl-7 sm:items-end sm:pl-0">
                           <span
                             className={`text-xs ${a.urgent ? "text-red" : "text-ink-faint"}`}
                           >
-                            {a.detail}
+                            {pick(a.detail, locale)}
                           </span>
                           <span className="label-tight border-line text-ink border px-2 py-1 text-[10px]">
-                            {a.action}
+                            {pick(a.action, locale)}
                           </span>
                         </span>
                       </span>
                     );
                     return (
-                      <li key={`${a.kind}-${a.subject}-${i}`}>
+                      <li key={`${a.kind}-${a.subject.pl}-${i}`}>
                         {a.href ? (
                           <Link
                             href={a.href as AppHref}

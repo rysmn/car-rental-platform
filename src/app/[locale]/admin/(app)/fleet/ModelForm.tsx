@@ -1,6 +1,7 @@
 "use client";
 
 import { useActionState, useState } from "react";
+import { useLocale, useTranslations } from "next-intl";
 import type { FormResult } from "./actions";
 import type { EditableModel } from "@/lib/admin/fleet";
 import {
@@ -14,6 +15,7 @@ import {
   SEGMENT_HINT,
 } from "@/lib/admin/fleet-options";
 import { EDITABLE_SEGMENTS } from "@/lib/fleet/segments";
+import { pick, type Bilingual } from "@/lib/i18n-pick";
 import {
   DRIVER_CLASSES,
   DRIVER_CLASS_LABEL,
@@ -24,8 +26,27 @@ type Action = (
   formData: FormData,
 ) => Promise<FormResult>;
 
+/** Flatten a bilingual map to the request locale for the Select labels. */
+function localized<K extends string>(
+  map: Record<K, Bilingual>,
+  locale: string,
+): Record<K, string> {
+  return Object.fromEntries(
+    Object.entries<Bilingual>(map).map(([k, v]) => [k, pick(v, locale)]),
+  ) as Record<K, string>;
+}
+
 function pln(grosze: number): string {
   return (grosze / 100).toString();
+}
+
+/** Symbol waluty w bieżącym locale (pl: „zł”, en: „PLN”). */
+function currencySymbol(locale: string) {
+  return (
+    new Intl.NumberFormat(locale, { style: "currency", currency: "PLN" })
+      .formatToParts(0)
+      .find((p) => p.type === "currency")?.value ?? "PLN"
+  );
 }
 
 /** Client-side preview of the server's slug normalisation. Kept in sync with
@@ -40,13 +61,6 @@ function slugify(input: string): string {
     .replace(/[^a-z0-9]+/g, "-")
     .replace(/^-+|-+$/g, "");
 }
-
-/** What each class is for, in the words an operator would use. */
-const DRIVER_CLASS_HINT: Record<(typeof DRIVER_CLASSES)[number], string> = {
-  standard: "Auta osobowe podstawowej klasy — np. RAV4, Tiguan.",
-  premium: "Auta klasy wyższej i luksusowej — np. GLE, Panamera, Tesla.",
-  van_bus: "Busy i auta 9-osobowe — np. Renault Trafic.",
-};
 
 const inputCls =
   "h-10 w-full border border-line-strong bg-surface-1 px-3 text-sm text-ink placeholder:text-ink-faint";
@@ -125,7 +139,17 @@ export function ModelForm({
   action: Action;
   model?: EditableModel;
 }) {
+  const t = useTranslations("Admin.fleet");
+  const locale = useLocale();
+  const currency = currencySymbol(locale);
   const [state, formAction, pending] = useActionState(action, null);
+
+  /** What each class is for, in the words an operator would use. */
+  const driverClassHint: Record<(typeof DRIVER_CLASSES)[number], string> = {
+    standard: t("driverClassHintStandard"),
+    premium: t("driverClassHintPremium"),
+    van_bus: t("driverClassHintVanBus"),
+  };
 
   // Slug UX: while creating, the slug tracks brand + model automatically until
   // the admin edits it by hand — so they never have to think about it, and the
@@ -147,11 +171,11 @@ export function ModelForm({
       {model && <input type="hidden" name="id" value={model.id} />}
 
       <fieldset className="space-y-4">
-        <legend className="label text-xs text-ink">Podstawowe dane</legend>
+        <legend className="label text-xs text-ink">{t("basicInfo")}</legend>
         <div className="grid gap-4 sm:grid-cols-2">
           <label className="flex flex-col gap-1">
             <span className={labelCls}>
-              Marka<span className="text-red"> *</span>
+              {t("brand")}<span className="text-red"> *</span>
             </span>
             <input
               name="brand"
@@ -164,7 +188,7 @@ export function ModelForm({
           </label>
           <label className="flex flex-col gap-1">
             <span className={labelCls}>
-              Model<span className="text-red"> *</span>
+              {t("modelName")}<span className="text-red"> *</span>
             </span>
             <input
               name="model"
@@ -176,7 +200,7 @@ export function ModelForm({
             />
           </label>
           <label className="flex flex-col gap-1 sm:col-span-2">
-            <span className={labelCls}>Identyfikator URL (slug)</span>
+            <span className={labelCls}>{t("slug")}</span>
             <input
               name="slug"
               value={slug}
@@ -186,13 +210,10 @@ export function ModelForm({
               placeholder="bmw-740d"
               className={`${inputCls} font-mono`}
             />
-            <span className="text-ink-faint text-[11px]">
-              Adres podstrony auta. Zostaw puste — utworzymy go z marki i
-              modelu.
-            </span>
+            <span className="text-ink-faint text-[11px]">{t("slugHelp")}</span>
           </label>
           <Text
-            label="Rok"
+            label={t("year")}
             name="year"
             type="number"
             min="1990"
@@ -201,14 +222,14 @@ export function ModelForm({
             placeholder="2024"
           />
           <Select
-            label="Segment"
+            label={t("segment")}
             name="category"
             options={CATEGORIES}
-            labels={CATEGORY_LABEL}
+            labels={localized(CATEGORY_LABEL, locale)}
             defaultValue={model?.category}
           />
           <Text
-            label="Liczba miejsc"
+            label={t("seats")}
             name="seats"
             type="number"
             min="1"
@@ -216,34 +237,25 @@ export function ModelForm({
             required
           />
           <Select
-            label="Skrzynia biegów"
+            label={t("gearbox")}
             name="gearbox"
             options={GEARBOXES}
-            labels={GEARBOX_LABEL}
+            labels={localized(GEARBOX_LABEL, locale)}
             defaultValue={model?.gearbox}
           />
           <Select
-            label="Paliwo"
+            label={t("fuel")}
             name="fuel"
             options={FUELS}
-            labels={FUEL_LABEL}
+            labels={localized(FUEL_LABEL, locale)}
             defaultValue={model?.fuel}
           />
         </div>
       </fieldset>
 
       <fieldset className="space-y-4">
-        <legend className="label text-xs text-ink">
-          Klasy floty (filtry na stronie)
-        </legend>
-        <p className="text-ink-faint text-[11px]">
-          Półka handlowa — decyduje o cenie i o tym, jak auto jest sprzedawane.
-          Można zaznaczyć kilka. Nadwozia się tu nie ustawia: filtry „SUV”,
-          „Sedan” i „Bus / Van” biorą się z typu nadwozia powyżej, „Elektryczne”
-          z paliwa, a „Premium SUV” pojawia się sam, gdy auto jest jednocześnie
-          SUV-em i ma zaznaczone „Luxury”. Dzięki temu nie da się oznaczyć
-          diesla jako elektryka ani sedana jako SUV-a.
-        </p>
+        <legend className="label text-xs text-ink">{t("fleetClasses")}</legend>
+        <p className="text-ink-faint text-[11px]">{t("fleetClassesIntro")}</p>
         <div className="grid gap-3 sm:grid-cols-2">
           {EDITABLE_SEGMENTS.map((s) => (
             <label
@@ -258,9 +270,9 @@ export function ModelForm({
                 className="accent-red mt-0.5 size-4 shrink-0"
               />
               <span className="flex flex-col gap-0.5">
-                <span className="text-sm text-ink">{SEGMENT_LABEL[s]}</span>
+                <span className="text-sm text-ink">{pick(SEGMENT_LABEL[s], locale)}</span>
                 <span className="text-ink-faint text-[11px]">
-                  {SEGMENT_HINT[s]}
+                  {pick(SEGMENT_HINT[s], locale)}
                 </span>
               </span>
             </label>
@@ -270,16 +282,12 @@ export function ModelForm({
 
       <fieldset className="space-y-4">
         <legend className="label text-xs text-ink">
-          Klasa wymogów kierowcy
+          {t("driverClassHeading")}
         </legend>
         <p className="text-ink-faint text-[11px]">
-          Decyduje o minimalnym wieku kierowcy i minimalnym stażu prawa jazdy
-          dla tego auta. Same progi ustawiasz w{" "}
-          <span className="text-silver">
-            Zasady wynajmu → Wiek kierowcy i staż
-          </span>{" "}
-          — tutaj wybierasz tylko, która klasa obowiązuje. Wybór jest
-          obowiązkowy: auto bez klasy nie ma żadnego wymogu.
+          {t("driverClassIntroA")}{" "}
+          <span className="text-silver">{t("rentalRulesPath")}</span>{" "}
+          {t("driverClassIntroB")}
         </p>
         <div className="grid gap-3 sm:grid-cols-3">
           {DRIVER_CLASSES.map((c) => (
@@ -297,10 +305,10 @@ export function ModelForm({
               />
               <span className="flex flex-col gap-0.5">
                 <span className="text-sm text-ink">
-                  {DRIVER_CLASS_LABEL[c]}
+                  {pick(DRIVER_CLASS_LABEL[c], locale)}
                 </span>
                 <span className="text-ink-faint text-[11px]">
-                  {DRIVER_CLASS_HINT[c]}
+                  {driverClassHint[c]}
                 </span>
               </span>
             </label>
@@ -308,17 +316,16 @@ export function ModelForm({
         </div>
         {model && !model.driverClass ? (
           <p className="text-[11px] text-amber-500">
-            To auto nie ma jeszcze klasy. Dopóki jej nie wybierzesz, nie
-            obowiązuje przy nim żaden wymóg wieku ani stażu.
+            {t("driverClassMissing")}
           </p>
         ) : null}
       </fieldset>
 
       <fieldset className="space-y-4">
-        <legend className="label text-xs text-ink">Cennik</legend>
+        <legend className="label text-xs text-ink">{t("pricing")}</legend>
         <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
           <Text
-            label="Cena / doba (zł)"
+            label={t("dailyPrice", { currency })}
             name="daily"
             type="number"
             step="0.01"
@@ -327,7 +334,7 @@ export function ModelForm({
             required
           />
           <Text
-            label="Cena / miesiąc (zł)"
+            label={t("monthlyPrice", { currency })}
             name="monthly"
             type="number"
             step="0.01"
@@ -336,7 +343,7 @@ export function ModelForm({
             required
           />
           <Text
-            label="Kaucja (zł)"
+            label={t("deposit", { currency })}
             name="deposit"
             type="number"
             step="0.01"
@@ -344,7 +351,7 @@ export function ModelForm({
             defaultValue={model ? pln(model.depositGrosze) : "0"}
           />
           <Text
-            label="Limit km / doba"
+            label={t("kmPerDayLimit")}
             name="kmPerDayLimit"
             type="number"
             min="0"
@@ -354,9 +361,9 @@ export function ModelForm({
       </fieldset>
 
       <fieldset className="space-y-4">
-        <legend className="label text-xs text-ink">Prezentacja</legend>
+        <legend className="label text-xs text-ink">{t("presentation")}</legend>
         <label className="flex flex-col gap-1">
-          <span className={labelCls}>Opis (PL)</span>
+          <span className={labelCls}>{t("descriptionPl")}</span>
           <textarea
             name="descriptionPl"
             defaultValue={model?.descriptionPl ?? ""}
@@ -365,7 +372,7 @@ export function ModelForm({
           />
         </label>
         <label className="flex flex-col gap-1">
-          <span className={labelCls}>Opis (EN)</span>
+          <span className={labelCls}>{t("descriptionEn")}</span>
           <textarea
             name="descriptionEn"
             defaultValue={model?.descriptionEn ?? ""}
@@ -375,7 +382,7 @@ export function ModelForm({
         </label>
         <div className="grid gap-4 sm:grid-cols-2">
           <Text
-            label="Kolejność"
+            label={t("sortOrder")}
             name="sortOrder"
             type="number"
             min="0"
@@ -388,9 +395,7 @@ export function ModelForm({
               defaultChecked={model?.published ?? true}
               className="accent-red size-4"
             />
-            <span className="text-silver text-sm">
-              Opublikowany (widoczny publicznie)
-            </span>
+            <span className="text-silver text-sm">{t("publishedCheckbox")}</span>
           </label>
         </div>
       </fieldset>
@@ -401,13 +406,13 @@ export function ModelForm({
           disabled={pending}
           className="label bg-red hover:bg-red-hover inline-flex h-11 items-center px-8 text-xs text-white transition-colors disabled:opacity-50"
         >
-          {pending ? "Zapisywanie…" : model ? "Zapisz zmiany" : "Utwórz model"}
+          {pending ? t("saving") : model ? t("saveChanges") : t("createModel")}
         </button>
         {state && !state.ok && (
           <span className="text-red text-sm">{state.error}</span>
         )}
         {state?.ok && (
-          <span className="text-sm text-emerald-400">Zapisano ✓</span>
+          <span className="text-sm text-emerald-400">{t("saved")}</span>
         )}
       </div>
     </form>

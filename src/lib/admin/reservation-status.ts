@@ -1,5 +1,7 @@
 // Pure reservation-status logic — safe to import from client components (no DB).
 
+import { type Bilingual } from "@/lib/i18n-pick";
+
 /**
  * Statusy rezerwacji — komplet, ten sam co enum w bazie.
  *
@@ -67,25 +69,25 @@ export function canTransition(from: ReservationStatus, to: ReservationStatus) {
   return STATUS_TRANSITIONS[from]?.includes(to) ?? false;
 }
 
-/** Polish labels (admin UI is Polish). */
-export const STATUS_LABEL: Record<ReservationStatus, string> = {
-  pending_verification: "Niepotwierdzona e-mailem",
-  pending: "Oczekująca",
-  confirmed: "Potwierdzona",
-  cancelled: "Anulowana",
-  no_show: "Nieodebrana",
-  completed: "Zakończona",
-  rejected: "Odrzucona",
+/** Status labels, bilingual. Pick with `pickFrom(STATUS_LABEL, s, locale)`. */
+export const STATUS_LABEL: Record<ReservationStatus, Bilingual> = {
+  pending_verification: { pl: "Niepotwierdzona e-mailem", en: "Unconfirmed by email" },
+  pending: { pl: "Oczekująca", en: "Pending" },
+  confirmed: { pl: "Potwierdzona", en: "Confirmed" },
+  cancelled: { pl: "Anulowana", en: "Cancelled" },
+  no_show: { pl: "Nieodebrana", en: "No-show" },
+  completed: { pl: "Zakończona", en: "Completed" },
+  rejected: { pl: "Odrzucona", en: "Rejected" },
 };
 
-export const ACTION_LABEL: Record<ReservationStatus, string> = {
+export const ACTION_LABEL: Record<ReservationStatus, Bilingual> = {
   // Nie jest celem żadnego przejścia — wpis istnieje, żeby mapa była kompletna
   // i żeby kompilator pilnował tego przy każdej kolejnej zmianie statusów.
-  pending_verification: "Niepotwierdzona e-mailem",
-  confirmed: "Potwierdź",
-  rejected: "Odrzuć",
-  cancelled: "Anuluj",
-  no_show: "Oznacz jako nieodebraną",
-  completed: "Zakończ",
-  pending: "Oczekująca",
+  pending_verification: { pl: "Niepotwierdzona e-mailem", en: "Unconfirmed by email" },
+  confirmed: { pl: "Potwierdź", en: "Confirm" },
+  rejected: { pl: "Odrzuć", en: "Reject" },
+  cancelled: { pl: "Anuluj", en: "Cancel" },
+  no_show: { pl: "Oznacz jako nieodebraną", en: "Mark as no-show" },
+  completed: { pl: "Zakończ", en: "Complete" },
+  pending: { pl: "Oczekująca", en: "Pending" },
 };

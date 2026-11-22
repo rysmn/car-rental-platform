@@ -13,6 +13,7 @@ import {
   type CancellationPolicy,
 } from "./cancellation";
 import type { QuoteBreakdown } from "./types";
+import { pick } from "@/lib/i18n-pick";
 
 /**
  * Odczyt i zapis należności za anulowanie — jedyna droga do tej tabeli.
@@ -290,6 +291,8 @@ export async function stanNieodebrania(input: {
   status: string;
   startDate: string;
   pickupTime: string | null;
+  /** Request locale — the reason is shown to the operator. */
+  locale: string;
 }): Promise<{ mozliwy: boolean; powod: string | null }> {
   const { getSetting } = await import("@/lib/admin/settings");
   const { chwilaWarszawska } = await import("./lead-time");
@@ -312,6 +315,12 @@ export async function stanNieodebrania(input: {
     ? { mozliwy: true, powod: null }
     : {
         mozliwy: false,
-        powod: `Rezerwację można uznać za nieodebraną dopiero ${polityka.noShowGraceMinutes} min po godzinie odbioru.`,
+        powod: pick(
+          {
+            pl: `Rezerwację można uznać za nieodebraną dopiero ${polityka.noShowGraceMinutes} min po godzinie odbioru.`,
+            en: `A reservation can be marked as a no-show only ${polityka.noShowGraceMinutes} min after the pickup time.`,
+          },
+          input.locale,
+        ),
       };
 }

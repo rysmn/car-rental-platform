@@ -1,4 +1,4 @@
-import { setRequestLocale } from "next-intl/server";
+import { getTranslations, setRequestLocale } from "next-intl/server";
 import { guardPage } from "@/lib/auth/guard";
 import { Link } from "@/i18n/navigation";
 import { formatPln } from "@/lib/format";
@@ -19,33 +19,27 @@ import {
   listBusinessExpenses,
   listBusinessRecurring,
 } from "@/lib/admin/business-expenses";
-import {
-  BUSINESS_EXPENSE_LABEL,
-  BUSINESS_GROUP_LABEL,
-} from "@/lib/admin/business-expense-options";
 import { ExpenseManager } from "./ExpenseManager";
 import { RecurringManager } from "./RecurringManager";
 
-export const metadata = { title: "Finanse" };
+export async function generateMetadata({
+  params,
+}: {
+  params: Promise<{ locale: string }>;
+}) {
+  const { locale } = await params;
+  const t = await getTranslations({ locale, namespace: "Admin.finance" });
+  return { title: t("title") };
+}
 
-/** "2026-08" → "sie 2026". Panel is Polish-only, so no locale argument. */
-function monthLabel(month: string): string {
+/** "2026-08" → "Aug 2026" / "sie 2026", in the request locale. */
+function monthLabel(month: string, locale: string): string {
   const [y, m] = month.split("-").map(Number);
-  const names = [
-    "sty",
-    "lut",
-    "mar",
-    "kwi",
-    "maj",
-    "cze",
-    "lip",
-    "sie",
-    "wrz",
-    "paź",
-    "lis",
-    "gru",
-  ];
-  return `${names[m - 1] ?? m} ${y}`;
+  return new Intl.DateTimeFormat(locale === "en" ? "en-GB" : "pl-PL", {
+    month: "short",
+    year: "numeric",
+    timeZone: "UTC",
+  }).format(new Date(Date.UTC(y, m - 1, 1)));
 }
 
 function pct(v: number | null): string {
@@ -55,13 +49,14 @@ function pct(v: number | null): string {
 }
 
 /** The period bar, as a plain GET form — a chosen period is a shareable link. */
-function PeriodFilters({
+async function PeriodFilters({
   period,
   window,
 }: {
   period: PeriodKey;
   window: Window;
 }) {
+  const t = await getTranslations("Admin.finance");
   const field =
     "h-9 border border-line-strong bg-surface-1 px-2 text-xs text-ink";
   return (
@@ -70,20 +65,24 @@ function PeriodFilters({
       className="border-line bg-void flex flex-wrap items-end gap-3 border p-4"
     >
       <label className="flex flex-col gap-1">
-        <span className="label-tight text-ink-faint text-[10px]">Okres</span>
+        <span className="label-tight text-ink-faint text-[10px]">
+          {t("period.label")}
+        </span>
         <select name="period" defaultValue={period} className={field}>
           {PERIODS.map((p) => (
             <option key={p.key} value={p.key}>
-              {p.label}
+              {t(`periods.${p.key}`)}
             </option>
           ))}
-          <option value="custom">Własny zakres</option>
+          <option value="custom">{t("period.custom")}</option>
         </select>
       </label>
       {/* Always visible, not hidden behind "custom": they double as a readout
           of what the chosen preset actually resolved to. */}
       <label className="flex flex-col gap-1">
-        <span className="label-tight text-ink-faint text-[10px]">Od</span>
+        <span className="label-tight text-ink-faint text-[10px]">
+          {t("period.from")}
+        </span>
         <input
           type="date"
           name="from"
@@ -92,7 +91,9 @@ function PeriodFilters({
         />
       </label>
       <label className="flex flex-col gap-1">
-        <span className="label-tight text-ink-faint text-[10px]">Do</span>
+        <span className="label-tight text-ink-faint text-[10px]">
+          {t("period.to")}
+        </span>
         <input
           type="date"
           name="to"
@@ -104,7 +105,7 @@ function PeriodFilters({
         type="submit"
         className="label bg-red hover:bg-red-hover inline-flex h-9 items-center px-5 text-xs text-white transition-colors"
       >
-        Pokaż
+        {t("period.submit")}
       </button>
     </form>
   );
@@ -164,6 +165,7 @@ export default async function FinancePage({
 
   const { locale } = await params;
   setRequestLocale(locale);
+  const t = await getTranslations("Admin.finance");
 
   const q = await searchParams;
   const one = (k: string) => {
@@ -196,20 +198,18 @@ export default async function FinancePage({
 
   return (
     <div>
-      <h1 className="font-heading text-3xl font-bold">Finanse</h1>
+      <h1 className="font-heading text-3xl font-bold">{t("title")}</h1>
       <p className="text-ink-muted mt-2 text-sm">
-        Koszty firmy — reklama, biuro, księgowość, telefony, domena. Wszystko,
-        czego nie da się przypisać do jednego auta. Koszty konkretnego
-        egzemplarza (serwis, OC, opony) wpisujesz przy aucie w zakładce{" "}
-        <Link
-          href="/admin/fleet"
-          className="text-silver hover:text-ink tap-area underline underline-offset-2"
-        >
-          Flota
-        </Link>{" "}
-        — inaczej jego marża będzie zawyżona. Przychód liczony tak samo jak w
-        Analityce: tylko rezerwacje potwierdzone i zakończone, rozłożone na dni
-        najmu.
+        {t.rich("intro", {
+          link: (chunks) => (
+            <Link
+              href="/admin/fleet"
+              className="text-silver hover:text-ink tap-area underline underline-offset-2"
+            >
+              {chunks}
+            </Link>
+          ),
+        })}
       </p>
 
       <div className="mt-8">
@@ -218,46 +218,48 @@ export default async function FinancePage({
 
       {/* ── Wynik firmy ──────────────────────────────────────────────────── */}
       <section className="mt-10">
-        <h2 className="label text-ink text-xs">Wynik za wybrany okres</h2>
+        <h2 className="label text-ink text-xs">{t("result.title")}</h2>
         <p className="text-ink-faint mt-1 mb-4 text-xs">
-          Przychód minus koszty aut minus koszty firmy. Porównanie do
-          poprzedniego, równie długiego okresu ({prev.from} – {prev.to}).
+          {t("result.description", { from: prev.from, to: prev.to })}
         </p>
         <div className="border-line bg-line grid gap-px border sm:grid-cols-2 lg:grid-cols-4">
           <Tile
-            label="Przychód"
-            value={formatPln(result.revenueGrosze, "pl")}
-            hint={`poprzednio ${formatPln(before.revenueGrosze, "pl")} · ${pct(
-              delta(result.revenueGrosze, before.revenueGrosze),
-            )}`}
+            label={t("tiles.revenue")}
+            value={formatPln(result.revenueGrosze, locale)}
+            hint={t("result.previously", {
+              value: formatPln(before.revenueGrosze, locale),
+              delta: pct(delta(result.revenueGrosze, before.revenueGrosze)),
+            })}
           />
           <Tile
-            label="Koszty aut"
-            value={formatPln(result.carCostGrosze, "pl")}
-            hint="serwis, paliwo, OC, leasing — z zakładki Flota"
+            label={t("tiles.carCosts")}
+            value={formatPln(result.carCostGrosze, locale)}
+            hint={t("tiles.carCostsHint")}
           />
           <Tile
-            label="Koszty firmy"
-            value={formatPln(result.businessCostGrosze, "pl")}
-            hint={`poprzednio ${formatPln(
-              before.businessCostGrosze,
-              "pl",
-            )} · ${pct(
-              delta(result.businessCostGrosze, before.businessCostGrosze),
-            )}`}
+            label={t("tiles.businessCosts")}
+            value={formatPln(result.businessCostGrosze, locale)}
+            hint={t("result.previously", {
+              value: formatPln(before.businessCostGrosze, locale),
+              delta: pct(
+                delta(result.businessCostGrosze, before.businessCostGrosze),
+              ),
+            })}
           />
           <Tile
-            label="Zostało"
-            value={formatPln(result.resultGrosze, "pl")}
+            label={t("tiles.left")}
+            value={formatPln(result.resultGrosze, locale)}
             tone={result.resultGrosze >= 0 ? "good" : "bad"}
             hint={
               result.marginPct == null
-                ? "brak przychodu w tym okresie"
-                : `marża ${Math.round(result.marginPct)}% · koszty firmy to ${
-                    businessSharePct == null
-                      ? "—"
-                      : `${Math.round(businessSharePct)}%`
-                  } wszystkich kosztów`
+                ? t("result.noRevenue")
+                : t("result.margin", {
+                    margin: Math.round(result.marginPct),
+                    share:
+                      businessSharePct == null
+                        ? "—"
+                        : `${Math.round(businessSharePct)}%`,
+                  })
             }
           />
         </div>
@@ -265,18 +267,16 @@ export default async function FinancePage({
 
       {/* ── Na co idą pieniądze ──────────────────────────────────────────── */}
       <section className="mt-14">
-        <h2 className="label text-ink text-xs">Na co idą pieniądze firmy</h2>
+        <h2 className="label text-ink text-xs">{t("structure.title")}</h2>
         <p className="text-ink-faint mt-1 mb-4 text-xs">
-          Koszt PRZYPADAJĄCY na wybrany okres: kwota rozłożona na dni, które
-          kupuje. Rok hostingu zapłacony w styczniu to jedna dwunasta na
-          miesiąc, a nie styczniowa katastrofa i jedenaście darmowych miesięcy.
-          Razem {formatPln(structure.totalGrosze, "pl")}.
+          {t("structure.description", {
+            total: formatPln(structure.totalGrosze, locale),
+          })}
         </p>
 
         {structure.groups.length === 0 ? (
           <p className="border-line text-silver border px-5 py-6 text-center text-sm">
-            Brak kosztów firmowych w tym okresie. Dodaj pierwszy niżej — albo
-            wpisz to, co płacisz co miesiąc, jako abonament.
+            {t("structure.empty")}
           </p>
         ) : (
           <div className="border-line border">
@@ -287,11 +287,11 @@ export default async function FinancePage({
               >
                 <div className="flex flex-wrap items-baseline justify-between gap-3">
                   <span className="text-ink text-sm">
-                    {BUSINESS_GROUP_LABEL[g.group]}
+                    {t(`groups.${g.group}`)}
                   </span>
                   <span className="flex items-baseline gap-3">
                     <span className="text-ink text-sm tabular-nums">
-                      {formatPln(g.amountGrosze, "pl")}
+                      {formatPln(g.amountGrosze, locale)}
                     </span>
                     <span className="text-ink-faint w-10 text-right text-xs tabular-nums">
                       {Math.round(g.sharePct)}%
@@ -310,9 +310,9 @@ export default async function FinancePage({
                       key={c.category}
                       className="text-ink-faint text-xs tabular-nums"
                     >
-                      {BUSINESS_EXPENSE_LABEL[c.category]}{" "}
+                      {t(`categories.${c.category}`)}{" "}
                       <span className="text-silver">
-                        {formatPln(c.amountGrosze, "pl")}
+                        {formatPln(c.amountGrosze, locale)}
                       </span>
                     </span>
                   ))}
@@ -325,34 +325,38 @@ export default async function FinancePage({
 
       {/* ── 12 miesięcy ──────────────────────────────────────────────────── */}
       <section className="mt-14">
-        <h2 className="label text-ink text-xs">Koszty firmy — 12 miesięcy</h2>
+        <h2 className="label text-ink text-xs">{t("months.title")}</h2>
         <p className="text-ink-faint mt-1 mb-4 text-xs">
-          Niezależne od filtra powyżej — odpowiada na pytanie, czy koszty stałe
-          rosną. Ostatni słupek to miesiąc w toku i z natury jest niepełny.
+          {t("months.description")}
         </p>
         {/* Dwanaście słupków z podpisami potrzebuje ~34rem. Na telefonie nie
             ma tyle miejsca, więc przewija się wykres, a nie cała strona. */}
         <div className="border-line overflow-x-auto border p-4">
           <div className="flex min-w-[32rem] items-end gap-1">
-          {months.map((m, i) => (
-            <div key={m.month} className="flex flex-1 flex-col items-center">
-              <div
-                className={`w-full ${
-                  i === months.length - 1 ? "bg-red/50" : "bg-red"
-                }`}
-                style={{
-                  height: `${Math.max((m.expenseGrosze / maxMonth) * 120, m.expenseGrosze > 0 ? 2 : 0)}px`,
-                }}
-                title={`${monthLabel(m.month)}: ${formatPln(m.expenseGrosze, "pl")}`}
-              />
-              <span className="text-ink-faint mt-2 text-[9px] whitespace-nowrap">
-                {monthLabel(m.month)}
-              </span>
-              <span className="text-silver text-[9px] tabular-nums">
-                {Math.round(m.expenseGrosze / 100).toLocaleString("pl-PL")}
-              </span>
-            </div>
-          ))}
+            {months.map((m, i) => (
+              <div key={m.month} className="flex flex-1 flex-col items-center">
+                <div
+                  className={`w-full ${
+                    i === months.length - 1 ? "bg-red/50" : "bg-red"
+                  }`}
+                  style={{
+                    height: `${Math.max((m.expenseGrosze / maxMonth) * 120, m.expenseGrosze > 0 ? 2 : 0)}px`,
+                  }}
+                  title={t("months.barTitle", {
+                    month: monthLabel(m.month, locale),
+                    amount: formatPln(m.expenseGrosze, locale),
+                  })}
+                />
+                <span className="text-ink-faint mt-2 text-[9px] whitespace-nowrap">
+                  {monthLabel(m.month, locale)}
+                </span>
+                <span className="text-silver text-[9px] tabular-nums">
+                  {Math.round(m.expenseGrosze / 100).toLocaleString(
+                    locale === "en" ? "en-GB" : "pl-PL",
+                  )}
+                </span>
+              </div>
+            ))}
           </div>
         </div>
       </section>
@@ -364,9 +368,7 @@ export default async function FinancePage({
 
       {/* ── Lista kosztów ────────────────────────────────────────────────── */}
       <section className="mt-14">
-        <h2 className="label text-ink mb-4 text-xs">
-          Koszty wpisane w tym okresie
-        </h2>
+        <h2 className="label text-ink mb-4 text-xs">{t("list.title")}</h2>
         <ExpenseManager expenses={expenses} />
       </section>
     </div>

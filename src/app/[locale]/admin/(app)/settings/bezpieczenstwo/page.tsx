@@ -1,4 +1,4 @@
-import { setRequestLocale } from "next-intl/server";
+import { setRequestLocale, getTranslations } from "next-intl/server";
 import {
   NAZWA_ZDARZENIA,
   podsumujZdarzenia,
@@ -18,30 +18,29 @@ import {
 } from "@/lib/admin/cache";
 import { currentAdmin } from "@/lib/auth/guard";
 import { formatDateTimePl } from "@/lib/format";
+import { pick } from "@/lib/i18n-pick";
 import { BuildCacheCard, type BuildCacheView } from "./BuildCacheCard";
 
-export const metadata = { title: "Bezpieczeństwo" };
+export async function generateMetadata({
+  params,
+}: {
+  params: Promise<{ locale: string }>;
+}) {
+  const { locale } = await params;
+  const t = await getTranslations({ locale, namespace: "Admin.settings.security" });
+  return { title: t("metaTitle") };
+}
 
-const LIGHT: Record<HealthState, { dot: string; label: string }> = {
-  ok: { dot: "🟢", label: "Działa" },
-  warn: { dot: "🟠", label: "Uwaga" },
-  fail: { dot: "🔴", label: "Nie działa" },
+const DOT: Record<HealthState, string> = {
+  ok: "🟢",
+  warn: "🟠",
+  fail: "🔴",
   // Two distinct not-green states, deliberately. "Stale" means the check used
   // to run and has gone quiet — which is itself a fault, and usually a worse
   // one than the thing being checked. "Unknown" means it never ran at all.
-  stale: { dot: "🟠", label: "Brak świeżego raportu" },
-  unknown: { dot: "⚪", label: "Nie wiadomo" },
+  stale: "🟠",
+  unknown: "⚪",
 };
-
-/** "przed chwilą" / "12 min temu" / "3 godz. temu" / "2 dni temu". */
-function ago(minutes: number | null): string {
-  if (minutes == null) return "nigdy";
-  if (minutes < 2) return "przed chwilą";
-  if (minutes < 60) return `${minutes} min temu`;
-  const hours = Math.round(minutes / 60);
-  if (hours < 48) return `${hours} godz. temu`;
-  return `${Math.round(hours / 24)} dni temu`;
-}
 
 /**
  * Bezpieczeństwo — what is actually true right now, not what was true when
@@ -63,6 +62,8 @@ export default async function SecurityPage({
 
   const { locale } = await params;
   setRequestLocale(locale);
+  const t = await getTranslations("Admin.settings.security");
+  const tc = await getTranslations("Admin.settings.common");
 
   const [checks, logins, accounts, cache, admin] = await Promise.all([
     getHealthChecks(),
@@ -72,30 +73,48 @@ export default async function SecurityPage({
     currentAdmin(),
   ]);
 
+  /** "przed chwilą" / "12 min temu" / "3 godz. temu" / "2 dni temu". */
+  const ago = (minutes: number | null): string => {
+    if (minutes == null) return t("ago.never");
+    if (minutes < 2) return t("ago.justNow");
+    if (minutes < 60) return t("ago.minutes", { n: minutes });
+    const hours = Math.round(minutes / 60);
+    if (hours < 48) return t("ago.hours", { n: hours });
+    return t("ago.days", { n: Math.round(hours / 24) });
+  };
+
   // Formatted here rather than in the client component, so the card cannot
   // invent a second way of writing a number that also appears in the log.
   const cacheView: BuildCacheView = {
-    dot: LIGHT[cache.state].dot,
+    dot: DOT[cache.state],
     statusLabel:
       cache.state === "ok"
-        ? "Działa"
+        ? t("health.ok")
         : cache.state === "warn"
-          ? "Czyści cache — dysk powyżej progu"
+          ? t("cache.statusWarn")
           : cache.state === "fail"
-            ? "Dysk pełny mimo czyszczenia — potrzebna decyzja"
-            : LIGHT[cache.state].label,
+            ? t("cache.statusFail")
+            : t(`health.${cache.state}`),
     cache: formatBytesPl(cache.cacheBytes),
     disk:
       cache.diskPercent == null
         ? "—"
-        : `${cache.diskPercent}%${cache.diskFree ? ` (${cache.diskFree} wolne)` : ""}`,
+        : cache.diskFree
+          ? t("cache.diskWithFree", {
+              percent: cache.diskPercent,
+              free: cache.diskFree,
+            })
+          : `${cache.diskPercent}%`,
     threshold: `${cache.thresholdPercent}%`,
     lastCheck: cache.checkedAt
-      ? `${formatDateTimePl(cache.checkedAt)} (${ago(cache.ageMinutes)})`
-      : "jeszcze nie było",
+      ? t("cache.lastCheckValue", {
+          date: formatDateTimePl(cache.checkedAt),
+          ago: ago(cache.ageMinutes),
+        })
+      : t("cache.neverChecked"),
     lastCleanup: cache.lastCleanupAt
       ? formatDateTimePl(cache.lastCleanupAt)
-      : "Jeszcze nie wykonano",
+      : t("cache.neverCleaned"),
     lastFreed:
       cache.lastFreedBytes == null ? "—" : formatBytesPl(cache.lastFreedBytes),
     note: cache.lastMessage,
@@ -117,21 +136,18 @@ export default async function SecurityPage({
         href="/admin/settings"
         className="-my-2 inline-flex min-h-11 items-center label-tight text-ink-faint hover:text-ink text-[10px]"
       >
-        ← Ustawienia
+        {tc("back")}
       </Link>
       <header className="mt-4 mb-8">
         <h1 className="font-heading text-ink text-2xl font-bold">
-          Bezpieczeństwo
+          {t("title")}
         </h1>
-        <p className="text-silver mt-1 text-sm">
-          Stan odczytany z działających systemów. Nic tu nie jest wpisane na
-          sztywno — jeśli coś świeci na zielono, znaczy że zameldowało się samo.
-        </p>
+        <p className="text-silver mt-1 text-sm">{t("subtitle")}</p>
       </header>
 
       {/* ── Systemy ──────────────────────────────────────────────────────── */}
       <section>
-        <h2 className="label text-ink text-xs">Systemy</h2>
+        <h2 className="label text-ink text-xs">{t("systems.heading")}</h2>
         <div className="border-line mt-4 border">
           {checks.map((c) => (
             <div
@@ -139,11 +155,11 @@ export default async function SecurityPage({
               className="border-line/60 flex flex-wrap items-baseline gap-x-4 gap-y-1 border-b px-4 py-3 last:border-0"
             >
               <span className="w-5 shrink-0" aria-hidden>
-                {LIGHT[c.state].dot}
+                {DOT[c.state]}
               </span>
-              <span className="text-ink min-w-[10rem] text-sm">{c.label}</span>
+              <span className="text-ink min-w-[10rem] text-sm">{pick(c.label, locale)}</span>
               <span className="text-silver text-xs">
-                {LIGHT[c.state].label}
+                {t(`health.${c.state}`)}
               </span>
               {c.detail && (
                 <span className="text-ink-faint text-xs">{c.detail}</span>
@@ -152,16 +168,21 @@ export default async function SecurityPage({
                 {ago(c.ageMinutes)}
               </span>
               <span className="text-ink-faint w-full text-xs">
-                {c.description}
+                {pick(c.description, locale)}
                 {c.state === "stale" && (
                   <>
                     {" — "}
                     <strong className="text-silver font-normal">
-                      powinno raportować co{" "}
-                      {c.expectedEveryMinutes >= 60
-                        ? `${Math.round(c.expectedEveryMinutes / 60)} godz.`
-                        : `${c.expectedEveryMinutes} min`}
-                      , a milczy
+                      {t("systems.stale", {
+                        interval:
+                          c.expectedEveryMinutes >= 60
+                            ? t("systems.everyHours", {
+                                n: Math.round(c.expectedEveryMinutes / 60),
+                              })
+                            : t("systems.everyMinutes", {
+                                n: c.expectedEveryMinutes,
+                              }),
+                      })}
                     </strong>
                   </>
                 )}
@@ -172,15 +193,12 @@ export default async function SecurityPage({
 
         {anyUnknown && (
           <p className="text-ink-faint mt-3 text-xs">
-            „Nie wiadomo” znaczy, że dany sprawdzian nigdy się nie zameldował.
-            Skrypty zapisują swój stan przy każdym uruchomieniu, więc pierwsze
-            wpisy pojawią się po najbliższym przebiegu — monitoring co 15 minut,
-            kopia w nocy o 03:00.
+            {t("systems.unknownNote")}
           </p>
         )}
         {!anyBad && !anyUnknown && (
           <p className="mt-3 text-xs text-emerald-400">
-            Wszystkie systemy zameldowały się na czas.
+            {t("systems.allOk")}
           </p>
         )}
       </section>
@@ -189,34 +207,24 @@ export default async function SecurityPage({
       <section className="mt-12">
         <h2 className="label text-ink text-xs">Docker build cache</h2>
         <p className="text-ink-faint mt-1 mb-4 text-xs">
-          Cache budowania obrazów rośnie z każdym wdrożeniem i nie sprząta po
-          sobie sam — w sierpniu urósł do 14 GB i podniósł zajęcie dysku do 83%.
-          Serwer sprawdza go co 15 minut i czyści sam dopiero od{" "}
-          {cache.thresholdPercent}% zajętego dysku. Poniżej progu nie usuwa
-          niczego, tylko zapisuje pomiar.
+          {t("cache.intro", { threshold: cache.thresholdPercent })}
         </p>
         <BuildCacheCard {...cacheView} />
         <p className="text-ink-faint mt-3 text-xs">
-          Czyszczone jest wyłącznie build cache. Obrazy produkcyjne, obrazy
-          rollback, kontenery, wolumeny (baza, media, certyfikaty), kopie i
-          snapshoty są poza zasięgiem tego mechanizmu — nawet gdy dysk jest
-          pełny. Jeśli po czyszczeniu zajęcie nadal przekracza{" "}
-          {CACHE_ALERT_PERCENT}%, serwer wysyła alert i czeka na decyzję
-          człowieka, zamiast usuwać cokolwiek więcej.
+          {t("cache.scope", { alert: CACHE_ALERT_PERCENT })}
         </p>
       </section>
 
       {/* ── Logowania ────────────────────────────────────────────────────── */}
       <section className="mt-12">
-        <h2 className="label text-ink text-xs">Logowania do panelu</h2>
+        <h2 className="label text-ink text-xs">{t("logins.heading")}</h2>
         <p className="text-ink-faint mt-1 mb-4 text-xs">
-          Prosto z dziennika zdarzeń — tego samego, który obejrzałby ktoś
-          badający włamanie.
+          {t("logins.intro")}
         </p>
         <div className="border-line bg-line grid gap-px border sm:grid-cols-3">
           <div className="bg-void p-5">
             <p className="label-tight text-ink-faint text-[10px]">
-              Nieudane — ostatnia godzina
+              {t("logins.failedHour")}
             </p>
             <p
               className={`font-heading mt-2 text-2xl font-bold tabular-nums ${
@@ -228,7 +236,7 @@ export default async function SecurityPage({
           </div>
           <div className="bg-void p-5">
             <p className="label-tight text-ink-faint text-[10px]">
-              Nieudane — doba
+              {t("logins.failedDay")}
             </p>
             <p className="font-heading text-ink mt-2 text-2xl font-bold tabular-nums">
               {logins.failedLastDay}
@@ -236,7 +244,7 @@ export default async function SecurityPage({
           </div>
           <div className="bg-void p-5">
             <p className="label-tight text-ink-faint text-[10px]">
-              Udane — doba
+              {t("logins.successDay")}
             </p>
             <p className="font-heading text-ink mt-2 text-2xl font-bold tabular-nums">
               {logins.successLastDay}
@@ -244,88 +252,85 @@ export default async function SecurityPage({
           </div>
         </div>
         <p className="text-ink-faint mt-3 text-xs">
-          Ostatnie nieudane logowanie:{" "}
+          {t("logins.lastFailure")}{" "}
           {logins.lastFailureAt ? (
             <>
               {formatDateTimePl(logins.lastFailureAt)}
-              {logins.lastFailureIp ? ` z adresu ${logins.lastFailureIp}` : ""}
+              {logins.lastFailureIp
+                ? t("logins.fromAddress", { ip: logins.lastFailureIp })
+                : ""}
             </>
           ) : (
-            "brak w historii"
+            t("logins.none")
           )}
-          . Konto blokuje się samo po serii nieudanych prób, a adres, który
-          próbuje zbyt szybko, dostaje odmowę na pięć minut.
+          {t("logins.lockout")}
         </p>
       </section>
 
       {/* ── Konta ────────────────────────────────────────────────────────── */}
       <section className="mt-12">
-        <h2 className="label text-ink text-xs">Konta</h2>
+        <h2 className="label text-ink text-xs">{t("accounts.heading")}</h2>
         <div className="border-line mt-4 border p-5">
           <p className="text-ink text-sm">
-            {accounts.total} {accounts.total === 1 ? "konto" : "konta"},{" "}
-            {accounts.active} aktywne, {accounts.superadmins} z pełnymi
-            uprawnieniami
-            {accounts.locked > 0 ? `, ${accounts.locked} zablokowane` : ""}.
+            {t("accounts.summary", {
+              total: accounts.total,
+              active: accounts.active,
+              superadmins: accounts.superadmins,
+              locked: accounts.locked,
+            })}
           </p>
 
           {accounts.total === 1 && (
             <p className="mt-3 text-xs text-amber-500">
-              Jedno konto to jeden punkt awarii. Zgubione hasło albo zablokowane
-              konto oznacza brak dostępu do panelu do czasu ręcznego odzyskania
-              z serwera.
+              {t("accounts.singleAccount")}
             </p>
           )}
           {accounts.withTwoFactor === 0 ? (
             <p className="mt-2 text-xs text-amber-500">
-              Dwuskładnikowe logowanie (2FA): nieaktywne na żadnym koncie.
-              Mechanizm jest gotowy — włącza się go w Ustawieniach → Moje konto,
-              razem z dziesięcioma kodami zapasowymi. Bez 2FA jedyną przeszkodą
-              między obcym a panelem jest hasło.
+              {t("accounts.noTwoFactor")}
             </p>
           ) : (
             <p className="text-ink-faint mt-2 text-xs">
-              Dwuskładnikowe logowanie (2FA): aktywne na{" "}
-              {accounts.withTwoFactor}{" "}
-              {accounts.withTwoFactor === 1 ? "koncie" : "kontach"}.
+              {t("accounts.withTwoFactor", {
+                count: accounts.withTwoFactor,
+              })}
             </p>
           )}
           <Link
             href="/admin/users"
             className="label border-line-strong text-ink hover:border-ink hover:bg-ink/5 tap mt-4 inline-flex h-9 items-center border px-4 text-xs transition-colors"
           >
-            Zarządzaj kontami
+            {t("accounts.manage")}
           </Link>
         </div>
       </section>
 
       {/* ── Ochrona formularzy i ruchu ───────────────────────────────────── */}
       <section className="mt-12">
-        <h2 className="label text-ink text-xs">Ochrona przed robotami</h2>
+        <h2 className="label text-ink text-xs">{t("protection.heading")}</h2>
         <div className="border-line mt-4 border p-5">
           <p className="text-ink text-sm">
-            {turnstileOn ? "🟢" : "⚪"} Cloudflare Turnstile:{" "}
-            {turnstileOn ? "włączone" : "nieskonfigurowane"}
+            {turnstileOn ? "🟢" : "⚪"}{" "}
+            {t("protection.turnstile", {
+              state: turnstileOn
+                ? t("protection.on")
+                : t("protection.off"),
+            })}
           </p>
           {!turnstileOn && (
             <p className="text-ink-faint mt-2 text-xs leading-relaxed">
-              Brakuje zmiennych <code className="text-silver">TURNSTILE_SITE_KEY</code>{" "}
-              i <code className="text-silver">TURNSTILE_SECRET_KEY</code>. Klucze
-              tworzy się w panelu Cloudflare (Turnstile → Add site), są darmowe,
-              a włączenie wymaga tylko restartu kontenera — bez przebudowy obrazu.
-              Do tego czasu formularzy pilnują pułapka na roboty, pomiar czasu
-              wypełniania i limity częstotliwości, które działają ZAWSZE i nie
-              zależą od żadnej usługi zewnętrznej.
+              {t.rich("protection.missingVars", {
+                code: (chunks) => <code className="text-silver">{chunks}</code>,
+              })}
             </p>
           )}
 
           <h3 className="label-tight text-ink-faint mt-6 text-[10px]">
-            Odrzucone próby — ostatnie 24 godziny
+            {t("protection.rejectedHeading")}
           </h3>
           {zdarzenia.length === 0 ? (
             <p className="text-ink-faint mt-2 text-xs">
-              Nic nie zostało odrzucone. To jest normalny wynik dla małego
-              serwisu — pusty dziennik nie znaczy, że ochrona nie działa.
+              {t("protection.none")}
             </p>
           ) : (
             <ul className="divide-line border-line mt-3 divide-y border-t text-sm">
@@ -335,7 +340,9 @@ export default async function SecurityPage({
                   className="flex items-center justify-between gap-4 py-2"
                 >
                   <span className="text-silver">
-                    {NAZWA_ZDARZENIA[z.kind] ?? z.kind}
+                    {NAZWA_ZDARZENIA[z.kind]
+                      ? pick(NAZWA_ZDARZENIA[z.kind], locale)
+                      : z.kind}
                   </span>
                   <span className="text-ink tabular-nums">{z.ile}</span>
                 </li>
@@ -343,39 +350,36 @@ export default async function SecurityPage({
             </ul>
           )}
           <p className="text-ink-faint mt-4 text-xs leading-relaxed">
-            Dziennik zapisuje czas, rodzaj blokady, adres trasy i SKRÓCONY
-            identyfikator — nie adres IP i nie e-mail. Wpisy są tylko do
-            dopisywania: nie da się ich zmienić ani skasować z panelu.
+            {t("protection.logNote")}
           </p>
         </div>
       </section>
 
       {/* ── Odzyskiwanie ─────────────────────────────────────────────────── */}
       <section className="mt-12">
-        <h2 className="label text-ink text-xs">Odzyskiwanie</h2>
+        <h2 className="label text-ink text-xs">{t("recovery.heading")}</h2>
         <p className="text-ink-faint mt-1 mb-4 text-xs">
-          Czynności wykonywane z konsoli serwera — panel ich nie uruchamia
-          celowo. Przycisk „przywróć bazę” w przeglądarce to jedno kliknięcie
-          dzielące od skasowania dnia pracy.
+          {t("recovery.intro")}
         </p>
         <div className="border-line border p-5">
           <dl className="grid gap-3 text-sm sm:grid-cols-[14rem_1fr]">
-            <dt className="text-ink-faint text-xs">Punkt przywracania</dt>
+            <dt className="text-ink-faint text-xs">{t("recovery.restorePoint")}</dt>
             <dd className="text-silver font-mono text-xs">
               ./scripts/snapshot.sh &quot;opis&quot;
             </dd>
-            <dt className="text-ink-faint text-xs">Cofnięcie zmian</dt>
+            <dt className="text-ink-faint text-xs">{t("recovery.rollback")}</dt>
             <dd className="text-silver font-mono text-xs">
               ./scripts/rollback.sh &lt;znacznik&gt;
             </dd>
-            <dt className="text-ink-faint text-xs">Kopia na komputer</dt>
+            <dt className="text-ink-faint text-xs">{t("recovery.copy")}</dt>
             <dd className="text-silver font-mono text-xs">
               pobierz-kopie (Windows / macOS)
             </dd>
           </dl>
           <p className="text-ink-faint mt-4 text-xs">
-            Pełny opis procedur:{" "}
-            <code className="text-silver">docs/BEZPIECZENSTWO.md</code>
+            {t.rich("recovery.docs", {
+              code: (chunks) => <code className="text-silver">{chunks}</code>,
+            })}
           </p>
         </div>
       </section>

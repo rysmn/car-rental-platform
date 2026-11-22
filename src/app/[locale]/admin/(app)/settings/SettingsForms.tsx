@@ -1,6 +1,7 @@
 "use client";
 
 import { useActionState, useRef, useState } from "react";
+import { useTranslations } from "next-intl";
 import {
   updateSocialLinks,
   updatePageVisibility,
@@ -27,12 +28,13 @@ import { OPENING_DAYS, type OpeningDayHours } from "@/lib/company/hours";
 function SaveBar({
   state,
   pending,
-  label = "Zapisz",
+  label,
 }: {
   state: SaveResult | null;
   pending: boolean;
   label?: string;
 }) {
+  const t = useTranslations("Admin.settings.common");
   return (
     <div className="flex items-center gap-3">
       <button
@@ -40,11 +42,11 @@ function SaveBar({
         disabled={pending}
         className="label border-line-strong text-ink hover:border-ink hover:bg-ink/5 inline-flex h-10 items-center border px-5 text-xs transition-colors disabled:opacity-50"
       >
-        {pending ? "Zapisywanie…" : label}
+        {pending ? t("saving") : (label ?? t("save"))}
       </button>
       {state?.ok && (
         <span className="text-xs text-emerald-400">
-          {state.message ?? "Zapisano ✓"}
+          {state.message ?? t("saved")}
         </span>
       )}
       {state && !state.ok && (
@@ -81,6 +83,7 @@ const SOCIAL_FIELDS: {
 
 export function SocialLinksForm({ initial }: { initial: SocialSettings }) {
   const [state, action, pending] = useActionState(updateSocialLinks, null);
+  const t = useTranslations("Admin.settings.social");
 
   return (
     <form action={action} className="flex flex-col gap-5">
@@ -99,9 +102,9 @@ export function SocialLinksForm({ initial }: { initial: SocialSettings }) {
         </label>
       ))}
       <p className="text-ink-faint text-xs">
-        Puste pole = ikona pozostaje nieaktywna (wyszarzona) na stronie.
-        Wizytówka Google jest teraz w sekcji <strong>GOOGLE</strong> — nie ma
-        ikony w nagłówku, więc nie było jej miejsce tutaj.
+        {t.rich("note", {
+          strong: (chunks) => <strong>{chunks}</strong>,
+        })}
       </p>
       <SaveBar state={state} pending={pending} />
     </form>
@@ -112,17 +115,18 @@ export function SocialLinksForm({ initial }: { initial: SocialSettings }) {
 
 const PAGE_FIELDS: {
   name: keyof PagesSettings;
-  label: string;
+  labelKey: "faq" | "about" | "howItWorks" | "contact";
   path: string;
 }[] = [
-  { name: "faq", label: "FAQ", path: "/faq" },
-  { name: "about", label: "O nas", path: "/about" },
-  { name: "howItWorks", label: "Jak to działa", path: "/how-it-works" },
-  { name: "contact", label: "Kontakt", path: "/contact" },
+  { name: "faq", labelKey: "faq", path: "/faq" },
+  { name: "about", labelKey: "about", path: "/about" },
+  { name: "howItWorks", labelKey: "howItWorks", path: "/how-it-works" },
+  { name: "contact", labelKey: "contact", path: "/contact" },
 ];
 
 export function PageVisibilityForm({ initial }: { initial: PagesSettings }) {
   const [state, action, pending] = useActionState(updatePageVisibility, null);
+  const t = useTranslations("Admin.settings.pageVisibility");
 
   return (
     <form action={action} className="flex flex-col gap-4">
@@ -133,7 +137,7 @@ export function PageVisibilityForm({ initial }: { initial: PagesSettings }) {
             className="flex cursor-pointer items-center justify-between gap-4 py-4"
           >
             <span>
-              <span className="text-ink text-sm">{field.label}</span>
+              <span className="text-ink text-sm">{t(field.labelKey)}</span>
               <span className="text-ink-faint ml-2 text-xs">{field.path}</span>
             </span>
             <input
@@ -145,10 +149,7 @@ export function PageVisibilityForm({ initial }: { initial: PagesSettings }) {
           </label>
         ))}
       </div>
-      <p className="text-ink-faint text-xs">
-        Wyłączona strona zwraca 404 i znika z menu. Strona główna, flota oraz
-        dokumenty prawne są zawsze dostępne.
-      </p>
+      <p className="text-ink-faint text-xs">{t("note")}</p>
       <SaveBar state={state} pending={pending} />
     </form>
   );
@@ -198,6 +199,8 @@ export function HeroImageForm({
    * identical bars belonged to the card they had just used. One form, one
    * message, and the card that is busy is the one that says so.
    */
+  const t = useTranslations("Admin.settings.heroImages");
+  const tc = useTranslations("Admin.settings.common");
   const [state, action, pending] = useActionState(updateHeroImage, null);
   const [slot, setSlot] = useState(0);
   const [busy, setBusy] = useState<number | null>(null);
@@ -260,12 +263,12 @@ export function HeroImageForm({
                   // eslint-disable-next-line @next/next/no-img-element
                   <img
                     src={shown}
-                    alt={`Zdjęcie ${index + 1}`}
+                    alt={t("photoAlt", { n: index + 1 })}
                     className="h-full w-full object-cover"
                   />
                 ) : (
                   <div className="text-ink-faint flex h-full w-full items-center justify-center text-[11px]">
-                    Puste
+                    {t("empty")}
                   </div>
                 )}
 
@@ -275,7 +278,7 @@ export function HeroImageForm({
 
                 {isActive && (
                   <span className="label-tight bg-red absolute right-0 bottom-0 px-2 py-1 text-[10px] text-white">
-                    AKTYWNE NA STRONIE
+                    {t("activeBadge")}
                   </span>
                 )}
               </div>
@@ -295,10 +298,10 @@ export function HeroImageForm({
                   className="label-tight border-line-strong text-ink hover:border-ink hover:bg-ink/5 tap inline-flex h-10 w-full items-center justify-center border px-3 text-[10px] transition-colors disabled:opacity-50"
                 >
                   {working
-                    ? "Pracuję…"
+                    ? t("working")
                     : image
-                      ? "Zmień zdjęcie"
-                      : "Dodaj zdjęcie"}
+                      ? t("change")
+                      : t("add")}
                 </button>
 
                 {image && (
@@ -311,7 +314,7 @@ export function HeroImageForm({
                       }
                       className="label-tight border-line-strong text-ink hover:border-red hover:text-red tap inline-flex h-10 flex-1 items-center justify-center border px-2 text-[10px] transition-colors disabled:opacity-40"
                     >
-                      {isActive ? "Na stronie" : "Ustaw jako aktywne"}
+                      {isActive ? t("onSite") : t("setActive")}
                     </button>
                     <button
                       type="button"
@@ -331,7 +334,7 @@ export function HeroImageForm({
                       }
                       className="label-tight border-line-strong text-ink-faint hover:border-red hover:text-red tap inline-flex h-10 items-center justify-center border px-4 text-[10px] transition-colors disabled:opacity-50"
                     >
-                      Usuń
+                      {t("remove")}
                     </button>
                   </div>
                 )}
@@ -373,7 +376,9 @@ export function HeroImageForm({
               e.target.value = "";
               setNote({
                 ok: false,
-                error: `Zdjęcie waży ${(file.size / 1024 / 1024).toFixed(1)} MB — maksimum to 8 MB. Zmniejsz plik i spróbuj ponownie.`,
+                error: t("tooLarge", {
+                  size: (file.size / 1024 / 1024).toFixed(1),
+                }),
               });
               return;
             }
@@ -390,16 +395,16 @@ export function HeroImageForm({
         <p className="text-ink-faint text-xs">
           {filled === 0
             ? fallbackImage
-              ? "Brak zdjęć — strona pokazuje domyślne zdjęcie dołączone do serwisu."
-              : "Brak zdjęć — sekcja startowa ma jednolite jasne tło."
-            : `Zapisane zdjęcia: ${filled} z 3. Na stronie: zdjęcie ${set.active + 1}.`}
+              ? t("noneFallback")
+              : t("noneLight")
+            : t("savedCount", { filled, active: set.active + 1 })}
         </p>
         {pending && (
-          <span className="text-ink-faint text-xs">Zapisywanie…</span>
+          <span className="text-ink-faint text-xs">{tc("saving")}</span>
         )}
         {result?.ok && (
           <span className="text-xs text-emerald-400">
-            {result.message ?? "Zapisano ✓"}
+            {result.message ?? tc("saved")}
           </span>
         )}
         {result && !result.ok && (
@@ -408,11 +413,8 @@ export function HeroImageForm({
       </div>
 
       <p className="text-ink-faint text-xs">
-        JPG, PNG lub WEBP, maks. 8 MB. Zalecane: szerokie zdjęcie poziome, min.
-        2000 px szerokości.{" "}
-        {variant === "dark"
-          ? "Tekst na zdjęciu jest przyciemniany, więc jasne zdjęcia też będą czytelne."
-          : "W jasnym motywie tekst jest ciemny, a zdjęcie rozjaśniane — wybierz jasne zdjęcie."}
+        {t("hint")}{" "}
+        {variant === "dark" ? t("darkHint") : t("lightHint")}
       </p>
     </div>
   );
@@ -467,7 +469,9 @@ function OpeningHoursRow({
   day: (typeof OPENING_DAYS)[number];
   initial: OpeningDayHours;
 }) {
+  const t = useTranslations("Admin.settings.company");
   const [closed, setClosed] = useState(initial.closed);
+  const dayName = t(`days.${day.key}`);
 
   // Cztery sztywne kolumny nie mieszczą się na telefonie: dwa natywne pola
   // czasu mają własną szerokość minimalną i razem z checkboxem rozpychały
@@ -475,13 +479,15 @@ function OpeningHoursRow({
   // od `sm` w górę wiersz wygląda tak jak wyglądał.
   return (
     <div className="border-line flex flex-wrap items-center gap-3 border-b py-2 last:border-b-0">
-      <span className="text-ink w-16 shrink-0 text-sm sm:w-24">{day.pl}</span>
+      <span className="text-ink w-16 shrink-0 text-sm sm:w-24">
+        {t(`dayShort.${day.key}`)}
+      </span>
       <input
         type="time"
         name={`${day.key}Opens`}
         defaultValue={initial.opens}
         disabled={closed}
-        aria-label={`${day.pl} — otwarcie`}
+        aria-label={t("dayOpen", { day: dayName })}
         className={`${inputClass} w-[7.5rem] min-w-0 flex-1 disabled:opacity-30 sm:max-w-[9rem]`}
       />
       <input
@@ -489,7 +495,7 @@ function OpeningHoursRow({
         name={`${day.key}Closes`}
         defaultValue={initial.closes}
         disabled={closed}
-        aria-label={`${day.pl} — zamknięcie`}
+        aria-label={t("dayClose", { day: dayName })}
         className={`${inputClass} w-[7.5rem] min-w-0 flex-1 disabled:opacity-30 sm:max-w-[9rem]`}
       />
       <label className="text-ink-faint tap-block flex cursor-pointer items-center gap-2 text-xs">
@@ -500,7 +506,7 @@ function OpeningHoursRow({
           onChange={(e) => setClosed(e.target.checked)}
           className="accent-red h-4 w-4"
         />
-        zamknięte
+        {t("closed")}
       </label>
     </div>
   );
@@ -508,6 +514,7 @@ function OpeningHoursRow({
 
 export function CompanyInfoForm({ initial }: { initial: CompanySettings }) {
   const [state, action, pending] = useActionState(updateCompanyInfo, null);
+  const t = useTranslations("Admin.settings.company");
   const pl = initial.phones.find((p) => p.lang === "PL");
   const en = initial.phones.find((p) => p.lang === "EN");
 
@@ -515,17 +522,17 @@ export function CompanyInfoForm({ initial }: { initial: CompanySettings }) {
     <form action={action} className="flex flex-col gap-8">
       <div>
         <p className="label-tight text-ink-faint mb-3 text-[10px]">
-          Telefon / WhatsApp — PL
+          {t("phoneHeading", { lang: "PL" })}
         </p>
         <div className="flex flex-wrap gap-4">
           <Field
-            label="Numer"
+            label={t("number")}
             name="phonePlNumber"
             defaultValue={pl?.number ?? ""}
             placeholder="+48 884 762 950"
           />
           <Field
-            label="WhatsApp (same cyfry z numerem kraju)"
+            label={t("whatsapp")}
             name="phonePlWhatsapp"
             defaultValue={pl?.whatsapp ?? ""}
             placeholder="48884762950"
@@ -535,17 +542,17 @@ export function CompanyInfoForm({ initial }: { initial: CompanySettings }) {
 
       <div>
         <p className="label-tight text-ink-faint mb-3 text-[10px]">
-          Telefon / WhatsApp — EN
+          {t("phoneHeading", { lang: "EN" })}
         </p>
         <div className="flex flex-wrap gap-4">
           <Field
-            label="Numer"
+            label={t("number")}
             name="phoneEnNumber"
             defaultValue={en?.number ?? ""}
             placeholder="+47 462 67 097"
           />
           <Field
-            label="WhatsApp (same cyfry z numerem kraju)"
+            label={t("whatsapp")}
             name="phoneEnWhatsapp"
             defaultValue={en?.whatsapp ?? ""}
             placeholder="4746267097"
@@ -555,7 +562,7 @@ export function CompanyInfoForm({ initial }: { initial: CompanySettings }) {
 
       <div className="flex flex-wrap gap-4">
         <Field
-          label="E-mail kontaktowy"
+          label={t("email")}
           name="email"
           type="email"
           defaultValue={initial.email}
@@ -565,13 +572,9 @@ export function CompanyInfoForm({ initial }: { initial: CompanySettings }) {
 
       <div>
         <p className="label-tight text-ink-faint mb-1 text-[10px]">
-          Godziny biura i obsługi rezerwacji
+          {t("hoursHeading")}
         </p>
-        <p className="text-ink-faint mb-3 text-xs">
-          Trafiają do danych strukturalnych, więc Google pokazuje je w wynikach
-          i w wizytówce. To godziny BIURA — telefon i wydawanie aut mają własne
-          zasady poniżej. Całą dobę = 00:00–23:59.
-        </p>
+        <p className="text-ink-faint mb-3 text-xs">{t("hoursIntro")}</p>
         <div className="border-line max-w-xl border-y">
           {OPENING_DAYS.map((day) => (
             <OpeningHoursRow
@@ -584,7 +587,7 @@ export function CompanyInfoForm({ initial }: { initial: CompanySettings }) {
         <div className="mt-4 flex flex-wrap gap-4">
           <label className="block">
             <span className="label-tight text-ink-faint mb-1 block text-[10px]">
-              Telefon — od
+              {t("phoneFrom")}
             </span>
             <input
               name="phoneOpens"
@@ -595,7 +598,7 @@ export function CompanyInfoForm({ initial }: { initial: CompanySettings }) {
           </label>
           <label className="block">
             <span className="label-tight text-ink-faint mb-1 block text-[10px]">
-              Telefon — do
+              {t("phoneTo")}
             </span>
             <input
               name="phoneCloses"
@@ -605,40 +608,29 @@ export function CompanyInfoForm({ initial }: { initial: CompanySettings }) {
             />
           </label>
         </div>
-        <p className="text-ink-faint mt-1 text-xs">
-          Godziny odbierania telefonu — dłuższe niż godziny biura i pokazywane
-          osobno na stronie, w FAQ i w asystencie. Dozwolone „24:00”. Nie
-          trafiają do danych strukturalnych.
-        </p>
-        <p className="text-ink-faint mt-3 text-xs">
-          Odbiór i zwrot samochodu są opisane wszędzie jako „24/7 po
-          wcześniejszym uzgodnieniu” — to zasada, nie harmonogram, więc nie ma
-          tu pola do ustawienia.
-        </p>
+        <p className="text-ink-faint mt-1 text-xs">{t("phoneHint")}</p>
+        <p className="text-ink-faint mt-3 text-xs">{t("handover")}</p>
 
         <div className="mt-4">
           <Field
-            label="Dopisek do godzin (opcjonalny, tylko na stronie kontakt)"
+            label={t("notesLabel")}
             name="hours"
             defaultValue={initial.hours}
-            placeholder="np. w święta obsługa od 10:00"
+            placeholder={t("notesPlaceholder")}
           />
-          <p className="text-ink-faint mt-1 text-xs">
-            Wyświetla się pod trzema liniami godzin na stronie kontaktowej. Nie
-            wpływa na dane strukturalne.
-          </p>
+          <p className="text-ink-faint mt-1 text-xs">{t("notesHint")}</p>
         </div>
       </div>
 
       <div className="flex flex-wrap gap-4">
         <Field
-          label="Miasto"
+          label={t("city")}
           name="city"
           defaultValue={initial.city}
           placeholder="Warszawa"
         />
         <Field
-          label="Adres (biuro / siedziba)"
+          label={t("address")}
           name="address"
           defaultValue={initial.address}
           placeholder="ul. Przykładowa 1, 00-001 Warszawa"
@@ -650,7 +642,7 @@ export function CompanyInfoForm({ initial }: { initial: CompanySettings }) {
 
       <div>
         <p className="label-tight text-ink-faint mb-3 text-[10px]">
-          Dane rejestrowe
+          {t("registry")}
         </p>
         <div className="flex flex-wrap gap-4">
           <Field label="NIP" name="nip" defaultValue={initial.nip} />
@@ -668,17 +660,26 @@ export function CompanyInfoForm({ initial }: { initial: CompanySettings }) {
 
 const HERO_TEXT_FIELD_META: {
   name: keyof HeroTextFields;
-  label: string;
+  labelKey:
+    | "eyebrow"
+    | "title"
+    | "subtitle"
+    | "cta"
+    | "ctaSecondary"
+    | "featureLuxury"
+    | "featureSuv"
+    | "featureAirport"
+    | "featureSupport";
 }[] = [
-  { name: "eyebrow", label: "Nadtytuł" },
-  { name: "title", label: "Nagłówek" },
-  { name: "subtitle", label: "Podtytuł" },
-  { name: "cta", label: "Przycisk główny" },
-  { name: "ctaSecondary", label: "Przycisk drugorzędny" },
-  { name: "featureLuxury", label: "Cecha 1" },
-  { name: "featureSuv", label: "Cecha 2" },
-  { name: "featureAirport", label: "Cecha 3" },
-  { name: "featureSupport", label: "Cecha 4" },
+  { name: "eyebrow", labelKey: "eyebrow" },
+  { name: "title", labelKey: "title" },
+  { name: "subtitle", labelKey: "subtitle" },
+  { name: "cta", labelKey: "cta" },
+  { name: "ctaSecondary", labelKey: "ctaSecondary" },
+  { name: "featureLuxury", labelKey: "featureLuxury" },
+  { name: "featureSuv", labelKey: "featureSuv" },
+  { name: "featureAirport", labelKey: "featureAirport" },
+  { name: "featureSupport", labelKey: "featureSupport" },
 ];
 
 function HeroTextLocaleForm({
@@ -690,6 +691,7 @@ function HeroTextLocaleForm({
 }) {
   const [state, action, pending] = useActionState(updateHeroText, null);
   const hasOverride = Object.values(initial).some((v) => v);
+  const t = useTranslations("Admin.settings.heroText");
 
   return (
     <form action={action} className="flex flex-col gap-4">
@@ -698,16 +700,14 @@ function HeroTextLocaleForm({
         {HERO_TEXT_FIELD_META.map((field) => (
           <Field
             key={field.name}
-            label={field.label}
+            label={t(`fields.${field.labelKey}`)}
             name={field.name}
             defaultValue={initial[field.name]}
           />
         ))}
       </div>
       <p className="text-ink-faint text-xs">
-        {hasOverride
-          ? "Publikowana jest wersja własna."
-          : "Puste pola = wyświetlana jest wbudowana treść strony."}
+        {hasOverride ? t("customVersion") : t("builtIn")}
       </p>
       <SaveBar state={state} pending={pending} />
     </form>
@@ -775,6 +775,7 @@ function GoogleToggle({
   /** What is missing, in the operator's words. */
   missing: string;
 }) {
+  const t = useTranslations("Admin.settings.googleMaps");
   return (
     <div className="border-line border-b py-3 last:border-b-0">
       <label className="tap-block flex cursor-pointer items-start gap-3">
@@ -792,8 +793,7 @@ function GoogleToggle({
       </label>
       {checked && !ready && (
         <p className="mt-2 ml-7 text-xs text-amber-500">
-          Włączone, ale {missing} — na stronie nic się nie pokaże. To celowe:
-          nie pokazujemy klientowi przycisku, który prowadzi donikąd.
+          {t("enabledButMissing", { missing })}
         </p>
       )}
     </div>
@@ -822,6 +822,7 @@ export function GoogleMapsForm({
   mapsUrl: string;
 }) {
   const [state, action, pending] = useActionState(updateGoogleMaps, null);
+  const t = useTranslations("Admin.settings.googleMaps");
 
   // Controlled only for the fields a switch depends on, so the warning under a
   // checkbox reacts as the operator types rather than after a save.
@@ -873,7 +874,7 @@ export function GoogleMapsForm({
       <div className="flex flex-col gap-5">
         <label className="flex flex-col gap-1">
           <span className="label-tight text-ink-faint text-[10px]">
-            Link do wizytówki Google
+            {t("profileLabel")}
           </span>
           <input
             type="url"
@@ -884,16 +885,15 @@ export function GoogleMapsForm({
             className={inputClass}
           />
           <span className="text-ink-faint text-xs">
-            Publiczna wizytówka firmy w Google — to, co widzi klient, gdy
-            wyszuka „A&amp;A Corporation”. Mówi też Google, że ta strona i
-            pinezka na mapie to ta sama firma (dane strukturalne{" "}
-            <code>sameAs</code>).
+            {t.rich("profileHint", {
+              code: (chunks) => <code>{chunks}</code>,
+            })}
           </span>
         </label>
 
         <label className="flex flex-col gap-1">
           <span className="label-tight text-ink-faint text-[10px]">
-            Link do wystawiania opinii
+            {t("reviewLabel")}
           </span>
           <input
             type="url"
@@ -903,15 +903,10 @@ export function GoogleMapsForm({
             placeholder="https://search.google.com/local/writereview?placeid=…"
             className={inputClass}
           />
-          <span className="text-ink-faint text-xs">
-            Bezpośredni link, który otwiera klientowi okno wystawienia opinii.
-            Inny niż wizytówka: wizytówka pokazuje firmę, ten link od razu pyta
-            o ocenę.
-          </span>
+          <span className="text-ink-faint text-xs">{t("reviewHint")}</span>
           {suggestedReview && review.trim() !== suggestedReview && (
             <span className="text-xs text-amber-500">
-              Gotowy link dla wpisanego Place ID (skopiuj, jeśli Google nie dał
-              Ci innego):
+              {t("suggestedReview")}
               <br />
               <code className="text-ink-faint break-all">
                 {suggestedReview}
@@ -922,7 +917,7 @@ export function GoogleMapsForm({
 
         <label className="flex flex-col gap-1">
           <span className="label-tight text-ink-faint text-[10px]">
-            Link do Map Google
+            {t("mapsLabel")}
           </span>
           <input
             type="url"
@@ -931,15 +926,12 @@ export function GoogleMapsForm({
             placeholder="https://maps.app.goo.gl/…"
             className={inputClass}
           />
-          <span className="text-ink-faint text-xs">
-            Lokalizacja firmy w Mapach — otwiera nawigację. Używany w stopce i
-            przy adresie na stronie kontaktowej.
-          </span>
+          <span className="text-ink-faint text-xs">{t("mapsHint")}</span>
         </label>
 
         <label className="flex flex-col gap-1">
           <span className="label-tight text-ink-faint text-[10px]">
-            Google Place ID
+            {t("placeIdLabel")}
           </span>
           <input
             type="text"
@@ -950,18 +942,16 @@ export function GoogleMapsForm({
             className={inputClass}
           />
           <span className="text-ink-faint text-xs">
-            Techniczny identyfikator lokalizacji w Google. Klient go nigdy nie
-            widzi. Znajdziesz go w profilu firmy albo narzędziem „Place ID
-            Finder” Google. <strong>Musi należeć dokładnie do A&amp;A</strong> —
-            identyfikator podobnie nazwanej firmy podepnie naszą stronę pod
-            cudzy adres.
+            {t.rich("placeIdHint", {
+              strong: (chunks) => <strong>{chunks}</strong>,
+            })}
           </span>
         </label>
 
         <div className="flex flex-wrap gap-4">
           <label className="flex flex-col gap-1">
             <span className="label-tight text-ink-faint text-[10px]">
-              Szerokość geogr. (lat)
+              {t("latLabel")}
             </span>
             <input
               type="text"
@@ -975,7 +965,7 @@ export function GoogleMapsForm({
           </label>
           <label className="flex flex-col gap-1">
             <span className="label-tight text-ink-faint text-[10px]">
-              Długość geogr. (lng)
+              {t("lngLabel")}
             </span>
             <input
               type="text"
@@ -988,17 +978,12 @@ export function GoogleMapsForm({
             />
           </label>
         </div>
-        <p className="text-ink-faint -mt-3 text-xs">
-          Współrzędne pinezki na mapie. W Mapach Google: kliknij prawym
-          przyciskiem w punkt odbioru — pierwsza pozycja w menu to właśnie te
-          dwie liczby. Trafiają na mapę na stronie kontaktowej i do danych
-          strukturalnych. Klient nie widzi ich jako liczb.
-        </p>
+        <p className="text-ink-faint -mt-3 text-xs">{t("coordsHint")}</p>
 
         <div className="flex flex-wrap gap-4">
           <label className="flex flex-col gap-1">
             <span className="label-tight text-ink-faint text-[10px]">
-              Średnia ocena
+              {t("ratingLabel")}
             </span>
             <input
               type="text"
@@ -1012,7 +997,7 @@ export function GoogleMapsForm({
           </label>
           <label className="flex flex-col gap-1">
             <span className="label-tight text-ink-faint text-[10px]">
-              Liczba opinii
+              {t("reviewCountLabel")}
             </span>
             <input
               type="text"
@@ -1025,24 +1010,23 @@ export function GoogleMapsForm({
             />
           </label>
         </div>
-        <p className="text-ink-faint -mt-3 text-xs">
-          <strong>Przepisz dokładnie to, co pokazuje wizytówka.</strong> Strona
-          nie umie tych liczb pobrać sama i nie jest to przeoczenie: Places API
-          Google wymaga projektu z włączonymi płatnościami, a pobieranie wyników
-          wyszukiwarki jest wprost zabronione w jej regulaminie. Zasada projektu
-          brzmi „zero nowych kosztów”, więc zostaje jedno uczciwe wyjście — te
-          dwa pola.
-          <br />
-          <strong>Puste pola nie są błędem.</strong> Pasek pokazuje wtedy sam
-          odnośnik „Przeczytaj wszystkie opinie”, bez gwiazdek i bez oceny.
-          Zostaw je puste, dopóki wizytówka nie ma opinii — wpisana „na zachętę”
-          piątka byłaby nieprawdą, którą klient sprawdza jednym kliknięciem.
-        </p>
+        <div className="text-ink-faint -mt-3 text-xs">
+          <p>
+            {t.rich("reviewsHint", {
+              strong: (chunks) => <strong>{chunks}</strong>,
+            })}
+          </p>
+          <p className="mt-2">
+            {t.rich("reviewsEmpty", {
+              strong: (chunks) => <strong>{chunks}</strong>,
+            })}
+          </p>
+        </div>
       </div>
 
       <div>
         <p className="label-tight text-ink-faint mb-2 text-[10px]">
-          Co pokazać na stronie
+          {t("showHeading")}
         </p>
         <div className="border-line max-w-xl border-y">
           {/*
@@ -1056,39 +1040,39 @@ export function GoogleMapsForm({
           */}
           <GoogleToggle
             name="showMap"
-            label="Pokaż mapę"
-            hint="Mapa z pinezką na stronie kontaktowej. Nie wymaga klucza API ani konta Google — nic nie kosztuje."
+            label={t("toggles.map.label")}
+            hint={t("toggles.map.hint")}
             checked={showMap}
             onChange={setShowMap}
             ready={hasGeo}
-            missing="nie ma kompletnych współrzędnych (lat i lng)"
+            missing={t("toggles.map.missing")}
           />
           <GoogleToggle
             name="showGoogleButton"
-            label="Zobacz nas w Google"
-            hint="Otwiera wizytówkę firmy w Google. Taki sam napis widzi klient na stronie kontaktowej."
+            label={t("toggles.googleButton.label")}
+            hint={t("toggles.googleButton.hint")}
             checked={showGoogleButton}
             onChange={setShowGoogleButton}
             ready={profile.trim() !== ""}
-            missing="pole „Link do wizytówki Google” jest puste"
+            missing={t("toggles.googleButton.missing")}
           />
           <GoogleToggle
             name="showReviewButton"
-            label="Dodaj opinię"
-            hint="Wysyła klienta prosto do okna wystawiania opinii. Taki sam napis widzi klient na stronie kontaktowej."
+            label={t("toggles.reviewButton.label")}
+            hint={t("toggles.reviewButton.hint")}
             checked={showReviewButton}
             onChange={setShowReviewButton}
             ready={review.trim() !== ""}
-            missing="pole „Link do wystawiania opinii” jest puste"
+            missing={t("toggles.reviewButton.missing")}
           />
           <GoogleToggle
             name="showReviewBar"
-            label="Pasek opinii"
-            hint="Jedna linijka nad mapą: gwiazdki, ocena, liczba opinii i „Przeczytaj wszystkie opinie”. Odnośnik prowadzi do opinii TEJ wizytówki — inaczej niż „Dodaj opinię”, które otwiera formularz nowej."
+            label={t("toggles.reviewBar.label")}
+            hint={t("toggles.reviewBar.hint")}
             checked={showReviewBar}
             onChange={setShowReviewBar}
             ready={hasProfileSource}
-            missing="nie ma ani Place ID, ani linku do wizytówki"
+            missing={t("toggles.reviewBar.missing")}
           />
         </div>
       </div>

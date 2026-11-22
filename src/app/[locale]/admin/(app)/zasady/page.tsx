@@ -1,11 +1,10 @@
-import { setRequestLocale } from "next-intl/server";
+import { getTranslations, setRequestLocale } from "next-intl/server";
 import { guardPage } from "@/lib/auth/guard";
 import { Link } from "@/i18n/navigation";
 import { getSetting } from "@/lib/admin/settings";
 import {
   ABROAD_RULE,
   DOCUMENTS_BASE_RULE,
-  STATUS_LABEL,
   driverAgeStatus,
   driverAgeSentence,
   driverRulesEnforced,
@@ -21,7 +20,15 @@ import { DocumentRulesForm } from "./DocumentRulesForm";
 import { DriverAgeForm } from "./DriverAgeForm";
 import { DriverClassForm } from "./DriverClassForm";
 
-export const metadata = { title: "Zasady wynajmu" };
+export async function generateMetadata({
+  params,
+}: {
+  params: Promise<{ locale: string }>;
+}) {
+  const { locale } = await params;
+  const t = await getTranslations({ locale, namespace: "Admin.rules" });
+  return { title: t("title") };
+}
 
 /**
  * The rules centre.
@@ -42,12 +49,17 @@ const TONE: Record<RuleStatus, string> = {
   disabled: "border-line text-ink-faint border",
 };
 
-function StatusChip({ status }: { status: RuleStatus }) {
+/** Bold inside translated copy: the same emphasis the panel always used. */
+const Strong = (chunks: React.ReactNode) => (
+  <strong className="text-silver font-normal">{chunks}</strong>
+);
+
+function StatusChip({ status, label }: { status: RuleStatus; label: string }) {
   return (
     <span
       className={`label-tight rounded-pill px-2 py-0.5 text-[9px] whitespace-nowrap ${TONE[status]}`}
     >
-      {STATUS_LABEL[status]}
+      {label}
     </span>
   );
 }
@@ -56,11 +68,13 @@ function Section({
   id,
   title,
   status,
+  chip,
   children,
 }: {
   id: string;
   title: string;
   status: RuleStatus;
+  chip: string;
   children: React.ReactNode;
 }) {
   /*
@@ -77,7 +91,7 @@ function Section({
     <section id={id} className="border-line min-w-0 scroll-mt-6 border-t pt-6">
       <div className="mb-1 flex flex-wrap items-center justify-between gap-3">
         <h2 className="label text-ink text-xs">{title}</h2>
-        <StatusChip status={status} />
+        <StatusChip status={status} label={chip} />
       </div>
       {children}
     </section>
@@ -109,6 +123,8 @@ export default async function RentalRulesPage({
 
   const { locale } = await params;
   setRequestLocale(locale);
+  const t = await getTranslations("Admin.rules");
+  const chip = (s: RuleStatus) => t(`status.${s}`);
 
   const [rules, questions, models] = await Promise.all([
     getSetting("rentalRules"),
@@ -156,61 +172,66 @@ export default async function RentalRulesPage({
     security: classified.filter((c) => c.candidate.kind === "security").length,
     system: classified.filter((c) => c.candidate.kind === "system").length,
   };
+  const setAsideTotal = setAside.security + setAside.system;
+  const setAsideText =
+    setAside.security > 0 && setAside.system > 0
+      ? t("other.setAside.both", {
+          total: setAsideTotal,
+          security: setAside.security,
+          system: setAside.system,
+        })
+      : setAside.security > 0
+        ? t("other.setAside.securityOnly", {
+            total: setAsideTotal,
+            security: setAside.security,
+          })
+        : t("other.setAside.systemOnly", { total: setAsideTotal });
 
   return (
     <div className="max-w-4xl">
       <header className="mb-6">
         <h1 className="font-heading text-ink text-2xl font-bold">
-          Zasady wynajmu
+          {t("title")}
         </h1>
-        <p className="text-silver mt-1 text-sm">
-          Jedno miejsce, z którego korzystają strona, FAQ, chatbot i — docelowo
-          — obsługa głosowa. Zasada zmieniona tutaj działa wszędzie, bez
-          poprawiania tej samej informacji w kilku plikach.
-        </p>
+        <p className="text-silver mt-1 text-sm">{t("intro")}</p>
       </header>
 
       <div className="mb-8 flex flex-wrap gap-2">
         <span className={`label-tight rounded-pill px-3 py-1 text-[10px] ${TONE.active}`}>
-          {count("active")} aktywne
+          {t("counts.active", { count: count("active") })}
         </span>
         <span
           className={`label-tight rounded-pill px-3 py-1 text-[10px] ${TONE.needs_decision}`}
         >
-          {count("needs_decision")} wymaga decyzji
+          {t("counts.needsDecision", { count: count("needs_decision") })}
         </span>
         <span className={`label-tight rounded-pill px-3 py-1 text-[10px] ${TONE.disabled}`}>
-          {count("disabled")} wyłączone
+          {t("counts.disabled", { count: count("disabled") })}
         </span>
       </div>
 
       <div className="grid gap-10">
         {/* ── Dokumenty ─────────────────────────────────────────────── */}
-        <Section id="dokumenty" title="Dokumenty kierowcy" status="active">
+        <Section
+          id="dokumenty"
+          title={t("sections.documents")}
+          status="active"
+          chip={chip("active")}
+        >
           <div className="border-line-strong bg-graphite/60 mb-4 border-l-2 border-l-emerald-500 p-4">
             <div className="mb-1 flex flex-wrap items-center gap-2">
               <span className="label-tight text-ink text-[10px]">
-                Zasada podstawowa
+                {t("documents.core")}
               </span>
-              <StatusChip status="active" />
+              <StatusChip status="active" label={chip("active")} />
             </div>
+            {/* Legal wording stays in Polish: it is the rule text itself. */}
             <p className="text-silver text-sm">„{DOCUMENTS_BASE_RULE.pl}”</p>
-            <p className="text-ink-faint mt-2 text-xs">
-              Obowiązuje zawsze, niezależnie od przełączników poniżej. Nie da się
-              jej wyłączyć — nie ma wynajmu bez prawa jazdy i dokumentu
-              tożsamości.
-            </p>
+            <p className="text-ink-faint mt-2 text-xs">{t("documents.coreNote")}</p>
           </div>
 
           <p className="text-ink-faint text-xs">
-            Każdy przełącznik odpowiada na pytanie{" "}
-            <strong className="text-silver font-normal">
-              „czy wolno nam to potwierdzić?”
-            </strong>
-            , a nie „czy tak jest”. Wyłączenie{" "}
-            <strong className="text-silver font-normal">nie oznacza</strong>{" "}
-            zasady przeciwnej — asystent po prostu milczy w tej sprawie i kieruje
-            klienta do pracownika A&amp;A.
+            {t.rich("documents.explainer", { b: Strong })}
           </p>
 
           <DocumentRulesForm rules={rules} />
@@ -219,28 +240,19 @@ export default async function RentalRulesPage({
         {/* ── Wiek ──────────────────────────────────────────────────── */}
         <Section
           id="wiek"
-          title="Wiek kierowcy i staż prawa jazdy"
+          title={t("sections.age")}
           status={driverAgeStatus()}
+          chip={chip(driverAgeStatus())}
         >
           {/* The one place in this panel where two different meanings of "off"
               meet, so the difference is stated before the switches, not left
               for somebody to infer from a rejected booking. */}
           <div className="border-line-strong bg-graphite/60 mb-4 border-l-2 border-l-amber-500 p-4">
             <p className="text-silver text-sm">
-              Przełączniki w tej sekcji odpowiadają na pytanie{" "}
-              <strong className="text-ink font-normal">
-                „czy ten wymóg obowiązuje?”
-              </strong>{" "}
-              — inaczej niż w sekcji dokumentów, gdzie odpowiadają na pytanie
-              „czy wolno nam to potwierdzić?”. Dlatego mają tu etykiety
-              OBOWIĄZUJE / NIE OBOWIĄZUJE.
+              {t.rich("age.explainer", { b: Strong })}
             </p>
             <p className="text-ink-faint mt-2 text-xs">
-              Wyłączenie wymogu klasy{" "}
-              <strong className="text-silver font-normal">nie znosi</strong>{" "}
-              kontroli wieku — sprowadza ją do progu bezpieczeństwa{" "}
-              {FALLBACK_MIN_AGE} lat, który obowiązuje zawsze i którego nie da
-              się wyłączyć z panelu.
+              {t.rich("age.offNote", { b: Strong, min: FALLBACK_MIN_AGE })}
             </p>
           </div>
 
@@ -253,20 +265,14 @@ export default async function RentalRulesPage({
           >
             <p className="text-silver text-sm">
               {driverRulesEnforced(rules)
-                ? "Formularz rezerwacji egzekwuje progi klas — sprawdza wiek kierowcy wobec klasy wybranego auta."
-                : `Formularz rezerwacji odrzuca kierowcę poniżej ${FALLBACK_MIN_AGE} lat, tak jak dotychczas. Progi klas są zapisane, ale jeszcze nie działają.`}
+                ? t("age.enforcedOn")
+                : t("age.enforcedOff", { min: FALLBACK_MIN_AGE })}
             </p>
+            <p className="text-ink-faint mt-2 text-xs">{t("age.oneSource")}</p>
             <p className="text-ink-faint mt-2 text-xs">
-              Jedno źródło dla wszystkich: formularz, backend, FAQ, strony
-              ofertowe i asystent czytają tę samą wartość. Klient nigdy nie
-              zobaczy progu, którego formularz nie stosuje.
-            </p>
-            <p className="text-ink-faint mt-2 text-xs">
-              Zdanie, które widzi klient: „
-              <span className="text-silver">
-                {driverAgeSentence(rules, "pl", "all")}
-              </span>
-              ”
+              {t("age.customerSentence", {
+                sentence: driverAgeSentence(rules, locale, "all"),
+              })}
             </p>
           </div>
 
@@ -275,21 +281,14 @@ export default async function RentalRulesPage({
               and stops — changing the umowa is a lawyer's decision. */}
           <div className="border-line-strong bg-graphite/60 mb-4 border-l-2 border-l-amber-500 p-4">
             <p className="label-tight text-[9px] text-amber-500">
-              WYMAGA DECYZJI / AKTUALIZACJI REGULAMINU
+              {t("age.legalTitle")}
             </p>
             <p className="text-ink-faint mt-2 text-xs">
-              Regulamin (§3, PL i EN) mówi: ukończone {FALLBACK_MIN_AGE} lat i
-              prawo jazdy wydane co najmniej rok wcześniej, a dla wybranych
-              modeli dopuszcza wyższy wiek podawany{" "}
-              <span className="text-silver">
-                przy potwierdzeniu rezerwacji
-              </span>
-              . Próg 25 lat mieści się w tym zapisie, ale formularz odrzuca{" "}
-              <span className="text-silver">wcześniej</span> — w chwili
-              składania rezerwacji. Do rozstrzygnięcia z prawnikiem przed
-              włączeniem egzekwowania; pełny wykaz miejsc w{" "}
-              <span className="text-silver">docs/ZLECENIE-WIEK-KIEROWCY.md</span>
-              . Panel nie zmienia dokumentu prawnego.
+              {t.rich("age.legalBody", {
+                b: (chunks) => <span className="text-silver">{chunks}</span>,
+                file: (chunks) => <span className="text-silver">{chunks}</span>,
+                min: FALLBACK_MIN_AGE,
+              })}
             </p>
           </div>
 
@@ -300,14 +299,8 @@ export default async function RentalRulesPage({
           />
 
           <div className="border-line mt-8 border-t pt-6">
-            <h3 className="label text-ink text-xs">
-              Przypisanie samochodów do klas
-            </h3>
-            <p className="text-ink-faint mt-1 text-xs">
-              Klasę można zmienić także przy edycji auta we Flocie — to jedno i
-              to samo ustawienie, pokazane w dwóch miejscach. Nowe auto nie
-              zapisze się bez wybranej klasy.
-            </p>
+            <h3 className="label text-ink text-xs">{t("classes.title")}</h3>
+            <p className="text-ink-faint mt-1 text-xs">{t("classes.note")}</p>
             <DriverClassForm models={models} />
           </div>
         </Section>
@@ -315,97 +308,72 @@ export default async function RentalRulesPage({
         {/* ── Zagranica ─────────────────────────────────────────────── */}
         <Section
           id="zagranica"
-          title="Wyjazdy zagraniczne"
+          title={t("sections.abroad")}
           status={rules.abroad.status}
+          chip={chip(rules.abroad.status)}
         >
           <p className="text-ink-faint mb-3 text-xs">
-            Zasada Z-1 · zatwierdzona 20.08.2026 ·{" "}
+            {t("abroad.ref")} ·{" "}
             <span className="text-silver">docs/ZASADY-BIZNESOWE.md</span>
           </p>
           <div className="border-line-strong bg-graphite/60 border-l-2 border-l-emerald-500 p-4">
+            {/* Legal wording stays in Polish: it is the rule text itself. */}
             <p className="text-silver text-sm">„{ABROAD_RULE.pl.short}”</p>
           </div>
           <ul className="text-ink-faint mt-3 grid gap-1.5 text-xs">
-            <li>
-              Lista krajów dozwolonych{" "}
-              <strong className="text-silver font-normal">
-                nie istnieje i nie powstanie
-              </strong>{" "}
-              — asystent odpowiada tak samo na każdy kierunek.
-            </li>
-            <li>
-              Asystent{" "}
-              <strong className="text-silver font-normal">
-                nie może udzielić zgody
-              </strong>{" "}
-              — kieruje do pracownika i mówi wprost, że brak odpowiedzi nie
-              oznacza zgody.
-            </li>
-            <li>
-              Treść tylko do odczytu: to zatwierdzona decyzja, a pole edycyjne
-              zapraszałoby do rozjechania jej z dokumentem.
-            </li>
+            <li>{t.rich("abroad.bullet1", { b: Strong })}</li>
+            <li>{t.rich("abroad.bullet2", { b: Strong })}</li>
+            <li>{t("abroad.bullet3")}</li>
           </ul>
         </Section>
 
         {/* ── Udział własny ─────────────────────────────────────────── */}
         <Section
           id="udzial-wlasny"
-          title="Udział własny / szkody"
+          title={t("sections.excess")}
           status={rules.excess.status}
+          chip={chip(rules.excess.status)}
         >
           <div className="mt-2">
-            <Placeholder label="Kwota / zasada udziału własnego" hint="do decyzji" />
             <Placeholder
-              label="Powiązanie z klasą lub pojazdem"
-              hint="brak powiązania"
+              label={t("excess.amount")}
+              hint={t("excess.amountHint")}
             />
-            <Placeholder label="Dodatkowe warunki" hint="puste" />
+            <Placeholder
+              label={t("excess.link")}
+              hint={t("excess.linkHint")}
+            />
+            <Placeholder label={t("excess.extra")} hint={t("excess.extraHint")} />
           </div>
-          <p className="text-ink-faint mt-3 text-xs">
-            W cenniku opłat są dwie pozycje, których treść nie jest nigdzie
-            wyjaśniona: pakiet ochronny i wynajem bez kaucji, obie po 100 zł za
-            dobę. Dopóki zasada nie zostanie zatwierdzona, asystent nie mówi, co
-            one obejmują.
-          </p>
+          <p className="text-ink-faint mt-3 text-xs">{t("excess.note")}</p>
         </Section>
 
         {/* ── Wypadek ───────────────────────────────────────────────── */}
         <Section
           id="wypadek"
-          title="Wypadek i awaria"
+          title={t("sections.emergency")}
           status={rules.emergency.status}
+          chip={chip(rules.emergency.status)}
         >
           <div className="mt-2">
-            <Placeholder label="Numer kontaktowy A&A / assistance" hint="brak" />
-            <Placeholder label="Numer dodatkowy" hint="brak" />
-            <Placeholder label="Instrukcja postępowania" hint="pusta" />
+            <Placeholder label={t("emergency.contact")} hint={t("emergency.none")} />
+            <Placeholder label={t("emergency.extra")} hint={t("emergency.none")} />
+            <Placeholder label={t("emergency.procedure")} hint={t("emergency.empty")} />
           </div>
-          <p className="text-ink-faint mt-3 text-xs">
-            Do czasu podania numeru i procedury obowiązuje bezpieczne
-            zachowanie: asystent rozpoznaje wypadek, kolizję i awarię, mówi że
-            sprawa jest pilna, podaje kontakt do A&amp;A i wprost odmawia
-            cytowania numeru pomocy drogowej z pamięci. Ta reakcja ma najwyższy
-            priorytet i nie da się jej wyłączyć przełącznikiem.
-          </p>
+          <p className="text-ink-faint mt-3 text-xs">{t("emergency.note")}</p>
         </Section>
 
         {/* ── Pozostałe ─────────────────────────────────────────────── */}
         <Section
           id="pozostale"
-          title="Pozostałe zasady"
+          title={t("sections.other")}
           status="needs_decision"
+          chip={chip("needs_decision")}
         >
-          <p className="text-ink-faint mb-4 text-xs">
-            Tematy, o które klienci już pytali, a asystent nie miał czym
-            odpowiedzieć. To nie jest lista życzeń — pochodzi z prawdziwych
-            rozmów. Próby obejścia asystenta, pytania o cudze dane i odbicia
-            własnych przycisków nie trafiają tutaj: zostają w logach, ale nie są
-            propozycjami zasad.
-          </p>
+          <p className="text-ink-faint mb-4 text-xs">{t("other.intro")}</p>
           {openTopics.length === 0 ? (
             <p className="border-line text-silver border px-5 py-6 text-center text-sm">
-              Brak nieobsłużonych tematów.
+              {t("other.empty")}
             </p>
           ) : (
             <ul className="grid gap-1.5">
@@ -416,62 +384,33 @@ export default async function RentalRulesPage({
                 >
                   <span className="text-silver">{q.question}</span>
                   <span className="text-ink-faint text-[10px] tabular-nums">
-                    pytano {q.times}×
-                    {q.kind === "low_confidence" ? " · niska pewność" : ""}
+                    {t("other.asked", { count: q.times })}
+                    {q.kind === "low_confidence" ? t("other.lowConfidence") : ""}
                   </span>
                 </li>
               ))}
             </ul>
           )}
-          {setAside.security + setAside.system > 0 ? (
+          {setAsideTotal > 0 ? (
             <p className="text-ink-faint mt-4 text-[10px]">
-              Odłożono na bok{" "}
-              <strong className="text-silver font-normal">
-                {setAside.security + setAside.system}
-              </strong>{" "}
-              {setAside.security > 0
-                ? `wpisów, w tym ${setAside.security} zaklasyfikowanych jako bezpieczeństwo`
-                : "wpisów technicznych"}
-              {setAside.security > 0 && setAside.system > 0
-                ? ` i ${setAside.system} technicznych`
-                : ""}
-              . Nic nie zostało usunięte — wszystkie są w „Pytaniach bez
-              odpowiedzi” i w Dzienniku zdarzeń.
+              {setAsideText} {t("other.setAside.tail")}
             </p>
           ) : null}
           <Link
             href="/admin/chatbot/pytania"
             className="label-tight text-silver hover:text-ink tap mt-4 inline-flex items-center text-[10px] transition-colors"
           >
-            Pełna lista i „Dodaj do FAQ” →
+            {t("other.link")}
           </Link>
         </Section>
       </div>
 
       <section className="border-line mt-12 border-t pt-8">
-        <h2 className="label text-ink text-xs">Warto wiedzieć</h2>
+        <h2 className="label text-ink text-xs">{t("notes.title")}</h2>
         <ul className="text-ink-faint mt-4 grid gap-2 text-xs">
-          <li>
-            <strong className="text-silver font-normal">
-              To nie jest regulamin wynajmu.
-            </strong>{" "}
-            Formalny regulamin to osobne ustawienie (Ustawienia → Dokumenty
-            prawne) i jest dziś pusty — a asystent przy anulowaniu rezerwacji
-            powołuje się na regulamin. Warto to rozstrzygnąć.
-          </li>
-          <li>
-            <strong className="text-silver font-normal">
-              Każda zmiana trafia do Dziennika zdarzeń
-            </strong>{" "}
-            razem z tym, co było przed nią i kto ją wprowadził.
-          </li>
-          <li>
-            <strong className="text-silver font-normal">
-              Zasada aktywna pojawia się w FAQ i u asystenta
-            </strong>{" "}
-            z tej samej treści. Zasada „wymaga decyzji” nie pojawia się nigdzie —
-            asystent kieruje wtedy do pracownika.
-          </li>
+          <li>{t.rich("notes.notTerms", { b: Strong })}</li>
+          <li>{t.rich("notes.audit", { b: Strong })}</li>
+          <li>{t.rich("notes.faq", { b: Strong })}</li>
         </ul>
       </section>
     </div>

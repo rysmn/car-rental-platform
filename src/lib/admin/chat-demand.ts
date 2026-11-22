@@ -1,6 +1,7 @@
 import "server-only";
 import { sql, type SQL } from "drizzle-orm";
 import { getDb } from "@/lib/db";
+import type { Bilingual } from "@/lib/i18n-pick";
 
 /**
  * The demand reports.
@@ -43,12 +44,12 @@ export const EMPTY_FILTERS: DemandFilters = { range: "30d" };
 
 const RANGES: DemandRange[] = ["today", "7d", "30d", "month", "custom"];
 
-export const RANGE_LABEL: Record<DemandRange, string> = {
-  today: "Dzisiaj",
-  "7d": "7 dni",
-  "30d": "30 dni",
-  month: "Ten miesiąc",
-  custom: "Zakres własny",
+export const RANGE_LABEL: Record<DemandRange, Bilingual> = {
+  today: { pl: "Dzisiaj", en: "Today" },
+  "7d": { pl: "7 dni", en: "7 days" },
+  "30d": { pl: "30 dni", en: "30 days" },
+  month: { pl: "Ten miesiąc", en: "This month" },
+  custom: { pl: "Zakres własny", en: "Custom range" },
 };
 
 const ISO = /^\d{4}-\d{2}-\d{2}$/;
@@ -481,7 +482,7 @@ export async function getFunnel(
 
 /* ── Why it did not become a booking ─────────────────────────────────────── */
 
-export type ReasonRow = { reason: string; label: string; n: number };
+export type ReasonRow = { reason: string; label: Bilingual; n: number };
 
 /**
  * Reasons, derived from evidence, with "not enough evidence" as a real answer.
@@ -532,19 +533,34 @@ export async function getNoBookingReasons(
        ${f.locale ? sql`AND d.locale = ${f.locale}` : sql``}
      GROUP BY 1 ORDER BY n DESC
   `);
-  const LABELS: Record<string, string> = {
-    brak_auta: "Brak odpowiedniego auta we flocie",
-    brak_dostepnosci: "Brak dostępności w terminie",
-    pracownik: "Przekazanie do pracownika",
-    lead: "Zostawił kontakt (lead)",
-    nie_rozpoznano: "Nie rozpoznano pytania",
-    tylko_sprawdzal: "Klient tylko sprawdzał",
-    zamknieto: "Zamknięto rozmowę po pierwszej wiadomości",
-    brak_danych: "Brak danych — za mało śladów, żeby orzec",
+  const LABELS: Record<string, Bilingual> = {
+    brak_auta: {
+      pl: "Brak odpowiedniego auta we flocie",
+      en: "No suitable car in the fleet",
+    },
+    brak_dostepnosci: {
+      pl: "Brak dostępności w terminie",
+      en: "Not available on the dates",
+    },
+    pracownik: {
+      pl: "Przekazanie do pracownika",
+      en: "Handed over to a member of staff",
+    },
+    lead: { pl: "Zostawił kontakt (lead)", en: "Left contact details (lead)" },
+    nie_rozpoznano: { pl: "Nie rozpoznano pytania", en: "Question not recognised" },
+    tylko_sprawdzal: { pl: "Klient tylko sprawdzał", en: "Customer was only checking" },
+    zamknieto: {
+      pl: "Zamknięto rozmowę po pierwszej wiadomości",
+      en: "Conversation closed after the first message",
+    },
+    brak_danych: {
+      pl: "Brak danych — za mało śladów, żeby orzec",
+      en: "No data — too few traces to decide",
+    },
   };
   return rows<{ reason: string; n: number }>(result).map((r) => ({
     reason: r.reason,
-    label: LABELS[r.reason] ?? r.reason,
+    label: LABELS[r.reason] ?? { pl: r.reason, en: r.reason },
     n: Number(r.n) || 0,
   }));
 }

@@ -1,0 +1,1 @@
+{"nodes": [{"id": "$graphify-root$_drizzle_0038_partnership_sql", "label": "0038_partnership.sql", "file_type": "code", "source_file": "drizzle/0038_partnership.sql", "source_location": null}, {"id": "chat_leads", "label": "\"chat_leads\"", "file_type": "code", "source_file": "", "source_location": "", "origin_file": "$graphify-root$/drizzle/0038_partnership.sql"}], "edges": []}

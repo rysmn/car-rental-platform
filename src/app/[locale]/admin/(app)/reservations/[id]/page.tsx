@@ -17,7 +17,7 @@ import {
   listDamages,
   ourCostGrosze,
 } from "@/lib/admin/damages";
-import { setRequestLocale } from "next-intl/server";
+import { getTranslations, setRequestLocale } from "next-intl/server";
 import { Link } from "@/i18n/navigation";
 import { getReservation } from "@/lib/admin/reservations";
 import { stanWeryfikacji } from "@/lib/booking/verification";
@@ -28,20 +28,13 @@ import { DokumentyPanel } from "../DokumentyPanel";
 import { type ReservationStatus } from "@/lib/admin/reservation-status";
 import { StatusBadge } from "@/components/admin/StatusBadge";
 import { StatusActions } from "../StatusActions";
-import { formatPln, formatDatePl, formatDateTimePl } from "@/lib/format";
+import { formatPln } from "@/lib/format";
 import { CancellationFeePanel } from "../CancellationFeePanel";
 import { naleznosc, stanNieodebrania } from "@/lib/booking/cancellation-repo";
+import { pickFrom } from "@/lib/i18n-pick";
 
 const UUID_RE =
   /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
-
-const LINE_LABEL: Record<string, string> = {
-  location: "Odbiór poza siedzibą",
-  extra_driver: "Dodatkowy kierowca",
-  child_seat: "Fotelik dziecięcy",
-  protection_package: "Pakiet ochronny",
-  no_deposit: "Wariant bez kaucji",
-};
 
 export default async function ReservationDetailPage({
   params,
@@ -50,6 +43,26 @@ export default async function ReservationDetailPage({
 }) {
   const { locale, id } = await params;
   setRequestLocale(locale);
+  const t = await getTranslations("Admin.reservations.detail");
+  const intl = locale === "en" ? "en-GB" : "pl-PL";
+  const day = (iso: string) =>
+    new Intl.DateTimeFormat(intl, {
+      timeZone: "UTC",
+      dateStyle: "short",
+    }).format(new Date(`${String(iso).slice(0, 10)}T00:00:00Z`));
+  const dateTime = (value: Date | string) =>
+    new Intl.DateTimeFormat(intl, {
+      dateStyle: "short",
+      timeStyle: "short",
+    }).format(typeof value === "string" ? new Date(value) : value);
+
+  const LINE_LABEL: Record<string, string> = {
+    location: t("lineLocation"),
+    extra_driver: t("lineExtraDriver"),
+    child_seat: t("lineChildSeat"),
+    protection_package: t("lineProtection"),
+    no_deposit: t("lineNoDeposit"),
+  };
 
   if (!UUID_RE.test(id)) notFound();
   const data = await getReservation(id);
@@ -88,6 +101,7 @@ export default async function ReservationDetailPage({
       status: r.status,
       startDate: String(r.startDate),
       pickupTime: r.pickupTime,
+      locale,
     });
 
   const status = r.status as ReservationStatus;
@@ -114,7 +128,7 @@ export default async function ReservationDetailPage({
   const ofThisRental = damages.filter((d) => d.reservationId === r.id);
   const differences =
     handovers.pickup && handovers.return
-      ? compareHandovers(handovers.pickup, handovers.return)
+      ? compareHandovers(handovers.pickup, handovers.return, locale)
       : [];
   const deposit = summariseDeposit(
     r.depositGrosze,
@@ -135,46 +149,44 @@ export default async function ReservationDetailPage({
         href="/admin/reservations"
         className="label-tight text-ink-faint hover:text-ink -my-2 inline-flex min-h-11 items-center text-[10px] transition-colors"
       >
-        ← Rezerwacje
+        {t("back")}
       </Link>
 
       <header className="mt-4 mb-8 flex flex-wrap items-start justify-between gap-4">
         <div>
           <div className="flex items-center gap-3">
             <h1 className="text-ink font-mono text-2xl">{r.reference}</h1>
-            <StatusBadge status={status} />
+            <StatusBadge status={status} locale={locale} />
           </div>
           <p className="text-ink-faint mt-1 text-sm">
-            Złożona {formatDateTimePl(r.createdAt)}
+            {t("createdAt", { date: dateTime(r.createdAt) })}
           </p>
         </div>
       </header>
 
       <div className="border-line bg-graphite/40 mb-8 border p-6">
         <h2 className="label-tight text-ink-faint mb-4 text-[10px]">
-          Działania
+          {t("actions")}
         </h2>
         <StatusActions id={r.id} status={status} />
         <Link
           href={{ pathname: "/admin/reservations/new", query: { kopia: r.id } }}
           className="label-tight border-line-strong text-ink hover:border-ink hover:bg-ink/5 tap mt-3 inline-flex h-11 items-center border px-4 text-[10px] transition-colors"
         >
-          Kopiuj rezerwację →
+          {t("copyBooking")}
         </Link>
         {status === "confirmed" && (
-          <p className="text-ink-faint mt-3 text-xs">
-            Termin tego auta jest teraz zablokowany w kalendarzu.
-          </p>
+          <p className="text-ink-faint mt-3 text-xs">{t("blockedHint")}</p>
         )}
         {status === "rejected" && (
           <div className="border-line mt-4 border-t pt-4">
             <p className="label-tight text-ink-faint text-[10px]">
-              Powód odrzucenia (wysłany do klienta)
+              {t("rejectionReason")}
             </p>
             <p className="text-silver mt-2 text-sm">
               {r.rejectionReason?.trim()
                 ? r.rejectionReason
-                : "Nie podano — klient otrzymał ogólną wiadomość."}
+                : t("noRejectionReason")}
             </p>
           </div>
         )}
@@ -183,15 +195,15 @@ export default async function ReservationDetailPage({
       {/* `[&>*]:min-w-0`: element siatki domyślnie ma `min-width: auto` i
           rozpycha się do szerokości treści — na 320 px wypychał całą stronę. */}
       <div className="grid gap-6 md:grid-cols-2 [&>*]:min-w-0">
-        <Panel title="Klient">
-          <Row label="Imię i nazwisko" value={r.customerName} />
+        <Panel title={t("panelCustomer")}>
+          <Row label={t("name")} value={r.customerName} />
           {/* `break-all` na SAMYM odnośniku, nie tylko na `<dd>` w `Row`.
               `break-words` na rodzicu nie pomaga, bo ten `<a>` jest
               `inline-block` — sam ustala swoją szerokość z najdłuższego
               nierozdzielnego ciągu, a adres e-mail jest właśnie takim ciągiem.
               Przy 320 px wypychało to całą stronę o 24 px. */}
           <Row
-            label="E-mail"
+            label={t("email")}
             value={
               <a
                 href={`mailto:${r.customerEmail}`}
@@ -202,7 +214,7 @@ export default async function ReservationDetailPage({
             }
           />
           <Row
-            label="Telefon"
+            label={t("phone")}
             value={
               <a
                 href={`tel:${r.customerPhone}`}
@@ -226,37 +238,40 @@ export default async function ReservationDetailPage({
           */}
           {weryfikacja && (
             <Row
-              label="Potwierdzenie e-mail"
+              label={t("emailConfirmation")}
               value={
                 weryfikacja.stan === "potwierdzony" ? (
                   <span className="text-ink">
-                    Potwierdzony
+                    {t("confirmed")}
                     {weryfikacja.potwierdzonyO
-                      ? ` · ${formatDateTimePl(weryfikacja.potwierdzonyO)}`
+                      ? ` · ${dateTime(weryfikacja.potwierdzonyO)}`
                       : ""}
                   </span>
                 ) : weryfikacja.stan === "oczekuje" ? (
                   <span className="text-ink-muted">
-                    Czeka na klienta · link ważny do{" "}
-                    {formatDateTimePl(weryfikacja.wazneDo)}
+                    {t("waitingCustomer", {
+                      date: dateTime(weryfikacja.wazneDo),
+                    })}
                   </span>
                 ) : (
                   <span className="text-ink-muted">
-                    Link wygasł {formatDateTimePl(weryfikacja.wazneDo)}
+                    {t("linkExpired", {
+                      date: dateTime(weryfikacja.wazneDo),
+                    })}
                   </span>
                 )
               }
             />
           )}
           {r.dateOfBirth && (
-            <Row label="Data urodzenia" value={formatDatePl(r.dateOfBirth)} />
+            <Row label={t("dateOfBirth")} value={day(r.dateOfBirth)} />
           )}
           {r.licenceNumber && (
-            <Row label="Nr prawa jazdy" value={r.licenceNumber} />
+            <Row label={t("licence")} value={r.licenceNumber} />
           )}
           {(r.addressStreet || r.addressCity) && (
             <Row
-              label="Adres"
+              label={t("address")}
               value={
                 <span>
                   {r.addressStreet}
@@ -277,7 +292,7 @@ export default async function ReservationDetailPage({
           klucza z tej samej przeglądarki. Panel nie miał jak tego pokazać,
           bo nie odróżniał „przypisano" od „wyszło". Teraz odróżnia.
         */}
-        <Panel title="Dokumenty">
+        <Panel title={t("panelDocuments")}>
           <DokumentyPanel
             reservationId={id}
             mozeWysylac={
@@ -289,33 +304,33 @@ export default async function ReservationDetailPage({
               fileName: d.fileName,
               autoSend: d.autoSend,
               stan: d.stan,
-              sentAt: d.sentAt ? formatDateTimePl(d.sentAt) : null,
+              sentAt: d.sentAt ? dateTime(d.sentAt) : null,
               sendError: d.sendError,
               sendAttempts: d.sendAttempts,
             }))}
           />
         </Panel>
 
-        <Panel title="Rezerwacja">
+        <Panel title={t("panelBooking")}>
           <Row
-            label="Auto"
+            label={t("car")}
             value={`${data.brand ?? ""} ${data.model ?? ""}`.trim() || "—"}
           />
-          {data.plate && <Row label="Rejestracja" value={data.plate} />}
+          {data.plate && <Row label={t("plate")} value={data.plate} />}
           <Row
-            label="Termin"
-            value={`${formatDatePl(r.startDate)}${r.pickupTime ? ` ${r.pickupTime.slice(0, 5)}` : ""} – ${formatDatePl(r.endDate)}${r.returnTime ? ` ${r.returnTime.slice(0, 5)}` : ""}`}
+            label={t("term")}
+            value={`${day(r.startDate)}${r.pickupTime ? ` ${r.pickupTime.slice(0, 5)}` : ""} – ${day(r.endDate)}${r.returnTime ? ` ${r.returnTime.slice(0, 5)}` : ""}`}
           />
-          <Row label="Liczba dni" value={String(r.days)} />
+          <Row label={t("days")} value={String(r.days)} />
           {data.locationName && (
-            <Row label="Miejsce odbioru" value={data.locationName} />
+            <Row label={t("pickupLocation")} value={data.locationName} />
           )}
           <Row
-            label="Kaucja"
+            label={t("deposit")}
             value={
               r.depositVariant === "no_deposit"
-                ? "Bez kaucji"
-                : "Z kaucją zwrotną"
+                ? t("noDeposit")
+                : t("depositRefundable")
             }
           />
         </Panel>
@@ -323,7 +338,7 @@ export default async function ReservationDetailPage({
 
       <div className="border-line bg-graphite/40 mt-6 border p-6">
         <h2 className="label-tight text-ink-faint mb-4 text-[10px]">
-          Protokoły
+          {t("protocols")}
         </h2>
         <div className="flex flex-wrap gap-3">
           <Link
@@ -333,7 +348,7 @@ export default async function ReservationDetailPage({
             }}
             className="label-tight border-line-strong text-ink hover:border-ink hover:bg-ink/5 tap inline-flex h-11 items-center border px-4 text-[10px] transition-colors"
           >
-            {handovers.pickup ? "Wydanie ✓" : "Spisz wydanie →"}
+            {handovers.pickup ? t("pickupDone") : t("pickupStart")}
           </Link>
           <Link
             href={{
@@ -342,7 +357,7 @@ export default async function ReservationDetailPage({
             }}
             className="label-tight border-line-strong text-ink hover:border-ink hover:bg-ink/5 tap inline-flex h-11 items-center border px-4 text-[10px] transition-colors"
           >
-            {handovers.return ? "Zwrot ✓" : "Spisz zwrot →"}
+            {handovers.return ? t("returnDone") : t("returnStart")}
           </Link>
           {(handovers.pickup || handovers.return) && (
             <Link
@@ -352,7 +367,7 @@ export default async function ReservationDetailPage({
               }}
               className="label-tight border-line-strong text-ink hover:border-ink hover:bg-ink/5 tap inline-flex h-11 items-center border px-4 text-[10px] transition-colors"
             >
-              Protokół do wydruku →
+              {t("printProtocol")}
             </Link>
           )}
         </div>
@@ -363,21 +378,23 @@ export default async function ReservationDetailPage({
             }`}
           >
             {isCleanReturn(differences)
-              ? "Auto wróciło w takim stanie, w jakim wyjechało."
-              : `Do rozliczenia: ${differences
-                  .filter((d) => d.action)
-                  .map((d) => d.label.toLowerCase())
-                  .join(", ")}.`}
+              ? t("cleanReturn")
+              : t("toSettle", {
+                  items: differences
+                    .filter((d) => d.action)
+                    .map((d) => d.label.toLowerCase())
+                    .join(", "),
+                })}
           </p>
         )}
       </div>
 
       <div className="border-line bg-graphite/40 mt-6 border p-6">
-        <h2 className="label-tight text-ink-faint mb-4 text-[10px]">Szkody</h2>
+        <h2 className="label-tight text-ink-faint mb-4 text-[10px]">
+          {t("damages")}
+        </h2>
         {ofThisRental.length === 0 ? (
-          <p className="text-ink-faint text-sm">
-            Z tego najmu nie ma żadnej szkody.
-          </p>
+          <p className="text-ink-faint text-sm">{t("noDamage")}</p>
         ) : (
           <ul className="divide-line divide-y">
             {ofThisRental.map((d) => (
@@ -401,7 +418,7 @@ export default async function ReservationDetailPage({
                   <span
                     className={`label-tight border px-2 py-1 text-[10px] ${DAMAGE_STATUS_TONE[d.status]}`}
                   >
-                    {DAMAGE_STATUS_LABEL[d.status]}
+                    {pickFrom(DAMAGE_STATUS_LABEL, d.status, locale)}
                   </span>
                 </span>
               </li>
@@ -412,7 +429,7 @@ export default async function ReservationDetailPage({
           href={{ pathname: "/admin/szkody", query: { nowa: "1" } }}
           className="label-tight border-line-strong text-ink hover:border-ink hover:bg-ink/5 tap mt-4 inline-flex h-11 items-center border px-4 text-[10px] transition-colors"
         >
-          Załóż szkodę →
+          {t("newDamage")}
         </Link>
       </div>
 
@@ -431,7 +448,7 @@ export default async function ReservationDetailPage({
 
       <div className="border-line bg-graphite/40 mt-6 border p-6">
         <h2 className="label-tight text-ink-faint mb-4 text-[10px]">
-          Stan licznika
+          {t("odometer")}
         </h2>
         <OdometerForm
           reservationId={r.id}
@@ -457,13 +474,15 @@ export default async function ReservationDetailPage({
       </div>
 
       <div className="border-line bg-graphite/40 mt-6 border p-6">
-        <h2 className="label-tight text-ink-faint mb-4 text-[10px]">Wycena</h2>
+        <h2 className="label-tight text-ink-faint mb-4 text-[10px]">
+          {t("quote")}
+        </h2>
         <dl className="space-y-2 text-sm">
           <PriceRow
-            label={`Wynajem (${data.quote?.days ?? r.days} dni × ${formatPln(
-              data.quote?.dailyPriceGrosze ?? 0,
-              locale,
-            )})`}
+            label={t("rentalRow", {
+              days: data.quote?.days ?? r.days,
+              daily: formatPln(data.quote?.dailyPriceGrosze ?? 0, locale),
+            })}
             value={formatPln(data.quote?.rentalGrosze ?? 0, locale)}
           />
           {/* `lines?.` a nie `lines.`: `quote` jest kolumną tekstową i wystarczy
@@ -478,14 +497,14 @@ export default async function ReservationDetailPage({
             />
           ))}
           <div className="border-line mt-3 flex items-center justify-between border-t pt-3">
-            <dt className="label text-ink text-xs">Razem</dt>
+            <dt className="label text-ink text-xs">{t("total")}</dt>
             <dd className="font-heading text-ink text-lg">
               {formatPln(r.totalGrosze, locale)}
             </dd>
           </div>
           {r.depositGrosze > 0 && (
             <PriceRow
-              label="Kaucja zwrotna (pobierana osobno)"
+              label={t("depositRow")}
               value={formatPln(r.depositGrosze, locale)}
               muted
             />

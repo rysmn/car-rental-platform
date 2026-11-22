@@ -2,7 +2,6 @@ import { setRequestLocale, getTranslations } from "next-intl/server";
 import { Link } from "@/i18n/navigation";
 import { formatPln, formatPlnDokladnie, formatPlnRange } from "@/lib/format";
 import { Money, MoneyRange } from "@/components/currency/Money";
-import { CurrencyNote } from "@/components/currency/CurrencyNote";
 import { dailyRateRangeGrosze } from "@/lib/booking/pricing";
 import { localeAlternates } from "@/lib/seo";
 import { getVisiblePublicModelStates } from "@/lib/fleet/status-repo";
@@ -385,7 +384,6 @@ export default async function ComparePage({
         {/* Jedno zdanie pod całą tabelą, nie pod każdą kolumną: zastrzeżenie
             powtórzone przy każdym aucie przestaje być czytane. Renderuje się
             tylko wtedy, gdy klient naprawdę patrzy na ceny w euro. */}
-        <CurrencyNote note={tNav("currencyNote")} className="mt-4" />
       </div>
     </div>
   );

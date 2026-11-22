@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { useTranslations } from "next-intl";
 import { WersjaAkcje } from "./WersjaAkcje";
 import { EdytujDokument } from "./EdytujDokument";
 
@@ -34,6 +35,7 @@ export function WierszWersji({
   opis: string;
   mozeZarzadzac: boolean;
 }) {
+  const t = useTranslations("Admin.documents");
   const [edytuje, setEdytuje] = useState(false);
 
   return (
@@ -41,14 +43,14 @@ export function WierszWersji({
       <div className="flex flex-wrap items-center justify-between gap-x-4 gap-y-2">
         <div className="min-w-0">
           <p className="text-ink text-sm">
-            Wersja {dokument.version}
+            {t("versionLabel", { version: dokument.version })}
             {dokument.active && (
-              <span className="text-ink ml-2 text-xs">· obowiązuje</span>
+              <span className="text-ink ml-2 text-xs">{t("inForce")}</span>
             )}
             {dokument.autoSend && dokument.active && (
               <span className="text-ink ml-2 text-xs">
-                · wysyłany klientowi
-                {dokument.bilingual ? " (PL i EN)" : " (tylko PL)"}
+                {t("sentToCustomer")}
+                {dokument.bilingual ? t("bothLanguages") : t("plOnly")}
               </span>
             )}
           </p>

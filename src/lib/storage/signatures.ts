@@ -1,8 +1,6 @@
 import "server-only";
-import { promises as fs } from "node:fs";
-import path from "node:path";
 import { randomUUID } from "node:crypto";
-import { uploadDir } from "./media";
+import { getStorage } from "./index";
 
 /**
  * Customer signatures from the handover protocols.
@@ -34,10 +32,6 @@ const MAX_BYTES = 300 * 1024;
 
 const DATA_URL_RE = /^data:image\/png;base64,([A-Za-z0-9+/=]+)$/;
 
-function signatureDir(): string {
-  return path.join(uploadDir(), SUBDIR);
-}
-
 export type SaveSignatureResult =
   | { ok: true; url: string }
   | { ok: false; error: "empty" | "too_large" | "not_png" | "write_failed" };
@@ -64,8 +58,12 @@ export async function saveSignature(
 
   const filename = `${randomUUID()}.png`;
   try {
-    await fs.mkdir(signatureDir(), { recursive: true });
-    await fs.writeFile(path.join(signatureDir(), filename), buffer);
+    await getStorage().put({
+      key: `${SUBDIR}/${filename}`,
+      body: buffer,
+      contentType: "image/png",
+      visibility: "private",
+    });
   } catch {
     return { ok: false, error: "write_failed" };
   }
@@ -73,8 +71,7 @@ export async function saveSignature(
 }
 
 /**
- * Absolute path for a requested signature, or null if it escapes the folder.
- * Same two-layer check as the other readers: by shape, then by result.
+ * Storage key for a requested signature, or null if the name is not one we issued.
  */
 export function resolveSignaturePath(segments: string[]): string | null {
   if (segments.length !== 1) return null;
@@ -84,16 +81,12 @@ export function resolveSignaturePath(segments: string[]): string | null {
   }
   if (!/^[a-f0-9-]{36}\.png$/i.test(name)) return null;
 
-  const root = path.resolve(signatureDir());
-  const resolved = path.resolve(root, name);
-  return resolved === path.join(root, name) ? resolved : null;
+  return `${SUBDIR}/${name}`;
 }
 
 export async function deleteSignature(url: string | null): Promise<void> {
   if (!url || !url.startsWith(`${SIGNATURE_URL_PREFIX}/`)) return;
-  const resolved = resolveSignaturePath([
-    url.slice(SIGNATURE_URL_PREFIX.length + 1),
-  ]);
-  if (!resolved) return;
-  await fs.rm(resolved, { force: true });
+  const key = resolveSignaturePath([url.slice(SIGNATURE_URL_PREFIX.length + 1)]);
+  if (!key) return;
+  await getStorage().delete(key);
 }

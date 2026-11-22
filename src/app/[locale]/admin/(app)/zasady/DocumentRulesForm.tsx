@@ -1,17 +1,19 @@
 "use client";
 
 import { useActionState, useState } from "react";
+import { useLocale, useTranslations } from "next-intl";
 import { saveDocumentRules, type SaveResult } from "./actions";
 import type { RentalRules } from "@/lib/admin/rental-rules";
 
 const labelCls = "label-tight text-[10px] text-ink-faint";
 
 function Feedback({ state }: { state: SaveResult | null }) {
+  const t = useTranslations("Admin.rules");
   if (!state) return null;
   if (state.ok)
     return (
       <span className="text-xs text-emerald-400">
-        {state.message ?? "Zapisano ✓"}
+        {state.message ?? t("actions.saved")}
       </span>
     );
   return <span className="text-red text-xs">{state.error}</span>;
@@ -48,6 +50,8 @@ function RuleToggle({
   children?: React.ReactNode;
   onChange?: (v: boolean) => void;
 }) {
+  const t = useTranslations("Admin.rules");
+  const locale = useLocale();
   const [on, setOn] = useState(defaultChecked);
   return (
     <div className="border-line/60 border-b py-4 last:border-0">
@@ -72,7 +76,7 @@ function RuleToggle({
                   : "border-line text-ink-faint border"
               }`}
             >
-              {on ? "ON" : "OFF"}
+              {on ? t("toggle.on") : t("toggle.off")}
             </span>
           </span>
           <span className="text-ink-faint mt-1 block text-xs">
@@ -83,16 +87,19 @@ function RuleToggle({
       {children}
       {stamp.updatedAt ? (
         <p className="text-ink-faint mt-2 pl-7 text-[10px]">
-          Ostatnia zmiana:{" "}
-          {new Date(stamp.updatedAt).toLocaleString("pl-PL", {
-            dateStyle: "short",
-            timeStyle: "short",
+          {t("stamp.lastChange", {
+            date: new Date(stamp.updatedAt).toLocaleString(
+              locale === "en" ? "en-GB" : "pl-PL",
+              { dateStyle: "short", timeStyle: "short" },
+            ),
           })}
-          {stamp.updatedBy ? ` · ${stamp.updatedBy}` : ""}
+          {stamp.updatedBy
+            ? t("stamp.by", { name: stamp.updatedBy })
+            : ""}
         </p>
       ) : (
         <p className="text-ink-faint mt-2 pl-7 text-[10px]">
-          Nigdy nie zmieniane.
+          {t("stamp.never")}
         </p>
       )}
     </div>
@@ -100,6 +107,7 @@ function RuleToggle({
 }
 
 export function DocumentRulesForm({ rules }: { rules: RentalRules }) {
+  const t = useTranslations("Admin.rules");
   const [state, action, pending] = useActionState(saveDocumentRules, null);
   const d = rules.documents;
   const [nonEuOn, setNonEuOn] = useState(d.nonEuLicence.enabled);
@@ -108,47 +116,47 @@ export function DocumentRulesForm({ rules }: { rules: RentalRules }) {
     <form action={action} className="mt-4">
       <RuleToggle
         name="mobywatel"
-        title="Akceptujemy mObywatel"
+        title={t("documents.mobywatel.title")}
         defaultChecked={d.mobywatel.enabled}
         stamp={d.mobywatel}
-        whenOn="Asystent może informować, że dokument tożsamości w aplikacji mObywatel jest akceptowany."
-        whenOff="Asystent nie potwierdza akceptacji mObywatela ani jej nie wyklucza — kieruje klienta do pracownika A&A."
+        whenOn={t("documents.mobywatel.on")}
+        whenOff={t("documents.mobywatel.off")}
       />
 
       <RuleToggle
         name="cardInDriverName"
-        title="Wymagana karta płatnicza na nazwisko kierowcy"
+        title={t("documents.card.title")}
         defaultChecked={d.cardInDriverName.enabled}
         stamp={d.cardInDriverName}
-        whenOn="Asystent informuje, że karta płatnicza na imię i nazwisko kierowcy jest wymagana."
-        whenOff="Asystent nie twierdzi, że karta na nazwisko kierowcy jest obowiązkowa. Przypadki firmowe — płatnikiem firma, kierowcą pracownik — ustala pracownik A&A."
+        whenOn={t("documents.card.on")}
+        whenOff={t("documents.card.off")}
       />
 
       <RuleToggle
         name="nonEuLicence"
-        title="Akceptujemy prawo jazdy spoza UE"
+        title={t("documents.nonEu.title")}
         defaultChecked={d.nonEuLicence.enabled}
         stamp={d.nonEuLicence}
         onChange={setNonEuOn}
-        whenOn="Asystent informuje o akceptacji wraz z warunkami wpisanymi poniżej."
-        whenOff="Asystent nie potwierdza samodzielnie akceptacji prawa jazdy spoza UE i kieruje klienta do A&A."
+        whenOn={t("documents.nonEu.on")}
+        whenOff={t("documents.nonEu.off")}
       >
         <div className="mt-3 pl-7">
           <label className={labelCls} htmlFor="nonEuLicenceNotes">
-            Dodatkowe warunki / informacje
+            {t("documents.nonEu.notesLabel")}
           </label>
           <textarea
             id="nonEuLicenceNotes"
             name="nonEuLicenceNotes"
             rows={3}
             defaultValue={d.nonEuLicence.notes}
-            placeholder="Puste — do uzupełnienia przez właściciela"
+            placeholder={t("documents.nonEu.notesPlaceholder")}
             className="border-line-strong bg-surface-1 text-ink placeholder:text-ink-faint mt-1 w-full border px-3 py-2 text-sm"
           />
           <p className="text-ink-faint mt-1 text-[10px]">
             {nonEuOn
-              ? "Ta treść zostanie dopisana do odpowiedzi asystenta i do FAQ."
-              : "Zapisywane, ale nieużywane, dopóki przełącznik jest wyłączony."}
+              ? t("documents.nonEu.notesOn")
+              : t("documents.nonEu.notesOff")}
           </p>
         </div>
       </RuleToggle>
@@ -159,7 +167,7 @@ export function DocumentRulesForm({ rules }: { rules: RentalRules }) {
           disabled={pending}
           className="label-tight border-line-strong text-ink hover:border-ink hover:bg-ink/5 tap inline-flex items-center border px-4 text-[10px] transition-colors disabled:opacity-50"
         >
-          {pending ? "Zapisywanie…" : "Zapisz"}
+          {pending ? t("actions.saving") : t("actions.save")}
         </button>
         <Feedback state={state} />
       </div>

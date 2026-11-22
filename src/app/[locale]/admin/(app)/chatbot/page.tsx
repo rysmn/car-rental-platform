@@ -1,4 +1,4 @@
-import { setRequestLocale } from "next-intl/server";
+import { getTranslations, setRequestLocale } from "next-intl/server";
 import { guardPage } from "@/lib/auth/guard";
 import { Link } from "@/i18n/navigation";
 import { getSetting } from "@/lib/admin/settings";
@@ -6,7 +6,15 @@ import { getChatStats, listLeads, listUnanswered } from "@/lib/chat/repo";
 import { formatDateTimePl } from "@/lib/format";
 import { ChatbotTabs } from "./ChatbotTabs";
 
-export const metadata = { title: "Chatbot" };
+export async function generateMetadata({
+  params,
+}: {
+  params: Promise<{ locale: string }>;
+}) {
+  const { locale } = await params;
+  const t = await getTranslations({ locale, namespace: "Admin.chatbot" });
+  return { title: t("dashboard.metaTitle") };
+}
 
 function Tile({
   label,
@@ -53,6 +61,7 @@ export default async function ChatbotDashboard({
 
   const { locale } = await params;
   setRequestLocale(locale);
+  const t = await getTranslations("Admin.chatbot");
 
   const [settings, stats, leads, unanswered] = await Promise.all([
     getSetting("chatbot"),
@@ -64,11 +73,9 @@ export default async function ChatbotDashboard({
   return (
     <div className="max-w-5xl">
       <header className="mb-6">
-        <h1 className="font-heading text-ink text-2xl font-bold">Chatbot</h1>
+        <h1 className="font-heading text-ink text-2xl font-bold">{t("dashboard.title")}</h1>
         <p className="text-silver mt-1 text-sm">
-          Asystent A&amp;A — tryb{" "}
-          {settings.mode === "deterministic" ? "deterministyczny" : "AI"}, bez
-          kosztów API.
+          {t("dashboard.subtitle", { mode: settings.mode })}
         </p>
       </header>
 
@@ -83,55 +90,55 @@ export default async function ChatbotDashboard({
         }`}
       >
         <p className="text-ink text-sm">
-          {settings.enabled ? "🟢 Chatbot włączony" : "⚪ Chatbot wyłączony"} —{" "}
+          {settings.enabled ? t("dashboard.statusOn") : t("dashboard.statusOff")} —{" "}
           {settings.enabled
-            ? "widget jest na stronie i odpowiada klientom."
-            : "nie ma go na stronie, a jego adres API zwraca 404."}
+            ? t("dashboard.statusOnText")
+            : t("dashboard.statusOffText")}
         </p>
         <Link
           href="/admin/settings/chatbot"
           className="label border-line-strong text-ink hover:border-ink hover:bg-ink/5 tap mt-3 inline-flex h-8 items-center border px-3 text-[10px] transition-colors"
         >
-          {settings.enabled ? "Wyłącz / zmień ustawienia" : "Włącz chatbota"}
+          {settings.enabled ? t("dashboard.changeSettings") : t("dashboard.enable")}
         </Link>
       </div>
 
       <div className="border-line bg-line grid gap-px border sm:grid-cols-2 lg:grid-cols-4">
-        <Tile label="Rozmowy dzisiaj" value={String(stats.today)} />
+        <Tile label={t("dashboard.tiles.today")} value={String(stats.today)} />
         <Tile
-          label="Aktywne teraz"
+          label={t("dashboard.tiles.activeNow")}
           value={String(stats.activeNow)}
-          hint="ostatnia wiadomość < 15 min"
+          hint={t("dashboard.tiles.activeHint")}
         />
-        <Tile label="Rozmowy w tym miesiącu" value={String(stats.month)} />
+        <Tile label={t("dashboard.tiles.month")} value={String(stats.month)} />
         <Tile
-          label="Nowe leady"
+          label={t("dashboard.tiles.leadsNew")}
           value={String(stats.leadsNew)}
           tone={stats.leadsNew > 0 ? "warn" : undefined}
-          hint={`${stats.leadsTotal} łącznie`}
+          hint={t("dashboard.tiles.leadsTotal", { count: stats.leadsTotal })}
         />
         <Tile
-          label="Przejścia do rezerwacji"
+          label={t("dashboard.tiles.toBooking")}
           value={String(stats.wentToBooking)}
-          hint="kliknięcia „Zarezerwuj”"
+          hint={t("dashboard.tiles.toBookingHint")}
         />
         <Tile
-          label="Rezerwacje z chatbota"
+          label={t("dashboard.tiles.fromChat")}
           value={String(stats.reservationsFromChat)}
           tone={stats.reservationsFromChat > 0 ? "good" : undefined}
-          hint="źródło = chatbot"
+          hint={t("dashboard.tiles.fromChatHint")}
         />
         <Tile
-          label="Konwersja"
+          label={t("dashboard.tiles.conversion")}
           value={
             stats.conversionPct == null
               ? "—"
               : `${Math.round(stats.conversionPct)}%`
           }
-          hint="rozmowy → przejście do rezerwacji"
+          hint={t("dashboard.tiles.conversionHint")}
         />
         <Tile
-          label="Pytania bez odpowiedzi"
+          label={t("dashboard.tiles.unanswered")}
           value={String(stats.unansweredOpen)}
           tone={stats.unansweredOpen > 0 ? "warn" : undefined}
         />
@@ -139,17 +146,17 @@ export default async function ChatbotDashboard({
 
       <section className="mt-12">
         <div className="mb-4 flex items-baseline justify-between gap-4">
-          <h2 className="label text-ink text-xs">Ostatnie leady</h2>
+          <h2 className="label text-ink text-xs">{t("dashboard.recentLeads")}</h2>
           <Link
             href="/admin/chatbot/leady"
             className="text-ink-faint hover:text-ink tap text-xs"
           >
-            Wszystkie →
+            {t("common.viewAll")}
           </Link>
         </div>
         {leads.length === 0 ? (
           <p className="border-line text-silver border px-5 py-6 text-center text-sm">
-            Brak zgłoszeń. Pojawią się tu, gdy klient poprosi o kontakt.
+            {t("dashboard.noLeads")}
           </p>
         ) : (
           <div className="border-line border">
@@ -171,7 +178,7 @@ export default async function ChatbotDashboard({
                   </span>
                 )}
                 <span className="border-line text-ink-faint ml-auto border px-2 text-[10px]">
-                  {l.status}
+                  {t.has(`leadStatus.${l.status}`) ? t(`leadStatus.${l.status}`) : l.status}
                 </span>
               </div>
             ))}
@@ -182,18 +189,18 @@ export default async function ChatbotDashboard({
       <section className="mt-12">
         <div className="mb-4 flex items-baseline justify-between gap-4">
           <h2 className="label text-ink text-xs">
-            Najczęstsze pytania bez odpowiedzi
+            {t("dashboard.unansweredTop")}
           </h2>
           <Link
             href="/admin/chatbot/pytania"
             className="text-ink-faint hover:text-ink tap text-xs"
           >
-            Wszystkie →
+            {t("common.viewAll")}
           </Link>
         </div>
         {unanswered.length === 0 ? (
           <p className="border-line text-silver border px-5 py-6 text-center text-sm">
-            Asystent odpowiedział na wszystko, o co go pytano.
+            {t("common.allAnswered")}
           </p>
         ) : (
           <div className="border-line border">

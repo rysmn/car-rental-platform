@@ -1,3 +1,4 @@
+import { pick, type Bilingual } from "@/lib/i18n-pick";
 import "server-only";
 import { sql } from "drizzle-orm";
 import { getDb } from "@/lib/db";
@@ -39,22 +40,23 @@ export type BookingAnalytics = {
   /** Rental length in days, over blocking reservations only. */
   length: { median: number | null; average: number | null };
   /** Share of blocking reservations that bought each add-on. */
-  addOns: { key: string; label: string; count: number; share: number }[];
+  addOns: { key: string; label: Bilingual; count: number; share: number }[];
   /** Where people collect from. */
   locations: { name: string; count: number; share: number }[];
   /** Deposit variant split. */
   deposit: { withDeposit: number; noDeposit: number };
 };
 
-const STATUS_LABEL: Record<string, string> = {
-  pending: "Oczekujące",
-  confirmed: "Potwierdzone",
-  cancelled: "Anulowane",
-  completed: "Zakończone",
-  rejected: "Odrzucone",
+const STATUS_LABEL: Record<string, Bilingual> = {
+  pending: { pl: "Oczekujące", en: "Pending" },
+  confirmed: { pl: "Potwierdzone", en: "Confirmed" },
+  cancelled: { pl: "Anulowane", en: "Cancelled" },
+  completed: { pl: "Zakończone", en: "Completed" },
+  rejected: { pl: "Odrzucone", en: "Rejected" },
 };
 
-export const statusLabel = (s: string) => STATUS_LABEL[s] ?? s;
+export const statusLabel = (s: string, locale: string) =>
+  STATUS_LABEL[s] ? pick(STATUS_LABEL[s], locale) : s;
 
 export async function getBookingAnalytics(
   windowDays = 365,
@@ -165,19 +167,19 @@ export async function getBookingAnalytics(
     addOns: [
       {
         key: "extraDriver",
-        label: "Dodatkowy kierowca",
+        label: { pl: "Dodatkowy kierowca", en: "Additional driver" },
         count: num(a?.extra_driver),
         share: share(num(a?.extra_driver)),
       },
       {
         key: "childSeat",
-        label: "Fotelik dziecięcy",
+        label: { pl: "Fotelik dziecięcy", en: "Child seat" },
         count: num(a?.child_seat),
         share: share(num(a?.child_seat)),
       },
       {
         key: "protection",
-        label: "Pakiet ochronny",
+        label: { pl: "Pakiet ochronny", en: "Protection package" },
         count: num(a?.protection_package),
         share: share(num(a?.protection_package)),
       },

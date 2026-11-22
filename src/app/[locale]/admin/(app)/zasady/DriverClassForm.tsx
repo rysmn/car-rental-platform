@@ -1,8 +1,10 @@
 "use client";
 
 import { useActionState, useState } from "react";
+import { useLocale, useTranslations } from "next-intl";
 import { saveDriverClasses, type SaveResult } from "./actions";
 import type { DriverClassRow } from "@/lib/admin/fleet";
+import { pick } from "@/lib/i18n-pick";
 import {
   DRIVER_CLASSES,
   DRIVER_CLASS_LABEL,
@@ -25,17 +27,20 @@ import {
  */
 
 function Feedback({ state }: { state: SaveResult | null }) {
+  const t = useTranslations("Admin.rules");
   if (!state) return null;
   if (state.ok)
     return (
       <span className="text-xs text-emerald-400">
-        {state.message ?? "Zapisano ✓"}
+        {state.message ?? t("actions.saved")}
       </span>
     );
   return <span className="text-red text-xs">{state.error}</span>;
 }
 
 export function DriverClassForm({ models }: { models: DriverClassRow[] }) {
+  const t = useTranslations("Admin.rules");
+  const locale = useLocale();
   const [state, action, pending] = useActionState(saveDriverClasses, null);
   const [picked, setPicked] = useState<Record<string, DriverClass | "">>(
     Object.fromEntries(models.map((m) => [m.id, m.driverClass ?? ""])),
@@ -52,18 +57,18 @@ export function DriverClassForm({ models }: { models: DriverClassRow[] }) {
           <thead>
             <tr className="border-line border-b">
               <th className="label-tight text-ink-faint px-3 py-2 text-left text-[10px]">
-                Samochód
+                {t("classes.car")}
               </th>
               {DRIVER_CLASSES.map((c) => (
                 <th
                   key={c}
                   className="label-tight text-ink-faint px-3 py-2 text-center text-[10px] whitespace-nowrap"
                 >
-                  {DRIVER_CLASS_LABEL[c]}
+                  {pick(DRIVER_CLASS_LABEL[c], locale)}
                 </th>
               ))}
               <th className="label-tight text-ink-faint px-3 py-2 text-center text-[10px]">
-                Brak
+                {t("classes.none")}
               </th>
             </tr>
           </thead>
@@ -81,12 +86,12 @@ export function DriverClassForm({ models }: { models: DriverClassRow[] }) {
                     </span>
                     {!m.published ? (
                       <span className="text-ink-faint ml-2 text-[10px]">
-                        nieopublikowane
+                        {t("classes.unpublished")}
                       </span>
                     ) : null}
                     {missing && m.published ? (
                       <span className="ml-2 text-[10px] text-amber-500">
-                        bez klasy
+                        {t("classes.noClass")}
                       </span>
                     ) : null}
                   </td>
@@ -109,7 +114,7 @@ export function DriverClassForm({ models }: { models: DriverClassRow[] }) {
                           onChange={() =>
                             setPicked((p) => ({ ...p, [m.id]: c }))
                           }
-                          aria-label={`${m.brand} ${m.model} — ${DRIVER_CLASS_LABEL[c]}`}
+                          aria-label={`${m.brand} ${m.model} — ${pick(DRIVER_CLASS_LABEL[c], locale)}`}
                           className="accent-red size-4"
                         />
                       </label>
@@ -123,7 +128,7 @@ export function DriverClassForm({ models }: { models: DriverClassRow[] }) {
                         value=""
                         checked={picked[m.id] === ""}
                         onChange={() => setPicked((p) => ({ ...p, [m.id]: "" }))}
-                        aria-label={`${m.brand} ${m.model} — bez klasy`}
+                        aria-label={`${m.brand} ${m.model} — ${t("classes.noClassAria")}`}
                         className="size-4"
                       />
                     </label>
@@ -139,8 +144,11 @@ export function DriverClassForm({ models }: { models: DriverClassRow[] }) {
         className={`mt-2 text-[11px] ${unassigned > 0 ? "text-amber-500" : "text-ink-faint"}`}
       >
         {unassigned > 0
-          ? `Bez klasy: ${unassigned} z ${models.length}. Dopóki jakieś opublikowane auto nie ma klasy, nie da się włączyć egzekwowania w formularzu.`
-          : `Wszystkie ${models.length} aut mają przypisaną klasę.`}
+          ? t("classes.unassignedHint", {
+              count: unassigned,
+              total: models.length,
+            })
+          : t("classes.allAssigned", { total: models.length })}
       </p>
 
       <div className="mt-4 flex flex-wrap items-center gap-4">
@@ -149,7 +157,7 @@ export function DriverClassForm({ models }: { models: DriverClassRow[] }) {
           disabled={pending}
           className="label-tight border-line-strong text-ink hover:border-ink hover:bg-ink/5 tap inline-flex items-center border px-4 text-[10px] transition-colors disabled:opacity-50"
         >
-          {pending ? "Zapisywanie…" : "Zapisz przypisanie"}
+          {pending ? t("actions.saving") : t("classes.save")}
         </button>
         <Feedback state={state} />
       </div>

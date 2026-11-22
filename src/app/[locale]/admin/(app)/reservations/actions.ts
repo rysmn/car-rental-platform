@@ -3,6 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { eq, sql } from "drizzle-orm";
 import { z } from "zod";
+import { getLocale, getTranslations } from "next-intl/server";
 import { getDb, schema } from "@/lib/db";
 import { requirePermission } from "@/lib/auth/guard";
 import { recordAudit } from "@/lib/auth/audit";
@@ -33,7 +34,7 @@ import { getSetting } from "@/lib/admin/settings";
 import { chwilaWarszawska } from "@/lib/booking/lead-time";
 import { HANDOVER } from "@/lib/booking/fees";
 import { recordAlert } from "@/lib/alerts/record";
-import { formatPln } from "@/lib/format";
+import { formatPln, formatPlnDokladnie } from "@/lib/format";
 import { noShowMozliwy } from "@/lib/booking/cancellation";
 import {
   naleznosc,
@@ -313,12 +314,12 @@ export async function updateOdometer(
   formData: FormData,
 ): Promise<OdometerResult> {
   const admin = await requirePermission("wydania.prowadz");
+  const t = await getTranslations("Admin.reservations.errors");
   const parsed = odometerInput.safeParse(Object.fromEntries(formData));
   if (!parsed.success) {
     return {
       ok: false,
-      error:
-        "Sprawdź stany licznika — muszą być liczbami, a stan przy zwrocie nie może być niższy niż przy wydaniu.",
+      error: t("odometerInvalid"),
     };
   }
   const d = parsed.data;
@@ -335,7 +336,7 @@ export async function updateOdometer(
       .from(schema.reservations)
       .where(eq(schema.reservations.id, d.id))
       .limit(1);
-    if (!before) return { ok: false, error: "Nie znaleziono rezerwacji." };
+    if (!before) return { ok: false, error: t("notFound") };
 
     await db
       .update(schema.reservations)
@@ -370,7 +371,7 @@ export async function updateOdometer(
     return { ok: true };
   } catch (err) {
     adminActionFailed("updateOdometer", err);
-    return { ok: false, error: "Wystąpił błąd. Spróbuj ponownie." };
+    return { ok: false, error: t("generic") };
   }
 }
 
@@ -395,27 +396,27 @@ const phoneBooking = z
   .object({
     modelId: z.string().uuid(),
     locationId: z.string().uuid(),
-    startDate: z.string().regex(DATE_RE, "Podaj datę odbioru"),
-    endDate: z.string().regex(DATE_RE, "Podaj datę zwrotu"),
+    startDate: z.string().regex(DATE_RE, "pickupDateRequired"),
+    endDate: z.string().regex(DATE_RE, "returnDateRequired"),
     pickupTime: z
       .string()
       .trim()
-      .refine((v) => v === "" || TIME_RE.test(v), "Godzina w formacie GG:MM")
+      .refine((v) => v === "" || TIME_RE.test(v), "timeFormat")
       .transform((v) => (v === "" ? null : v)),
     returnTime: z
       .string()
       .trim()
-      .refine((v) => v === "" || TIME_RE.test(v), "Godzina w formacie GG:MM")
+      .refine((v) => v === "" || TIME_RE.test(v), "timeFormat")
       .transform((v) => (v === "" ? null : v)),
-    customerName: z.string().trim().min(2, "Imię i nazwisko").max(120),
-    customerPhone: z.string().trim().min(6, "Numer telefonu").max(40),
+    customerName: z.string().trim().min(2, "nameRequired").max(120),
+    customerPhone: z.string().trim().min(6, "phoneRequired").max(40),
     customerEmail: z
       .string()
       .trim()
       .max(200)
       .refine(
         (v) => v === "" || /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(v),
-        "Nieprawidłowy adres e-mail",
+        "emailInvalid",
       ),
     extraDriver: z.coerce.boolean(),
     childSeat: z.coerce.boolean(),
@@ -440,7 +441,7 @@ const phoneBooking = z
     paymentMethod: z.enum(["", "cash", "card", "transfer", "online"]),
   })
   .refine((d) => d.endDate >= d.startDate, {
-    message: "Zwrot nie może być przed odbiorem",
+    message: "returnBeforePickup",
     path: ["endDate"],
   });
 
@@ -465,6 +466,9 @@ export async function createPhoneBooking(
   formData: FormData,
 ): Promise<PhoneBookingResult> {
   const admin = await requirePermission("rezerwacje.status");
+
+  const t = await getTranslations("Admin.reservations.errors");
+  const msg = (m: string) => (t.has(m) ? t(m) : m);
 
   // Kept for every failure path below. React puts its own bookkeeping into
   // the same FormData ($ACTION_REF, $ACTION_KEY…); echoing that back to the
@@ -496,7 +500,7 @@ export async function createPhoneBooking(
     const fieldErrors: Record<string, string> = {};
     for (const issue of parsed.error.issues) {
       const key = String(issue.path[0] ?? "form");
-      if (!fieldErrors[key]) fieldErrors[key] = issue.message;
+      if (!fieldErrors[key]) fieldErrors[key] = msg(issue.message);
     }
     return { ok: false, error: "validation", fieldErrors, values };
   }
@@ -653,9 +657,9 @@ const paymentInput = z.object({
   reservationId: z.string().uuid(),
   amount: z.coerce
     .number()
-    .refine((v) => Number.isFinite(v) && v !== 0, "Podaj kwotę"),
+    .refine((v) => Number.isFinite(v) && v !== 0, "amountRequired"),
   method: z.enum(["cash", "card", "transfer", "online"]),
-  paidOn: z.string().regex(DATE_RE, "Podaj datę"),
+  paidOn: z.string().regex(DATE_RE, "paymentDateRequired"),
   note: z.string().trim().max(300),
 });
 
@@ -672,6 +676,8 @@ export async function addPayment(
   formData: FormData,
 ): Promise<PaymentResult> {
   const admin = await requirePermission("finanse.edytuj");
+  const t = await getTranslations("Admin.reservations.errors");
+  const msg = (m: string) => (t.has(m) ? t(m) : m);
   const parsed = paymentInput.safeParse({
     reservationId: formData.get("reservationId") ?? "",
     amount: String(formData.get("amount") ?? "").replace(",", "."),
@@ -682,7 +688,9 @@ export async function addPayment(
   if (!parsed.success) {
     return {
       ok: false,
-      error: parsed.error.issues[0]?.message ?? "Popraw dane wpłaty",
+      error: parsed.error.issues[0]
+        ? msg(parsed.error.issues[0].message)
+        : t("paymentFormInvalid"),
     };
   }
   const d = parsed.data;
@@ -711,7 +719,7 @@ export async function addPayment(
     return { ok: true };
   } catch (err) {
     adminActionFailed("Payment", err);
-    return { ok: false, error: "Nie udało się zapisać wpłaty" };
+    return { ok: false, error: t("paymentSaveFailed") };
   }
 }
 
@@ -720,10 +728,11 @@ export async function deletePayment(
   formData: FormData,
 ): Promise<PaymentResult> {
   const admin = await requirePermission("finanse.edytuj");
+  const t = await getTranslations("Admin.reservations.errors");
   const id = String(formData.get("id") ?? "");
   const reservationId = String(formData.get("reservationId") ?? "");
   if (!UUID_RE.test(id) || !UUID_RE.test(reservationId)) {
-    return { ok: false, error: "Nieprawidłowe dane" };
+    return { ok: false, error: t("invalidData") };
   }
   try {
     await getDb()
@@ -742,7 +751,7 @@ export async function deletePayment(
     return { ok: true };
   } catch (err) {
     adminActionFailed("paymentDelete", err);
-    return { ok: false, error: "Nie udało się usunąć wpłaty" };
+    return { ok: false, error: t("paymentDeleteFailed") };
   }
 }
 
@@ -751,8 +760,8 @@ export async function deletePayment(
 const depositInput = z.object({
   reservationId: z.string().uuid(),
   status: z.enum(DEPOSIT_STATUSES),
-  amount: z.coerce.number().min(0, "Kwota nie może być ujemna"),
-  kept: z.coerce.number().min(0, "Kwota nie może być ujemna"),
+  amount: z.coerce.number().min(0, "amountNegative"),
+  kept: z.coerce.number().min(0, "amountNegative"),
   method: z.enum(["cash", "card", "transfer", "online"]).optional(),
   note: z.string().trim().max(300),
 });
@@ -774,6 +783,9 @@ export async function addDepositEvent(
   formData: FormData,
 ): Promise<DepositResult> {
   const admin = await requirePermission("kaucje.prowadz");
+  const t = await getTranslations("Admin.reservations.errors");
+  const msg = (m: string) => (t.has(m) ? t(m) : m);
+  const locale = await getLocale();
   const parsed = depositInput.safeParse({
     reservationId: formData.get("reservationId") ?? "",
     status: formData.get("status") ?? "",
@@ -785,7 +797,9 @@ export async function addDepositEvent(
   if (!parsed.success) {
     return {
       ok: false,
-      error: parsed.error.issues[0]?.message ?? "Popraw dane kaucji",
+      error: parsed.error.issues[0]
+        ? msg(parsed.error.issues[0].message)
+        : t("depositFormInvalid"),
     };
   }
   const d = parsed.data;
@@ -794,13 +808,13 @@ export async function addDepositEvent(
   const movesMoney = DEPOSIT_TAKES_AMOUNT[d.status];
 
   if (movesMoney && amount + kept <= 0) {
-    return { ok: false, error: "Podaj kwotę" };
+    return { ok: false, error: t("amountRequired") };
   }
   if (d.status === "partially_kept" && kept <= 0) {
-    return { ok: false, error: "Podaj, ile zatrzymujecie" };
+    return { ok: false, error: t("keptRequired") };
   }
   if (d.status === "partially_kept" && !d.note) {
-    return { ok: false, error: "Napisz, za co zatrzymana jest część kaucji" };
+    return { ok: false, error: t("keptReasonRequired") };
   }
 
   try {
@@ -811,7 +825,7 @@ export async function addDepositEvent(
       })
       .from(schema.reservations)
       .where(eq(schema.reservations.id, d.reservationId));
-    if (!r) return { ok: false, error: "Nie ma takiej rezerwacji" };
+    if (!r) return { ok: false, error: t("reservationMissing") };
 
     const events = await listDepositEvents(d.reservationId);
     const before = summariseDeposit(r.depositGrosze, r.depositVariant, events);
@@ -822,7 +836,9 @@ export async function addDepositEvent(
     if (releasing > before.securedGrosze) {
       return {
         ok: false,
-        error: `Zabezpieczone jest ${(before.securedGrosze / 100).toFixed(2)} zł — nie można rozliczyć więcej`,
+        error: t("depositExceeded", {
+          amount: formatPlnDokladnie(before.securedGrosze, locale),
+        }),
       };
     }
 
@@ -851,7 +867,7 @@ export async function addDepositEvent(
     return { ok: true };
   } catch (err) {
     adminActionFailed("Deposit", err);
-    return { ok: false, error: "Nie udało się zapisać kaucji" };
+    return { ok: false, error: t("depositSaveFailed") };
   }
 }
 
@@ -869,10 +885,11 @@ export async function deleteLastDepositEvent(
   formData: FormData,
 ): Promise<DepositResult> {
   const admin = await requirePermission("kaucje.prowadz");
+  const t = await getTranslations("Admin.reservations.errors");
   const id = String(formData.get("id") ?? "");
   const reservationId = String(formData.get("reservationId") ?? "");
   if (!UUID_RE.test(id) || !UUID_RE.test(reservationId)) {
-    return { ok: false, error: "Nieprawidłowe dane" };
+    return { ok: false, error: t("invalidData") };
   }
   try {
     const events = await listDepositEvents(reservationId);
@@ -880,7 +897,7 @@ export async function deleteLastDepositEvent(
     if (!last || last.id !== id) {
       return {
         ok: false,
-        error: "Cofnąć można tylko ostatni wpis — historia kaucji nie ma dziur",
+        error: t("depositUndoOnlyLast"),
       };
     }
     await getDb()
@@ -903,7 +920,7 @@ export async function deleteLastDepositEvent(
     return { ok: true };
   } catch (err) {
     adminActionFailed("depositDelete", err);
-    return { ok: false, error: "Nie udało się cofnąć wpisu" };
+    return { ok: false, error: t("depositUndoFailed") };
   }
 }
 
@@ -934,8 +951,9 @@ export async function moveReservation(input: {
   carId: string;
 }): Promise<MoveResult> {
   const admin = await requirePermission("rezerwacje.status");
+  const t = await getTranslations("Admin.reservations.errors");
   if (!UUID_RE.test(input.id) || !UUID_RE.test(input.carId)) {
-    return { ok: false, error: "Nieprawidłowe dane" };
+    return { ok: false, error: t("invalidData") };
   }
 
   try {
@@ -948,24 +966,24 @@ export async function moveReservation(input: {
       })
       .from(schema.reservations)
       .where(eq(schema.reservations.id, input.id));
-    if (!before) return { ok: false, error: "Nie ma takiej rezerwacji" };
+    if (!before) return { ok: false, error: t("reservationMissing") };
     if (before.status === "cancelled" || before.status === "rejected") {
       return {
         ok: false,
-        error: "Odwołanej rezerwacji nie ma po co przenosić",
+        error: t("moveCancelled"),
       };
     }
     if (before.carId === input.carId) {
-      return { ok: false, error: "To jest to samo auto" };
+      return { ok: false, error: t("moveSameCar") };
     }
 
     const [car] = await db
       .select({ modelId: schema.cars.modelId, status: schema.cars.status })
       .from(schema.cars)
       .where(eq(schema.cars.id, input.carId));
-    if (!car) return { ok: false, error: "Nie ma takiego auta" };
+    if (!car) return { ok: false, error: t("carMissing") };
     if (car.status !== "available") {
-      return { ok: false, error: "To auto nie jest sprawne" };
+      return { ok: false, error: t("carNotAvailable") };
     }
 
     await db
@@ -995,11 +1013,11 @@ export async function moveReservation(input: {
     if (isOverlapError(err)) {
       return {
         ok: false,
-        error: "To auto jest w tym terminie zajęte — ktoś je właśnie wziął",
+        error: t("carTaken"),
       };
     }
     adminActionFailed("reservationMove", err);
-    return { ok: false, error: "Nie udało się przenieść rezerwacji" };
+    return { ok: false, error: t("moveFailed") };
   }
 }
 
@@ -1113,8 +1131,9 @@ export async function oznaczNieodebranie(
   formData: FormData,
 ): Promise<{ ok: true; kwotaGrosze: number } | { ok: false; error: string }> {
   const admin = await requirePermission("rezerwacje.status");
+  const t = await getTranslations("Admin.reservations.errors");
   const id = String(formData.get("id") ?? "");
-  if (!UUID_RE.test(id)) return { ok: false, error: "Nieprawidłowe dane." };
+  if (!UUID_RE.test(id)) return { ok: false, error: t("invalidData") };
 
   try {
     const db = getDb();
@@ -1142,12 +1161,12 @@ export async function oznaczNieodebranie(
       )
       .where(eq(schema.reservations.id, id))
       .limit(1);
-    if (!r) return { ok: false, error: "not_found" };
+    if (!r) return { ok: false, error: t("notFound") };
 
     if (!canTransition(r.status as ReservationStatus, "no_show")) {
       return {
         ok: false,
-        error: "Tylko potwierdzona rezerwacja może być nieodebrana.",
+        error: t("noShowOnlyConfirmed"),
       };
     }
 
@@ -1166,7 +1185,7 @@ export async function oznaczNieodebranie(
     if (!noShowMozliwy(doOdbioruH, polityka)) {
       return {
         ok: false,
-        error: `Za wcześnie. Rezerwację można uznać za nieodebraną dopiero ${polityka.noShowGraceMinutes} min po godzinie odbioru.`,
+        error: t("noShowTooEarly", { minutes: polityka.noShowGraceMinutes }),
       };
     }
 
@@ -1196,7 +1215,7 @@ export async function oznaczNieodebranie(
       return "ok" as const;
     });
     if (wynik === "zajete") {
-      return { ok: false, error: "Status zmienił się w międzyczasie." };
+      return { ok: false, error: t("statusChanged") };
     }
 
     await recordAudit({
@@ -1224,7 +1243,7 @@ export async function oznaczNieodebranie(
     return { ok: true, kwotaGrosze: charge.amountGrosze };
   } catch (err) {
     adminActionFailed("oznaczNieodebranie", err);
-    return { ok: false, error: "Wystąpił błąd. Spróbuj ponownie." };
+    return { ok: false, error: t("generic") };
   }
 }
 
@@ -1240,25 +1259,30 @@ export async function umorzOplateAnulowania(
   formData: FormData,
 ): Promise<{ ok: true } | { ok: false; error: string }> {
   const admin = await requirePermission("finanse.edytuj");
+  const t = await getTranslations("Admin.reservations.errors");
+  const locale = await getLocale();
   const id = String(formData.get("id") ?? "");
   const powod = String(formData.get("reason") ?? "").trim();
-  if (!UUID_RE.test(id)) return { ok: false, error: "Nieprawidłowe dane." };
+  if (!UUID_RE.test(id)) return { ok: false, error: t("invalidData") };
   if (powod.length < 3 || powod.length > 500) {
-    return { ok: false, error: "Podaj powód umorzenia (3–500 znaków)." };
+    return { ok: false, error: t("waiveReasonLength") };
   }
 
   try {
     const przed = await naleznosc(id);
-    if (!przed) return { ok: false, error: "Brak naliczonej opłaty." };
+    if (!przed) return { ok: false, error: t("noCharge") };
     if (przed.status === "waived") {
-      return { ok: false, error: "Ta opłata jest już umorzona." };
+      return { ok: false, error: t("alreadyWaived") };
     }
     if (przed.amountGrosze <= 0) {
-      return { ok: false, error: "Nie ma czego umarzać — opłata wynosi 0 zł." };
+      return {
+        ok: false,
+        error: t("nothingToWaive", { amount: formatPln(0, locale) }),
+      };
     }
 
     const po = await umorz({ reservationId: id, adminId: admin.id, reason: powod });
-    if (!po) return { ok: false, error: "Ta opłata jest już umorzona." };
+    if (!po) return { ok: false, error: t("alreadyWaived") };
 
     await recordAudit({
       adminId: admin.id,
@@ -1292,7 +1316,7 @@ export async function umorzOplateAnulowania(
     return { ok: true };
   } catch (err) {
     adminActionFailed("umorzOplateAnulowania", err);
-    return { ok: false, error: "Wystąpił błąd. Spróbuj ponownie." };
+    return { ok: false, error: t("generic") };
   }
 }
 
@@ -1302,14 +1326,15 @@ export async function oznaczOplateZaplacona(
   formData: FormData,
 ): Promise<{ ok: true } | { ok: false; error: string }> {
   const admin = await requirePermission("finanse.edytuj");
+  const t = await getTranslations("Admin.reservations.errors");
   const id = String(formData.get("id") ?? "");
-  if (!UUID_RE.test(id)) return { ok: false, error: "Nieprawidłowe dane." };
+  if (!UUID_RE.test(id)) return { ok: false, error: t("invalidData") };
   try {
     const po = await oznaczZaplacona({ reservationId: id });
     if (!po) {
       return {
         ok: false,
-        error: "Nie ma czego odnotować — opłata jest już zapłacona lub umorzona.",
+        error: t("nothingToRecord"),
       };
     }
     await recordAudit({
@@ -1324,6 +1349,6 @@ export async function oznaczOplateZaplacona(
     return { ok: true };
   } catch (err) {
     adminActionFailed("oznaczOplateZaplacona", err);
-    return { ok: false, error: "Wystąpił błąd. Spróbuj ponownie." };
+    return { ok: false, error: t("generic") };
   }
 }

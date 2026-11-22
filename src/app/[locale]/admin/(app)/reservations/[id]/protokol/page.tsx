@@ -1,5 +1,5 @@
 import { notFound } from "next/navigation";
-import { setRequestLocale } from "next-intl/server";
+import { getTranslations, setRequestLocale } from "next-intl/server";
 import { guardPage } from "@/lib/auth/guard";
 import { Link } from "@/i18n/navigation";
 import { getReservation } from "@/lib/admin/reservations";
@@ -14,6 +14,7 @@ import {
   type HandoverRecord,
 } from "@/lib/admin/handovers";
 import { formatDatePl, formatDateTimePl, formatPln } from "@/lib/format";
+import { pick } from "@/lib/i18n-pick";
 import { PrintButton } from "../../PrintButton";
 
 export const metadata = { title: "Protokół zdawczo-odbiorczy" };
@@ -49,6 +50,7 @@ export default async function ProtocolPrintPage({
   const { locale, id } = await params;
   setRequestLocale(locale);
   await guardPage("wydania.prowadz");
+  const t = await getTranslations("Admin.reservations.protocol");
 
   if (!UUID_RE.test(id)) notFound();
   const [data, both, company] = await Promise.all([
@@ -60,7 +62,9 @@ export default async function ProtocolPrintPage({
 
   const r = data.r;
   const differences =
-    both.pickup && both.return ? compareHandovers(both.pickup, both.return) : [];
+    both.pickup && both.return
+      ? compareHandovers(both.pickup, both.return, locale)
+      : [];
 
   return (
     <div className="mx-auto max-w-3xl">
@@ -69,7 +73,7 @@ export default async function ProtocolPrintPage({
           href={{ pathname: "/admin/reservations/[id]", params: { id } }}
           className="label-tight text-ink-faint hover:text-ink -my-2 inline-flex min-h-11 items-center text-[10px] transition-colors"
         >
-          ← Rezerwacja {r.reference}
+          {t("backToBooking", { reference: r.reference })}
         </Link>
         <PrintButton />
       </div>
@@ -127,8 +131,8 @@ export default async function ProtocolPrintPage({
         </section>
 
         <section className="mt-6 grid gap-4 sm:grid-cols-2" data-print-keep>
-          <Protocol title="Wydanie" record={both.pickup} />
-          <Protocol title="Zwrot" record={both.return} />
+          <Protocol title="Wydanie" record={both.pickup} locale={locale} />
+          <Protocol title="Zwrot" record={both.return} locale={locale} />
         </section>
 
         {both.pickup && both.return && (
@@ -206,9 +210,11 @@ function Line({ label, value }: { label: string; value: string }) {
 function Protocol({
   title,
   record,
+  locale,
 }: {
   title: string;
   record: HandoverRecord | null;
+  locale: string;
 }) {
   if (!record) {
     return (
@@ -225,15 +231,21 @@ function Protocol({
     <Block title={title}>
       <Line label="Data" value={formatDateTimePl(record.createdAt)} />
       <Line label="Przebieg" value={`${record.odometerKm} km`} />
-      <Line label="Paliwo" value={FUEL_LABEL[record.fuelEighths]} />
-      <Line label="Czystość" value={CLEANLINESS_LABEL[record.cleanliness]} />
+      <Line label="Paliwo" value={pick(FUEL_LABEL[record.fuelEighths], locale)} />
+      <Line
+        label="Czystość"
+        value={pick(CLEANLINESS_LABEL[record.cleanliness], locale)}
+      />
       <Line label="Kluczyki" value={String(record.keysCount)} />
       <Line
         label="Braki"
         value={
           missing.length
             ? missing
-                .map((i) => `${i.label} (${GROUP_LABEL[i.group].toLowerCase()})`)
+                .map(
+                  (i) =>
+                    `${pick(i.label, locale)} (${pick(GROUP_LABEL[i.group], locale).toLowerCase()})`,
+                )
                 .join(", ")
             : "brak"
         }

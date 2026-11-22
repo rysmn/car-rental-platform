@@ -1,6 +1,7 @@
 "use client";
 
 import { useActionState, useEffect, useRef, useState } from "react";
+import { useTranslations } from "next-intl";
 import { loginAction, type LoginState } from "./actions";
 
 const inputCls =
@@ -22,6 +23,7 @@ export function LoginForm() {
     loginAction,
     {},
   );
+  const t = useTranslations("Admin.login");
   const [email, setEmail] = useState("");
   const [haslo, setHaslo] = useState("");
   const poleKodu = useRef<HTMLInputElement>(null);
@@ -42,7 +44,7 @@ export function LoginForm() {
           <input type="hidden" name="password" value={haslo} />
           <label className="block">
             <span className="label-tight text-ink-faint text-[10px]">
-              Kod z aplikacji lub kod zapasowy
+              {t("codeLabel")}
             </span>
             <input
               ref={poleKodu}
@@ -56,20 +58,17 @@ export function LoginForm() {
             />
           </label>
           <p className="text-ink-faint text-[11px] leading-relaxed">
-            Sześć cyfr z aplikacji uwierzytelniającej. Jeżeli nie masz telefonu,
-            wpisz jeden z kodów zapasowych — każdy działa raz.
+            {t("codeHelp")}
           </p>
           {state.zlyKod && (
-            <p className="text-red text-xs">
-              Kod nie pasuje. Sprawdź, czy aplikacja pokazuje aktualny kod.
-            </p>
+            <p className="text-red text-xs">{t("codeWrong")}</p>
           )}
         </>
       ) : (
         <>
           <label className="block">
             <span className="label-tight text-ink-faint text-[10px]">
-              E-mail
+              {t("email")}
             </span>
             <input
               name="email"
@@ -82,9 +81,7 @@ export function LoginForm() {
             />
           </label>
           <label className="block">
-            <span className="label-tight text-ink-faint text-[10px]">
-              Hasło
-            </span>
+            <span className="label-tight text-ink-faint text-[10px]">{t("password")}</span>
             <input
               name="password"
               type="password"
@@ -96,7 +93,7 @@ export function LoginForm() {
             />
           </label>
           {state.error && (
-            <p className="text-red text-xs">Nieprawidłowy e-mail lub hasło.</p>
+            <p className="text-red text-xs">{t("invalid")}</p>
           )}
         </>
       )}
@@ -106,7 +103,7 @@ export function LoginForm() {
         disabled={pending}
         className="label bg-red hover:bg-red-hover mt-2 inline-flex h-12 w-full items-center justify-center text-sm text-white transition-colors disabled:opacity-50"
       >
-        {pending ? "Logowanie…" : krokKodu ? "Potwierdź kod" : "Zaloguj się"}
+        {pending ? t("signingIn") : krokKodu ? t("confirmCode") : t("signIn")}
       </button>
     </form>
   );

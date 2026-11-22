@@ -1,6 +1,7 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
+import { getTranslations } from "next-intl/server";
 import { eq } from "drizzle-orm";
 import { z } from "zod";
 import { getDb, schema } from "@/lib/db";
@@ -19,13 +20,13 @@ const money = z
   .string()
   .trim()
   .transform((v) => Number(v.replace(",", ".").replace(/\s/g, "") || "0"))
-  .refine((v) => Number.isFinite(v) && v >= 0 && v <= 1_000_000, "Sprawdź kwotę");
+  .refine((v) => Number.isFinite(v) && v >= 0 && v <= 1_000_000, "amount");
 
 const damageInput = z.object({
-  carId: z.string().uuid("Wskaż auto"),
+  carId: z.string().uuid("car"),
   reservationId: z.string().optional(),
-  occurredOn: z.string().regex(DATE_RE, "Podaj datę zdarzenia"),
-  title: z.string().trim().min(3, "Napisz, co się stało").max(200),
+  occurredOn: z.string().regex(DATE_RE, "occurredOn"),
+  title: z.string().trim().min(3, "title").max(200),
   description: z.string().trim().max(4000),
   status: z.enum(DAMAGE_STATUSES),
   repairCost: money,
@@ -38,12 +39,25 @@ export type DamageResult =
   | { ok: true; id?: string }
   | { ok: false; error: string };
 
-const PHOTO_ERRORS: Record<string, string> = {
-  empty: "Nie wybrano pliku.",
-  too_large: "Zdjęcie jest za duże — maksymalnie 8 MB.",
-  unsupported_type: "Nieobsługiwany format. Dozwolone: JPG, PNG, WEBP, PDF.",
-  write_failed: "Nie udało się zapisać pliku.",
-};
+/** Validation messages are keys: the schema names the field, the caller translates. */
+const VALIDATION_KEYS = new Set(["car", "occurredOn", "title", "amount"]);
+
+async function validationError(e: { issues: { message: string }[] }) {
+  const t = await getTranslations("Admin.damages");
+  const m = e.issues[0]?.message ?? "";
+  return t(VALIDATION_KEYS.has(m) ? `validation.${m}` : "validation.fixData");
+}
+
+async function photoError(code: string) {
+  const t = await getTranslations("Admin.damages");
+  const KEYS: Record<string, string> = {
+    empty: "errors.photoEmpty",
+    too_large: "errors.photoTooLarge",
+    unsupported_type: "errors.photoType",
+    write_failed: "errors.photoWrite",
+  };
+  return KEYS[code] ? t(KEYS[code]) : t("errors.photoGeneric");
+}
 
 function parse(formData: FormData) {
   return damageInput.safeParse({
@@ -83,12 +97,10 @@ export async function createDamage(
   formData: FormData,
 ): Promise<DamageResult> {
   const admin = await requirePermission("wydania.prowadz");
+  const t = await getTranslations("Admin.damages");
   const parsed = parse(formData);
   if (!parsed.success) {
-    return {
-      ok: false,
-      error: parsed.error.issues[0]?.message ?? "Popraw dane szkody",
-    };
+    return { ok: false, error: await validationError(parsed.error) };
   }
   const d = parsed.data;
   const reservationId =
@@ -126,7 +138,7 @@ export async function createDamage(
     return { ok: true, id: row.id };
   } catch (err) {
     adminActionFailed("damageCreate", err);
-    return { ok: false, error: "Nie udało się zapisać szkody" };
+    return { ok: false, error: t("errors.saveFailed") };
   }
 }
 
@@ -135,14 +147,12 @@ export async function updateDamage(
   formData: FormData,
 ): Promise<DamageResult> {
   const admin = await requirePermission("wydania.prowadz");
+  const t = await getTranslations("Admin.damages");
   const id = String(formData.get("id") ?? "");
-  if (!UUID_RE.test(id)) return { ok: false, error: "Nieprawidłowe dane" };
+  if (!UUID_RE.test(id)) return { ok: false, error: t("errors.invalidData") };
   const parsed = parse(formData);
   if (!parsed.success) {
-    return {
-      ok: false,
-      error: parsed.error.issues[0]?.message ?? "Popraw dane szkody",
-    };
+    return { ok: false, error: await validationError(parsed.error) };
   }
   const d = parsed.data;
   const reservationId =
@@ -150,7 +160,7 @@ export async function updateDamage(
 
   try {
     const before = await getDamage(id);
-    if (!before) return { ok: false, error: "Nie ma takiej szkody" };
+    if (!before) return { ok: false, error: t("errors.damageNotFound") };
 
     await getDb()
       .update(schema.damages)
@@ -191,7 +201,7 @@ export async function updateDamage(
     return { ok: true, id };
   } catch (err) {
     adminActionFailed("damageUpdate", err);
-    return { ok: false, error: "Nie udało się zapisać zmian" };
+    return { ok: false, error: t("errors.updateFailed") };
   }
 }
 
@@ -200,16 +210,17 @@ export async function addDamagePhoto(
   formData: FormData,
 ): Promise<DamageResult> {
   const admin = await requirePermission("wydania.prowadz");
+  const t = await getTranslations("Admin.damages");
   const damageId = String(formData.get("damageId") ?? "");
-  if (!UUID_RE.test(damageId)) return { ok: false, error: "Nieprawidłowe dane" };
+  if (!UUID_RE.test(damageId)) return { ok: false, error: t("errors.invalidData") };
 
   const file = formData.get("photo");
   if (!(file instanceof File) || file.size === 0) {
-    return { ok: false, error: PHOTO_ERRORS.empty };
+    return { ok: false, error: await photoError("empty") };
   }
   const saved = await saveInvoice(file);
   if (!saved.ok) {
-    return { ok: false, error: PHOTO_ERRORS[saved.error] ?? "Błąd zapisu." };
+    return { ok: false, error: await photoError(saved.error) };
   }
   try {
     await getDb().insert(schema.damagePhotos).values({
@@ -231,7 +242,7 @@ export async function addDamagePhoto(
     // sierota, której nic nie tłumaczy.
     await deleteInvoice(saved.url);
     adminActionFailed("damagePhoto", err);
-    return { ok: false, error: "Nie udało się dodać zdjęcia" };
+    return { ok: false, error: t("errors.photoAddFailed") };
   }
 }
 
@@ -240,10 +251,11 @@ export async function deleteDamagePhoto(
   formData: FormData,
 ): Promise<DamageResult> {
   const admin = await requirePermission("wydania.prowadz");
+  const t = await getTranslations("Admin.damages");
   const id = String(formData.get("photoId") ?? "");
   const damageId = String(formData.get("damageId") ?? "");
   if (!UUID_RE.test(id) || !UUID_RE.test(damageId)) {
-    return { ok: false, error: "Nieprawidłowe dane" };
+    return { ok: false, error: t("errors.invalidData") };
   }
   try {
     const [row] = await getDb()
@@ -265,6 +277,6 @@ export async function deleteDamagePhoto(
     return { ok: true, id: damageId };
   } catch (err) {
     adminActionFailed("damagePhotoDelete", err);
-    return { ok: false, error: "Nie udało się usunąć zdjęcia" };
+    return { ok: false, error: t("errors.photoDeleteFailed") };
   }
 }

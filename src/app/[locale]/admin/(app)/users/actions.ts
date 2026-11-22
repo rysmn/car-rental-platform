@@ -12,45 +12,48 @@ import { hashPassword, verifyPassword } from "@/lib/auth/password";
 import { countActiveSuperadmins } from "@/lib/admin/admins";
 import { MIN_PASSWORD_LENGTH } from "./constants";
 import { adminActionFailed } from "@/lib/alerts/admin";
+import { getTranslations } from "next-intl/server";
 
 export type ActionResult =
   { ok: true; message?: string } | { ok: false; error: string };
 
-const GENERIC_ERROR: ActionResult = {
-  ok: false,
-  error: "Wystąpił błąd. Spróbuj ponownie.",
-};
+type Tr = (key: string, values?: Record<string, string | number>) => string;
 
 const UUID_RE =
   /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
-const password = z
-  .string()
-  .min(
-    MIN_PASSWORD_LENGTH,
-    `Hasło musi mieć co najmniej ${MIN_PASSWORD_LENGTH} znaków.`,
-  )
-  .max(200, "Hasło jest za długie.");
+function genericFailure(t: Tr): ActionResult {
+  return { ok: false, error: t("genericError") };
+}
 
-const CreateSchema = z.object({
-  email: z
+function passwordSchema(t: Tr) {
+  return z
     .string()
-    .trim()
-    .toLowerCase()
-    .max(200)
-    .pipe(z.email("Podaj poprawny adres e-mail.")),
-  name: z.string().trim().min(1, "Podaj imię i nazwisko.").max(120),
-  /*
-    Trzy role od rozdziału 13.6. Kolejność w enumie nie ma tu znaczenia — zbiór
-    jest zamknięty, a co która rola może, rozstrzyga `lib/auth/permissions`,
-    nie ten walidator.
-  */
-  role: z.enum(ADMIN_ROLES),
-  password,
-});
+    .min(MIN_PASSWORD_LENGTH, t("passwordMin", { min: MIN_PASSWORD_LENGTH }))
+    .max(200, t("passwordMax"));
+}
 
-function firstError(err: z.ZodError): ActionResult {
-  return { ok: false, error: err.issues[0]?.message ?? "Nieprawidłowe dane." };
+function createSchema(t: Tr) {
+  return z.object({
+    email: z
+      .string()
+      .trim()
+      .toLowerCase()
+      .max(200)
+      .pipe(z.email(t("emailInvalid"))),
+    name: z.string().trim().min(1, t("nameRequired")).max(120),
+    /*
+      Trzy role od rozdziału 13.6. Kolejność w enumie nie ma tu znaczenia — zbiór
+      jest zamknięty, a co która rola może, rozstrzyga `lib/auth/permissions`,
+      nie ten walidator.
+    */
+    role: z.enum(ADMIN_ROLES),
+    password: passwordSchema(t),
+  });
+}
+
+function firstError(err: z.ZodError, t: Tr): ActionResult {
+  return { ok: false, error: err.issues[0]?.message ?? t("invalidData") };
 }
 
 /** Unique-violation on admins.email — the only conflict this table can raise. */
@@ -76,14 +79,15 @@ export async function createAdminAccount(
   const brama = await bramaKrytyczna("konta.zarzadzaj");
   if (!brama.ok) return { ok: false, error: brama.error };
   const actor = brama.admin;
+  const t = await getTranslations("Admin.users");
 
-  const parsed = CreateSchema.safeParse({
+  const parsed = createSchema(t).safeParse({
     email: formData.get("email"),
     name: formData.get("name"),
     role: formData.get("role"),
     password: formData.get("password"),
   });
-  if (!parsed.success) return firstError(parsed.error);
+  if (!parsed.success) return firstError(parsed.error, t);
   const d = parsed.data;
 
   try {
@@ -106,29 +110,31 @@ export async function createAdminAccount(
       after: { email: d.email, name: d.name, role: d.role },
     });
     revalidateUsers();
-    return { ok: true, message: `Konto ${d.email} utworzone.` };
+    return { ok: true, message: t("accountCreated", { email: d.email }) };
   } catch (err) {
     if (isDuplicateEmail(err)) {
-      return { ok: false, error: "Konto z tym adresem e-mail już istnieje." };
+      return { ok: false, error: t("duplicateEmail") };
     }
     adminActionFailed("createAdminAccount", err);
-    return GENERIC_ERROR;
+    return genericFailure(t);
   }
 }
 
 /* ── Edit (name / role / active) ─────────────────────────────────────────── */
 
-const UpdateSchema = z.object({
-  id: z.string().regex(UUID_RE),
-  name: z.string().trim().min(1, "Podaj imię i nazwisko.").max(120),
-  /*
-    Trzy role od rozdziału 13.6. Kolejność w enumie nie ma tu znaczenia — zbiór
-    jest zamknięty, a co która rola może, rozstrzyga `lib/auth/permissions`,
-    nie ten walidator.
-  */
-  role: z.enum(ADMIN_ROLES),
-  active: z.preprocess((v) => v === "on" || v === "true", z.boolean()),
-});
+function updateSchema(t: Tr) {
+  return z.object({
+    id: z.string().regex(UUID_RE),
+    name: z.string().trim().min(1, t("nameRequired")).max(120),
+    /*
+      Trzy role od rozdziału 13.6. Kolejność w enumie nie ma tu znaczenia — zbiór
+      jest zamknięty, a co która rola może, rozstrzyga `lib/auth/permissions`,
+      nie ten walidator.
+    */
+    role: z.enum(ADMIN_ROLES),
+    active: z.preprocess((v) => v === "on" || v === "true", z.boolean()),
+  });
+}
 
 export async function updateAdminAccount(
   _prev: ActionResult | null,
@@ -138,13 +144,14 @@ export async function updateAdminAccount(
   if (!brama.ok) return { ok: false, error: brama.error };
   const actor = brama.admin;
 
-  const parsed = UpdateSchema.safeParse({
+  const t = await getTranslations("Admin.users");
+  const parsed = updateSchema(t).safeParse({
     id: formData.get("id"),
     name: formData.get("name"),
     role: formData.get("role"),
     active: formData.get("active"),
   });
-  if (!parsed.success) return firstError(parsed.error);
+  if (!parsed.success) return firstError(parsed.error, t);
   const d = parsed.data;
 
   try {
@@ -160,18 +167,15 @@ export async function updateAdminAccount(
       .from(schema.admins)
       .where(eq(schema.admins.id, d.id))
       .limit(1);
-    if (!before) return { ok: false, error: "Nie znaleziono konta." };
+    if (!before) return { ok: false, error: t("notFound") };
 
     // Locking yourself out is the one mistake this screen can make irreversible
     // from the panel, so self-demotion and self-deactivation are refused here.
     if (before.id === actor.id && d.role !== "superadmin") {
-      return {
-        ok: false,
-        error: "Nie możesz odebrać uprawnień własnemu kontu.",
-      };
+      return { ok: false, error: t("cannotDemoteSelf") };
     }
     if (before.id === actor.id && !d.active) {
-      return { ok: false, error: "Nie możesz dezaktywować własnego konta." };
+      return { ok: false, error: t("cannotDeactivateSelf") };
     }
 
     const losesSuperadmin =
@@ -179,11 +183,7 @@ export async function updateAdminAccount(
       before.active &&
       (d.role !== "superadmin" || !d.active);
     if (losesSuperadmin && (await countActiveSuperadmins()) <= 1) {
-      return {
-        ok: false,
-        error:
-          "To ostatni aktywny superadmin — musi pozostać co najmniej jeden.",
-      };
+      return { ok: false, error: t("lastSuperadmin") };
     }
 
     await db
@@ -209,19 +209,21 @@ export async function updateAdminAccount(
       after: { ...before, name: d.name, role: d.role, active: d.active },
     });
     revalidateUsers();
-    return { ok: true, message: "Zapisano." };
+    return { ok: true, message: t("saved") };
   } catch (err) {
     adminActionFailed("updateAdminAccount", err);
-    return GENERIC_ERROR;
+    return genericFailure(t);
   }
 }
 
 /* ── Password reset (superadmin sets someone else's password) ────────────── */
 
-const SetPasswordSchema = z.object({
-  id: z.string().regex(UUID_RE),
-  password,
-});
+function setPasswordSchema(t: Tr) {
+  return z.object({
+    id: z.string().regex(UUID_RE),
+    password: passwordSchema(t),
+  });
+}
 
 export async function setAdminPassword(
   _prev: ActionResult | null,
@@ -231,11 +233,12 @@ export async function setAdminPassword(
   if (!brama.ok) return { ok: false, error: brama.error };
   const actor = brama.admin;
 
-  const parsed = SetPasswordSchema.safeParse({
+  const t = await getTranslations("Admin.users");
+  const parsed = setPasswordSchema(t).safeParse({
     id: formData.get("id"),
     password: formData.get("password"),
   });
-  if (!parsed.success) return firstError(parsed.error);
+  if (!parsed.success) return firstError(parsed.error, t);
   const d = parsed.data;
 
   try {
@@ -245,7 +248,7 @@ export async function setAdminPassword(
       .from(schema.admins)
       .where(eq(schema.admins.id, d.id))
       .limit(1);
-    if (!target) return { ok: false, error: "Nie znaleziono konta." };
+    if (!target) return { ok: false, error: t("notFound") };
 
     await db
       .update(schema.admins)
@@ -267,25 +270,27 @@ export async function setAdminPassword(
       after: { email: target.email },
     });
     revalidateUsers();
-    return { ok: true, message: `Hasło dla ${target.email} zmienione.` };
+    return { ok: true, message: t("passwordSetFor", { email: target.email }) };
   } catch (err) {
     adminActionFailed("setAdminPassword", err);
-    return GENERIC_ERROR;
+    return genericFailure(t);
   }
 }
 
 /* ── Own password (available to every admin) ─────────────────────────────── */
 
-const ChangeOwnSchema = z
-  .object({
-    current: z.string().min(1, "Podaj aktualne hasło."),
-    password,
-    confirm: z.string(),
-  })
-  .refine((d) => d.password === d.confirm, {
-    message: "Nowe hasła nie są takie same.",
-    path: ["confirm"],
-  });
+function changeOwnSchema(t: Tr) {
+  return z
+    .object({
+      current: z.string().min(1, t("currentRequired")),
+      password: passwordSchema(t),
+      confirm: z.string(),
+    })
+    .refine((d) => d.password === d.confirm, {
+      message: t("passwordsDiffer"),
+      path: ["confirm"],
+    });
+}
 
 export async function changeOwnPassword(
   _prev: ActionResult | null,
@@ -293,12 +298,13 @@ export async function changeOwnPassword(
 ): Promise<ActionResult> {
   const actor = await requireAdmin();
 
-  const parsed = ChangeOwnSchema.safeParse({
+  const t = await getTranslations("Admin.users");
+  const parsed = changeOwnSchema(t).safeParse({
     current: formData.get("current"),
     password: formData.get("password"),
     confirm: formData.get("confirm"),
   });
-  if (!parsed.success) return firstError(parsed.error);
+  if (!parsed.success) return firstError(parsed.error, t);
   const d = parsed.data;
 
   try {
@@ -308,12 +314,12 @@ export async function changeOwnPassword(
       .from(schema.admins)
       .where(eq(schema.admins.id, actor.id))
       .limit(1);
-    if (!row) return { ok: false, error: "Nie znaleziono konta." };
+    if (!row) return { ok: false, error: t("notFound") };
 
     // Knowing the current password is what makes this safe to expose to every
     // admin — a hijacked open session still cannot silently take the account.
     if (!(await verifyPassword(row.passwordHash, d.current))) {
-      return { ok: false, error: "Aktualne hasło jest nieprawidłowe." };
+      return { ok: false, error: t("currentWrong") };
     }
 
     await db
@@ -333,10 +339,10 @@ export async function changeOwnPassword(
       entityId: actor.id,
     });
     revalidateUsers();
-    return { ok: true, message: "Hasło zmienione." };
+    return { ok: true, message: t("passwordChanged") };
   } catch (err) {
     adminActionFailed("changeOwnPassword", err);
-    return GENERIC_ERROR;
+    return genericFailure(t);
   }
 }
 
@@ -346,7 +352,8 @@ export async function unlockAdminAccount(id: string): Promise<ActionResult> {
   const brama = await bramaKrytyczna("konta.zarzadzaj");
   if (!brama.ok) return { ok: false, error: brama.error };
   const actor = brama.admin;
-  if (!UUID_RE.test(id)) return { ok: false, error: "Nieprawidłowe dane." };
+  const t = await getTranslations("Admin.users");
+  if (!UUID_RE.test(id)) return { ok: false, error: t("invalidData") };
 
   try {
     const db = getDb();
@@ -362,10 +369,10 @@ export async function unlockAdminAccount(id: string): Promise<ActionResult> {
       entityId: id,
     });
     revalidateUsers();
-    return { ok: true, message: "Blokada zdjęta." };
+    return { ok: true, message: t("unlocked") };
   } catch (err) {
     adminActionFailed("unlockAdminAccount", err);
-    return GENERIC_ERROR;
+    return genericFailure(t);
   }
 }
 
@@ -375,9 +382,10 @@ export async function deleteAdminAccount(id: string): Promise<ActionResult> {
   const brama = await bramaKrytyczna("konta.zarzadzaj");
   if (!brama.ok) return { ok: false, error: brama.error };
   const actor = brama.admin;
-  if (!UUID_RE.test(id)) return { ok: false, error: "Nieprawidłowe dane." };
+  const t = await getTranslations("Admin.users");
+  if (!UUID_RE.test(id)) return { ok: false, error: t("invalidData") };
   if (id === actor.id) {
-    return { ok: false, error: "Nie możesz usunąć własnego konta." };
+    return { ok: false, error: t("cannotDeleteSelf") };
   }
 
   try {
@@ -393,17 +401,14 @@ export async function deleteAdminAccount(id: string): Promise<ActionResult> {
       .from(schema.admins)
       .where(eq(schema.admins.id, id))
       .limit(1);
-    if (!target) return { ok: false, error: "Nie znaleziono konta." };
+    if (!target) return { ok: false, error: t("notFound") };
 
     if (
       target.role === "superadmin" &&
       target.active &&
       (await countActiveSuperadmins()) <= 1
     ) {
-      return {
-        ok: false,
-        error: "To ostatni aktywny superadmin — nie można go usunąć.",
-      };
+      return { ok: false, error: t("lastSuperadminDelete") };
     }
 
     // The audit trail keeps this admin's past entries; `admin_id` is declared
@@ -419,28 +424,30 @@ export async function deleteAdminAccount(id: string): Promise<ActionResult> {
       before: target,
     });
     revalidateUsers();
-    return { ok: true, message: `Konto ${target.email} usunięte.` };
+    return { ok: true, message: t("accountDeleted", { email: target.email }) };
   } catch (err) {
     adminActionFailed("deleteAdminAccount", err);
-    return GENERIC_ERROR;
+    return genericFailure(t);
   }
 }
 
 /* ── Own profile (name and phone; every admin edits their own) ────────────── */
 
-const OwnProfileSchema = z.object({
-  name: z.string().trim().min(1, "Podaj imię i nazwisko.").max(120),
-  /**
-   * Deliberately loose: "+48 884 762 950", "884762950" and "+48-884-762-950"
-   * are the same number, and rejecting a format a person actually uses buys
-   * nothing. Empty clears it.
-   */
-  phone: z
-    .string()
-    .trim()
-    .max(40, "Numer jest za długi.")
-    .transform((s) => s || null),
-});
+function ownProfileSchema(t: Tr) {
+  return z.object({
+    name: z.string().trim().min(1, t("nameRequired")).max(120),
+    /**
+     * Deliberately loose: "+48 884 762 950", "884762950" and "+48-884-762-950"
+     * are the same number, and rejecting a format a person actually uses buys
+     * nothing. Empty clears it.
+     */
+    phone: z
+      .string()
+      .trim()
+      .max(40, t("phoneTooLong"))
+      .transform((s) => s || null),
+  });
+}
 
 /**
  * Name and phone only.
@@ -455,12 +462,13 @@ export async function updateOwnProfile(
   formData: FormData,
 ): Promise<ActionResult> {
   const actor = await requireAdmin();
+  const t = await getTranslations("Admin.users");
 
-  const parsed = OwnProfileSchema.safeParse({
+  const parsed = ownProfileSchema(t).safeParse({
     name: formData.get("name"),
     phone: formData.get("phone") ?? "",
   });
-  if (!parsed.success) return firstError(parsed.error);
+  if (!parsed.success) return firstError(parsed.error, t);
   const d = parsed.data;
 
   try {
@@ -488,9 +496,9 @@ export async function updateOwnProfile(
     revalidatePath("/admin/settings/konto");
     // The sidebar prints the admin's name on every page.
     revalidatePath("/admin", "layout");
-    return { ok: true, message: "Dane zapisane." };
+    return { ok: true, message: t("profileSaved") };
   } catch (err) {
     adminActionFailed("updateOwnProfile", err);
-    return GENERIC_ERROR;
+    return genericFailure(t);
   }
 }

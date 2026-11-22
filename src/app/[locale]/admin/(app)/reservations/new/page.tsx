@@ -1,4 +1,4 @@
-import { setRequestLocale } from "next-intl/server";
+import { getTranslations, setRequestLocale } from "next-intl/server";
 import { asc, eq } from "drizzle-orm";
 import { getDb, schema } from "@/lib/db";
 import { guardPage } from "@/lib/auth/guard";
@@ -6,7 +6,18 @@ import { Link } from "@/i18n/navigation";
 import { NewReservationForm, type Prefill } from "./NewReservationForm";
 import { getReservation } from "@/lib/admin/reservations";
 
-export const metadata = { title: "Nowa rezerwacja" };
+export async function generateMetadata({
+  params,
+}: {
+  params: Promise<{ locale: string }>;
+}) {
+  const { locale } = await params;
+  const t = await getTranslations({
+    locale,
+    namespace: "Admin.reservations.newBooking",
+  });
+  return { title: t("title") };
+}
 
 /**
  * The phone-call page.
@@ -30,6 +41,7 @@ export default async function NewReservationPage({
 }) {
   const { locale } = await params;
   setRequestLocale(locale);
+  const t = await getTranslations("Admin.reservations.newBooking");
   await guardPage("rezerwacje.status");
 
   // `?kopia=<id>` — „Kopiuj rezerwację" ze strony poprzedniego najmu.
@@ -79,28 +91,24 @@ export default async function NewReservationPage({
     <div>
       <div className="flex flex-wrap items-start justify-between gap-4">
         <div>
-          <h1 className="font-heading text-3xl font-bold">Nowa rezerwacja</h1>
-          <p className="text-ink-muted mt-2 max-w-2xl text-sm">
-            Rezerwacja przyjęta przez telefon. Cena liczy się sama z cennika —
-            tak jak na stronie. Adres, data urodzenia i numer prawa jazdy
-            uzupełnisz później na stronie rezerwacji, przy podpisaniu umowy.
-          </p>
+          <h1 className="font-heading text-3xl font-bold">{t("title")}</h1>
+          <p className="text-ink-muted mt-2 max-w-2xl text-sm">{t("intro")}</p>
         </div>
         <Link
           href="/admin"
           className="-my-2 inline-flex min-h-11 items-center label-tight text-silver text-[10px] transition-colors hover:text-ink"
         >
-          ← Pulpit
+          {t("back")}
         </Link>
       </div>
 
       <div className="mt-8 max-w-3xl">
         {prefill && (
           <p className="border-line bg-graphite/40 text-silver mb-6 border p-4 text-sm">
-            Kopia najmu <span className="font-mono">{source?.r.reference}</span>{" "}
-            — klient, auto, miejsce odbioru i dodatki są już wpisane.{" "}
-            <strong className="text-ink">Terminu nie kopiujemy</strong>, bo po to
-            jest ten telefon.
+            {t("copyOf")} <span className="font-mono">{source?.r.reference}</span>{" "}
+            {t("copyDetails")}{" "}
+            <strong className="text-ink">{t("datesNotCopied")}</strong>
+            {t("datesNotCopiedWhy")}
           </p>
         )}
         <NewReservationForm

@@ -1,4 +1,5 @@
 import { deflateRawSync } from "node:zlib";
+import { SHOP_CURRENCY } from "@/lib/currency/shop";
 
 /**
  * A minimal XLSX writer — real Excel files, no dependency.
@@ -96,7 +97,7 @@ function stylesXml(): string {
   return `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
 <styleSheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main">
 <numFmts count="3">
-<numFmt numFmtId="164" formatCode="#,##0.00&quot; zł&quot;"/>
+<numFmt numFmtId="164" formatCode="#,##0.00&quot; ${SHOP_CURRENCY}&quot;"/>
 <numFmt numFmtId="165" formatCode="0%"/>
 <numFmt numFmtId="166" formatCode="yyyy\\-mm\\-dd"/>
 </numFmts>

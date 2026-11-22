@@ -1,6 +1,7 @@
 "use client";
 
 import { useActionState } from "react";
+import { useTranslations } from "next-intl";
 import {
   addDamagePhoto,
   deleteDamagePhoto,
@@ -23,6 +24,7 @@ export function PhotoManager({
   damageId: string;
   photos: DamagePhotoRecord[];
 }) {
+  const t = useTranslations("Admin.damages");
   const [addState, add, adding] = useActionState<DamageResult | null, FormData>(
     addDamagePhoto,
     null,
@@ -49,7 +51,7 @@ export function PhotoManager({
                 {/* eslint-disable-next-line @next/next/no-img-element */}
                 <img
                   src={p.url}
-                  alt={p.note ?? "Zdjęcie szkody"}
+                  alt={p.note ?? t("photos.alt")}
                   className="h-32 w-full bg-white object-contain"
                 />
               </a>
@@ -64,7 +66,7 @@ export function PhotoManager({
                     disabled={removing}
                     className="label-tight text-ink-faint hover:text-red text-[10px] transition-colors disabled:opacity-60"
                   >
-                    Usuń
+                    {t("actions.delete")}
                   </button>
                 </form>
               </div>
@@ -76,7 +78,9 @@ export function PhotoManager({
       <form action={add} className="flex flex-wrap items-end gap-3">
         <input type="hidden" name="damageId" value={damageId} />
         <label className="flex flex-col gap-1">
-          <span className="label-tight text-ink-faint text-[10px]">Zdjęcie</span>
+          <span className="label-tight text-ink-faint text-[10px]">
+            {t("photos.file")}
+          </span>
           <input
             type="file"
             name="photo"
@@ -85,10 +89,12 @@ export function PhotoManager({
           />
         </label>
         <label className="flex flex-1 flex-col gap-1">
-          <span className="label-tight text-ink-faint text-[10px]">Opis</span>
+          <span className="label-tight text-ink-faint text-[10px]">
+            {t("photos.note")}
+          </span>
           <input
             name="note"
-            placeholder="np. błotnik przedni prawy"
+            placeholder={t("photos.notePlaceholder")}
             className="border-line-strong bg-surface-1 text-ink h-11 w-full min-w-40 border px-3 text-sm"
           />
         </label>
@@ -97,7 +103,7 @@ export function PhotoManager({
           disabled={adding}
           className="label border-line-strong text-ink hover:border-ink hover:bg-ink/5 inline-flex h-11 items-center border px-5 text-xs transition-colors disabled:opacity-60"
         >
-          {adding ? "Wysyłanie…" : "Dodaj zdjęcie"}
+          {adding ? t("photos.uploading") : t("photos.add")}
         </button>
       </form>
 

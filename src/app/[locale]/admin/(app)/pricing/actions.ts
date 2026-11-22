@@ -1,6 +1,7 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
+import { getTranslations } from "next-intl/server";
 import { bramaKrytyczna } from "@/lib/auth/critical";
 import { eq } from "drizzle-orm";
 import { getDb, schema } from "@/lib/db";
@@ -57,7 +58,10 @@ function parseCount(v: FormDataEntryValue | null): number | null {
   return n;
 }
 
-const INVALID: SaveResult = { ok: false, error: "Nieprawidłowe dane." };
+async function invalid(): Promise<SaveResult> {
+  const t = await getTranslations("Admin.pricing");
+  return { ok: false, error: t("errors.invalidData") };
+}
 
 export async function updateModelPricing(
   _prev: SaveResult | null,
@@ -78,11 +82,8 @@ export async function updateModelPricing(
   const kmPerDay = parseCount(formData.get("kmPerDay"));
   const extraMileage = parseStawkaKm(formData.get("extraMileage"));
   if (extraMileage === undefined) {
-    return {
-      ok: false,
-      error:
-        "Opłata za dodatkowy kilometr musi być większa od zera. Zostaw pole puste, jeżeli stawka nie jest jeszcze ustalona.",
-    };
+    const t = await getTranslations("Admin.pricing");
+    return { ok: false, error: t("errors.extraMileageZero") };
   }
   if (
     !UUID_RE.test(id) ||
@@ -91,7 +92,7 @@ export async function updateModelPricing(
     deposit === null ||
     kmPerDay === null
   ) {
-    return INVALID;
+    return invalid();
   }
 
   const db = getDb();
@@ -110,7 +111,10 @@ export async function updateModelPricing(
       .from(schema.carModels)
       .where(eq(schema.carModels.id, id))
       .limit(1);
-    if (!before) return { ok: false, error: "Nie znaleziono modelu." };
+    if (!before) {
+      const t = await getTranslations("Admin.pricing");
+      return { ok: false, error: t("errors.modelNotFound") };
+    }
 
     const after = {
       dailyPriceGrosze: daily,
@@ -139,7 +143,8 @@ export async function updateModelPricing(
     return { ok: true };
   } catch (err) {
     adminActionFailed("updateModelPricing", err);
-    return { ok: false, error: "Wystąpił błąd. Spróbuj ponownie." };
+    const t = await getTranslations("Admin.pricing");
+    return { ok: false, error: t("errors.generic") };
   }
 }
 
@@ -156,7 +161,7 @@ export async function updateFee(
   const unit: "per_day" | "per_rental" | null =
     unitRaw === "per_day" || unitRaw === "per_rental" ? unitRaw : null;
   const active = formData.get("active") === "on";
-  if (!UUID_RE.test(id) || amount === null || unit === null) return INVALID;
+  if (!UUID_RE.test(id) || amount === null || unit === null) return invalid();
 
   const db = getDb();
   try {
@@ -169,7 +174,10 @@ export async function updateFee(
       .from(schema.fees)
       .where(eq(schema.fees.id, id))
       .limit(1);
-    if (!before) return { ok: false, error: "Nie znaleziono opłaty." };
+    if (!before) {
+      const t = await getTranslations("Admin.pricing");
+      return { ok: false, error: t("errors.feeNotFound") };
+    }
 
     const after = { amountGrosze: amount, unit, active };
     await db
@@ -189,7 +197,8 @@ export async function updateFee(
     return { ok: true };
   } catch (err) {
     adminActionFailed("updateFee", err);
-    return { ok: false, error: "Wystąpił błąd. Spróbuj ponownie." };
+    const t = await getTranslations("Admin.pricing");
+    return { ok: false, error: t("errors.generic") };
   }
 }
 
@@ -203,7 +212,7 @@ export async function updatePickupLocation(
   const id = String(formData.get("id") ?? "");
   const fee = parseGrosze(formData.get("fee"));
   const active = formData.get("active") === "on";
-  if (!UUID_RE.test(id) || fee === null) return INVALID;
+  if (!UUID_RE.test(id) || fee === null) return invalid();
 
   const db = getDb();
   try {
@@ -215,7 +224,10 @@ export async function updatePickupLocation(
       .from(schema.pickupLocations)
       .where(eq(schema.pickupLocations.id, id))
       .limit(1);
-    if (!before) return { ok: false, error: "Nie znaleziono lokalizacji." };
+    if (!before) {
+      const t = await getTranslations("Admin.pricing");
+      return { ok: false, error: t("errors.locationNotFound") };
+    }
 
     const after = { feeGrosze: fee, active };
     await db
@@ -235,7 +247,8 @@ export async function updatePickupLocation(
     return { ok: true };
   } catch (err) {
     adminActionFailed("updatePickupLocation", err);
-    return { ok: false, error: "Wystąpił błąd. Spróbuj ponownie." };
+    const t = await getTranslations("Admin.pricing");
+    return { ok: false, error: t("errors.generic") };
   }
 }
 
@@ -282,7 +295,7 @@ export async function updateCancellationPolicy(
     tier2Grosze === null ||
     noShowGrosze === null
   ) {
-    return INVALID;
+    return invalid();
   }
 
   const przed = await getSetting("cancellation");
@@ -303,12 +316,8 @@ export async function updateCancellationPolicy(
   */
   const sprawdzone = cancellationSchema.safeParse(po);
   if (!sprawdzone.success) {
-    return {
-      ok: false,
-      error:
-        sprawdzone.error.issues[0]?.message ??
-        "Nieprawidłowe dane polityki anulowania.",
-    };
+    const t = await getTranslations("Admin.pricing");
+    return { ok: false, error: t("errors.cancellationInvalid") };
   }
 
   try {
@@ -325,6 +334,7 @@ export async function updateCancellationPolicy(
     return { ok: true };
   } catch (err) {
     adminActionFailed("updateCancellationPolicy", err);
-    return { ok: false, error: "Wystąpił błąd. Spróbuj ponownie." };
+    const t = await getTranslations("Admin.pricing");
+    return { ok: false, error: t("errors.generic") };
   }
 }

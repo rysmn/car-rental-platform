@@ -3,6 +3,7 @@
 import { useActionState, useRef, useState } from "react";
 import { useEditor, EditorContent, type Editor } from "@tiptap/react";
 import StarterKit from "@tiptap/starter-kit";
+import { useTranslations } from "next-intl";
 import { updateLegalDocument } from "../actions";
 
 type Doc = "terms" | "privacy";
@@ -38,21 +39,18 @@ function ToolbarButton({
 }
 
 function Toolbar({ editor }: { editor: Editor }) {
+  const t = useTranslations("Admin.settings.legalEditor");
+
   const promptLink = () => {
     const previous = editor.getAttributes("link")?.href as string | undefined;
-    const url = window.prompt(
-      "Adres linku (https://…)",
-      previous ?? "https://",
-    );
+    const url = window.prompt(t("linkPrompt"), previous ?? "https://");
     if (url === null) return;
     if (url === "") {
       editor.chain().focus().extendMarkRange("link").unsetLink().run();
       return;
     }
     if (!/^(https?:\/\/|mailto:|tel:)/i.test(url)) {
-      window.alert(
-        "Link musi zaczynać się od http://, https://, mailto: lub tel:",
-      );
+      window.alert(t("linkInvalid"));
       return;
     }
     editor.chain().focus().extendMarkRange("link").setLink({ href: url }).run();
@@ -62,49 +60,49 @@ function Toolbar({ editor }: { editor: Editor }) {
     <div className="border-line bg-surface-2 flex flex-wrap gap-1 border-b p-2">
       <ToolbarButton
         label="B"
-        title="Pogrubienie"
+        title={t("bold")}
         active={editor.isActive("bold")}
         onClick={() => editor.chain().focus().toggleBold().run()}
       />
       <ToolbarButton
         label="I"
-        title="Kursywa"
+        title={t("italic")}
         active={editor.isActive("italic")}
         onClick={() => editor.chain().focus().toggleItalic().run()}
       />
       <ToolbarButton
         label="H2"
-        title="Nagłówek sekcji"
+        title={t("heading")}
         active={editor.isActive("heading", { level: 2 })}
         onClick={() => editor.chain().focus().toggleHeading({ level: 2 }).run()}
       />
       <ToolbarButton
         label="H3"
-        title="Nagłówek niższego poziomu"
+        title={t("subheading")}
         active={editor.isActive("heading", { level: 3 })}
         onClick={() => editor.chain().focus().toggleHeading({ level: 3 }).run()}
       />
       <ToolbarButton
-        label="• Lista"
-        title="Lista punktowana"
+        label={t("bulletLabel")}
+        title={t("bulletList")}
         active={editor.isActive("bulletList")}
         onClick={() => editor.chain().focus().toggleBulletList().run()}
       />
       <ToolbarButton
-        label="1. Lista"
-        title="Lista numerowana"
+        label={t("numberedLabel")}
+        title={t("numberedList")}
         active={editor.isActive("orderedList")}
         onClick={() => editor.chain().focus().toggleOrderedList().run()}
       />
       <ToolbarButton
-        label="Link"
-        title="Wstaw link"
+        label={t("linkLabel")}
+        title={t("insertLink")}
         active={editor.isActive("link")}
         onClick={promptLink}
       />
       <ToolbarButton
-        label="Cytat"
-        title="Cytat"
+        label={t("quoteLabel")}
+        title={t("quote")}
         active={editor.isActive("blockquote")}
         onClick={() => editor.chain().focus().toggleBlockquote().run()}
       />
@@ -132,6 +130,8 @@ export function LegalEditor({
   const [state, action, pending] = useActionState(updateLegalDocument, null);
   const htmlRef = useRef<HTMLInputElement>(null);
   const [dirty, setDirty] = useState(false);
+  const t = useTranslations("Admin.settings.legalEditor");
+  const tc = useTranslations("Admin.settings.common");
 
   const editor = useEditor({
     extensions: [StarterKit],
@@ -169,10 +169,7 @@ export function LegalEditor({
       </div>
 
       {!isOverride && (
-        <p className="text-ink-faint text-xs">
-          Wyświetlana jest wbudowana treść dokumentu. Pierwszy zapis utworzy
-          wersję własną, która od tej pory będzie publikowana.
-        </p>
+        <p className="text-ink-faint text-xs">{t("builtInNote")}</p>
       )}
 
       <div className="flex items-center gap-3">
@@ -181,10 +178,10 @@ export function LegalEditor({
           disabled={pending}
           className="label border-line-strong inline-flex h-10 items-center border px-5 text-xs text-ink transition-colors hover:border-ink hover:bg-ink/5 disabled:opacity-50"
         >
-          {pending ? "Zapisywanie…" : "Zapisz dokument"}
+          {pending ? tc("saving") : t("save")}
         </button>
         {dirty && !pending && (
-          <span className="text-ink-faint text-xs">Niezapisane zmiany</span>
+          <span className="text-ink-faint text-xs">{t("unsaved")}</span>
         )}
         {state?.ok && (
           <span className="text-xs text-emerald-400">{state.message}</span>

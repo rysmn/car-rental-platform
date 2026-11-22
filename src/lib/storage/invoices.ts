@@ -1,8 +1,7 @@
 import "server-only";
-import { promises as fs } from "node:fs";
 import path from "node:path";
 import { randomUUID } from "node:crypto";
-import { uploadDir } from "./media";
+import { getStorage } from "./index";
 
 /**
  * Invoice and receipt scans attached to a cost.
@@ -18,6 +17,7 @@ import { uploadDir } from "./media";
  * the session first.
  */
 
+/** Prefiks klucza w magazynie (lokalnie i w S3). */
 const SUBDIR = "invoices";
 
 /** URL prefix of the authenticated reader. */
@@ -62,10 +62,6 @@ const SIGNATURES: {
   },
 ];
 
-function invoiceDir(): string {
-  return path.join(uploadDir(), SUBDIR);
-}
-
 export type SaveInvoiceResult =
   | { ok: true; url: string }
   | {
@@ -85,8 +81,12 @@ export async function saveInvoice(file: File): Promise<SaveInvoiceResult> {
   // a path separator or a second extension.
   const filename = `${randomUUID()}.${match.ext}`;
   try {
-    await fs.mkdir(invoiceDir(), { recursive: true });
-    await fs.writeFile(path.join(invoiceDir(), filename), buffer);
+    await getStorage().put({
+      key: `${SUBDIR}/${filename}`,
+      body: buffer,
+      contentType: match.mime,
+      visibility: "private",
+    });
   } catch {
     return { ok: false, error: "write_failed" };
   }
@@ -99,8 +99,9 @@ export function mimeForInvoice(filename: string): string | null {
 }
 
 /**
- * Absolute path for a requested invoice, or null if it escapes the directory.
- * Same two-layer check as the public reader: by shape, then by result.
+ * Storage key for a requested invoice, or null if the name is not one we issued.
+ * Two checks: the name must match the generated shape, so no separator or dot
+ * segment can get through.
  */
 export function resolveInvoicePath(segments: string[]): string | null {
   if (segments.length !== 1) return null;
@@ -115,16 +116,12 @@ export function resolveInvoicePath(segments: string[]): string | null {
   }
   if (!/^[a-f0-9-]{36}\.(pdf|jpg|png|webp)$/i.test(name)) return null;
 
-  const root = path.resolve(invoiceDir());
-  const resolved = path.resolve(root, name);
-  return resolved === path.join(root, name) ? resolved : null;
+  return `${SUBDIR}/${name}`;
 }
 
 export async function deleteInvoice(url: string | null): Promise<void> {
   if (!url || !url.startsWith(`${INVOICE_URL_PREFIX}/`)) return;
-  const resolved = resolveInvoicePath([
-    url.slice(INVOICE_URL_PREFIX.length + 1),
-  ]);
-  if (!resolved) return;
-  await fs.rm(resolved, { force: true });
+  const key = resolveInvoicePath([url.slice(INVOICE_URL_PREFIX.length + 1)]);
+  if (!key) return;
+  await getStorage().delete(key);
 }

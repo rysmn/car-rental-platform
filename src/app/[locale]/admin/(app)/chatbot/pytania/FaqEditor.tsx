@@ -1,6 +1,7 @@
 "use client";
 
 import { useActionState, useState } from "react";
+import { useTranslations } from "next-intl";
 import {
   createFaqDraft,
   saveFaqEntry,
@@ -24,6 +25,7 @@ export function AddToFaq({
   locale: string;
   existing: { id: string; status: string } | null;
 }) {
+  const t = useTranslations("Admin.chatbot");
   const [state, action, pending] = useActionState<LeadResult | null, FormData>(
     createFaqDraft,
     null,
@@ -32,7 +34,7 @@ export function AddToFaq({
   if (existing) {
     return (
       <span className="text-ink-faint text-xs">
-        {existing.status === "published" ? "w FAQ ✓" : "szkic ↓"}
+        {existing.status === "published" ? t("questions.faq.inFaq") : t("questions.faq.draft")}
       </span>
     );
   }
@@ -46,7 +48,7 @@ export function AddToFaq({
         disabled={pending || state?.ok === true}
         className="label-tight border-line text-ink-faint hover:border-ink hover:text-ink border px-2 py-1 text-[10px] transition-colors disabled:opacity-50"
       >
-        {pending ? "…" : state?.ok ? "utworzono ↓" : "Dodaj do FAQ"}
+        {pending ? "…" : state?.ok ? t("questions.faq.created") : t("questions.faq.addToFaq")}
       </button>
       {state && !state.ok && (
         <span className="text-red ml-2 text-[10px]">{state.error}</span>
@@ -76,6 +78,7 @@ export function FaqDraftRow({
     deleteFaqEntry,
     null,
   );
+  const t = useTranslations("Admin.chatbot");
   const [publish, setPublish] = useState("0");
   const [confirming, setConfirming] = useState(false);
 
@@ -90,7 +93,7 @@ export function FaqDraftRow({
             status === "published" ? "text-emerald-400" : "text-amber-500"
           }`}
         >
-          {status === "published" ? "opublikowane" : "szkic — niewidoczne"}
+          {status === "published" ? t("questions.faq.published") : t("questions.faq.draftHidden")}
         </span>
       </div>
 
@@ -99,7 +102,7 @@ export function FaqDraftRow({
         <input type="hidden" name="publish" value={publish} />
         <label className="block">
           <span className="label-tight text-ink-faint text-[10px]">
-            Pytanie
+            {t("questions.faq.question")}
           </span>
           <input
             name="question"
@@ -109,13 +112,13 @@ export function FaqDraftRow({
         </label>
         <label className="mt-3 block">
           <span className="label-tight text-ink-faint text-[10px]">
-            Odpowiedź — tę treść zobaczy klient
+            {t("questions.faq.answer")}
           </span>
           <textarea
             name="answer"
             defaultValue={answer}
             rows={4}
-            placeholder="Napisz odpowiedź. Nic nie jest generowane automatycznie."
+            placeholder={t("questions.faq.answerPlaceholder")}
             className="border-line bg-void text-ink mt-1 block w-full border px-3 py-2 text-sm"
           />
         </label>
@@ -127,7 +130,7 @@ export function FaqDraftRow({
             disabled={saving}
             className="label border-line-strong text-ink hover:border-ink hover:bg-ink/5 inline-flex h-9 items-center border px-4 text-xs transition-colors disabled:opacity-50"
           >
-            {saving ? "Zapisywanie…" : "Zapisz szkic"}
+            {saving ? t("common.saving") : t("questions.faq.saveDraft")}
           </button>
           <button
             type="submit"
@@ -136,11 +139,11 @@ export function FaqDraftRow({
             className="label border-line-strong text-ink hover:border-ink hover:bg-ink/5 inline-flex h-9 items-center border px-4 text-xs transition-colors disabled:opacity-50"
           >
             {status === "published"
-              ? "Zapisz i zostaw w FAQ"
-              : "Zatwierdź i opublikuj"}
+              ? t("questions.faq.saveKeep")
+              : t("questions.faq.publish")}
           </button>
           {saveState?.ok && (
-            <span className="text-xs text-emerald-400">Zapisano ✓</span>
+            <span className="text-xs text-emerald-400">{t("common.saved")}</span>
           )}
           {saveState && !saveState.ok && (
             <span className="text-red text-xs">{saveState.error}</span>
@@ -152,20 +155,20 @@ export function FaqDraftRow({
         {confirming ? (
           <form action={del} className="flex items-center gap-3">
             <input type="hidden" name="id" value={id} />
-            <span className="text-silver text-xs">Usunąć ten wpis?</span>
+            <span className="text-silver text-xs">{t("questions.faq.deleteConfirm")}</span>
             <button
               type="submit"
               disabled={deleting}
               className="label border-red text-red hover:bg-red hover:text-ink tap inline-flex h-8 items-center border px-3 text-[10px] transition-colors disabled:opacity-50"
             >
-              {deleting ? "Usuwanie…" : "Tak, usuń"}
+              {deleting ? t("questions.faq.deleting") : t("questions.faq.deleteYes")}
             </button>
             <button
               type="button"
               onClick={() => setConfirming(false)}
               className="text-ink-faint hover:text-ink text-xs"
             >
-              Anuluj
+              {t("common.cancel")}
             </button>
             {delState && !delState.ok && (
               <span className="text-red text-xs">{delState.error}</span>
@@ -177,7 +180,7 @@ export function FaqDraftRow({
             onClick={() => setConfirming(true)}
             className="label-tight text-ink-faint hover:text-red text-[10px] transition-colors"
           >
-            Usuń wpis
+            {t("questions.faq.deleteEntry")}
           </button>
         )}
       </div>

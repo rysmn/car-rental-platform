@@ -2,6 +2,7 @@
 
 import { useState, useTransition } from "react";
 import Link from "next/link";
+import { useTranslations } from "next-intl";
 import {
   odnowKodyZapasowe,
   potwierdz2FA,
@@ -41,6 +42,7 @@ export function TwoFactorPanel({
   wlaczone: boolean;
   kodowZostalo: number;
 }) {
+  const t = useTranslations("Admin.settings.twoFactor");
   const [pending, startTransition] = useTransition();
   const [blad, setBlad] = useState<string | null>(null);
   const [info, setInfo] = useState<string | null>(null);
@@ -118,11 +120,9 @@ export function TwoFactorPanel({
   if (kody && !zapisane) {
     return (
       <div className="border-line-strong border p-5">
-        <h3 className="label text-ink text-xs">Kody zapasowe — zapisz je TERAZ</h3>
+        <h3 className="label text-ink text-xs">{t("codes.title")}</h3>
         <p className="text-ink-muted mt-2 text-sm leading-relaxed">
-          To jedyny raz, kiedy je widzisz. W bazie leżą tylko skróty — nikt,
-          łącznie z nami, nie odczyta ich później. Każdy kod działa raz i wpisuje
-          się go zamiast kodu z aplikacji, gdy nie masz telefonu.
+          {t("codes.intro")}
         </p>
         <ul className="border-line mt-4 grid grid-cols-2 gap-2 border p-4 font-mono text-sm">
           {kody.map((k) => (
@@ -137,17 +137,17 @@ export function TwoFactorPanel({
             className={BUTTON}
             onClick={() => {
               void navigator.clipboard?.writeText(kody.join("\n"));
-              setInfo("Skopiowane do schowka.");
+              setInfo(t("codes.copied"));
             }}
           >
-            Kopiuj
+            {t("codes.copy")}
           </button>
           <button
             type="button"
             className={BUTTON}
             onClick={() => window.print()}
           >
-            Drukuj
+            {t("codes.print")}
           </button>
         </div>
         <label className="mt-5 flex items-start gap-3 text-sm">
@@ -156,9 +156,7 @@ export function TwoFactorPanel({
             className="mt-0.5"
             onChange={(e) => setZapisane(e.target.checked)}
           />
-          <span className="text-ink-muted">
-            Zapisałem kody w bezpiecznym miejscu poza tym komputerem.
-          </span>
+          <span className="text-ink-muted">{t("codes.savedCheck")}</span>
         </label>
         {info && <p className="text-ink-faint mt-3 text-xs">{info}</p>}
       </div>
@@ -175,14 +173,14 @@ export function TwoFactorPanel({
     return (
       <div className="border-line border p-5">
         <p className="text-sm text-emerald-400">
-          🟢 2FA włączone. Przy następnym logowaniu panel poprosi o kod
-          z aplikacji.
+          {"🟢 "}
+          {t("enabledNow")}
         </p>
         <Link
           href="/admin"
           className="label border-line-strong text-ink hover:border-ink hover:bg-ink/5 mt-4 inline-flex h-10 items-center border px-5 text-xs transition-colors"
         >
-          Przejdź do panelu
+          {t("goToPanel")}
         </Link>
       </div>
     );
@@ -193,19 +191,18 @@ export function TwoFactorPanel({
       <div className="border-line border p-5">
         <div className="flex flex-wrap items-center justify-between gap-3">
           <div>
-            <h3 className="label text-ink text-xs">
-              Logowanie dwuskładnikowe (2FA)
-            </h3>
+            <h3 className="label text-ink text-xs">{t("heading")}</h3>
             <p className="text-silver mt-1 text-sm">
               {wlaczone ? (
                 <>
-                  🟢 Włączone · kodów zapasowych: {kodowZostalo}
+                  {"🟢 "}
+                  {t("statusOn", { count: kodowZostalo })}
                   {kodowZostalo <= 2 && (
-                    <span className="text-red"> — odnów je</span>
+                    <span className="text-red">{t("renewHint")}</span>
                   )}
                 </>
               ) : (
-                "⚪ Wyłączone"
+                `⚪ ${t("statusOff")}`
               )}
             </p>
           </div>
@@ -216,7 +213,7 @@ export function TwoFactorPanel({
               disabled={pending}
               onClick={rozpocznij}
             >
-              Włącz 2FA
+              {t("start")}
             </button>
           )}
         </div>
@@ -225,16 +222,14 @@ export function TwoFactorPanel({
         {sekret && uri && (
           <div className="border-line mt-5 border-t pt-5">
             <p className="text-ink-muted text-sm leading-relaxed">
-              Otwórz aplikację uwierzytelniającą (Google Authenticator, Aegis,
-              1Password, Authy) i dodaj konto ręcznie, wpisując poniższy klucz.
-              Potem przepisz sześć cyfr, które pokaże aplikacja.
+              {t("setup.intro")}
             </p>
             <p className="border-line bg-surface-1 text-ink mt-4 border p-4 font-mono text-sm break-all">
               {sekret}
             </p>
             <details className="mt-3">
               <summary className="text-ink-faint cursor-pointer text-xs">
-                Adres otpauth:// (dla aplikacji, które go przyjmują)
+                {t("setup.otpauth")}
               </summary>
               <p className="text-silver mt-2 font-mono text-[11px] break-all">
                 {uri}
@@ -243,7 +238,7 @@ export function TwoFactorPanel({
             <div className="mt-5 space-y-3">
               <label className="block">
                 <span className="label-tight text-ink-faint text-[10px]">
-                  Kod z aplikacji
+                  {t("setup.code")}
                 </span>
                 <input
                   className={`${INPUT} mt-2 tracking-widest`}
@@ -255,7 +250,7 @@ export function TwoFactorPanel({
               </label>
               <label className="block">
                 <span className="label-tight text-ink-faint text-[10px]">
-                  Twoje hasło
+                  {t("yourPassword")}
                 </span>
                 <input
                   type="password"
@@ -271,7 +266,7 @@ export function TwoFactorPanel({
                 disabled={pending || !kod || !haslo}
                 onClick={potwierdz}
               >
-                Potwierdź i włącz
+                {t("setup.confirm")}
               </button>
             </div>
           </div>
@@ -282,7 +277,7 @@ export function TwoFactorPanel({
           <div className="border-line mt-5 space-y-3 border-t pt-5">
             <label className="block">
               <span className="label-tight text-ink-faint text-[10px]">
-                Twoje hasło
+                {t("yourPassword")}
               </span>
               <input
                 type="password"
@@ -299,25 +294,23 @@ export function TwoFactorPanel({
                 disabled={pending || !haslo}
                 onClick={odnow}
               >
-                Nowe kody zapasowe
+                {t("regenerate")}
               </button>
             </div>
             <details className="pt-2">
               <summary className="text-ink-faint cursor-pointer text-xs">
-                Wyłącz 2FA
+                {t("disable.summary")}
               </summary>
               <div className="mt-3 space-y-3">
                 <p className="text-ink-muted text-xs leading-relaxed">
-                  Wyłączenie wymaga hasła ORAZ aktualnego kodu — dwóch
-                  składników do zdjęcia dwóch składników. Kody zapasowe zostaną
-                  skasowane.
+                  {t("disable.note")}
                 </p>
                 <input
                   className={`${INPUT} tracking-widest`}
                   value={kod}
                   onChange={(e) => setKod(e.target.value)}
                   inputMode="numeric"
-                  placeholder="Kod z aplikacji"
+                  placeholder={t("codePlaceholder")}
                 />
                 <button
                   type="button"
@@ -325,7 +318,7 @@ export function TwoFactorPanel({
                   disabled={pending || !haslo || !kod}
                   onClick={wylacz}
                 >
-                  Wyłącz 2FA
+                  {t("disable.summary")}
                 </button>
               </div>
             </details>
@@ -335,16 +328,14 @@ export function TwoFactorPanel({
 
       {/* ── Sesje ────────────────────────────────────────────────────── */}
       <div className="border-line border p-5">
-        <h3 className="label text-ink text-xs">Wyloguj ze wszystkich urządzeń</h3>
+        <h3 className="label text-ink text-xs">{t("sessions.heading")}</h3>
         <p className="text-ink-muted mt-2 text-sm leading-relaxed">
-          Unieważnia KAŻDĄ otwartą sesję tego konta — także tę. Użyj tego, gdy
-          zostawiłeś panel zalogowany na cudzym komputerze albo gdy podejrzewasz,
-          że ktoś zna Twoje hasło.
+          {t("sessions.note")}
         </p>
         <div className="mt-4 space-y-3">
           <label className="block">
             <span className="label-tight text-ink-faint text-[10px]">
-              Twoje hasło
+              {t("yourPassword")}
             </span>
             <input
               type="password"
@@ -360,7 +351,7 @@ export function TwoFactorPanel({
             disabled={pending || !haslo}
             onClick={wyloguj}
           >
-            Wyloguj wszędzie
+            {t("sessions.button")}
           </button>
         </div>
       </div>

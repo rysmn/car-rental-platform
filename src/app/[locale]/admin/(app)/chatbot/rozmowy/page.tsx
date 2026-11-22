@@ -1,4 +1,4 @@
-import { setRequestLocale } from "next-intl/server";
+import { getTranslations, setRequestLocale } from "next-intl/server";
 import { Link } from "@/i18n/navigation";
 import {
   getTranscript,
@@ -6,35 +6,20 @@ import {
   RETENTION_DAYS,
 } from "@/lib/chat/repo";
 import { getConversationSummary } from "@/lib/admin/chat-summary";
+import { pick } from "@/lib/i18n-pick";
 import { sanitizeAIInput } from "@/lib/chat/ai/sanitize";
 import { formatDateTimePl } from "@/lib/format";
 import { ChatbotTabs } from "../ChatbotTabs";
 
-export const metadata = { title: "Rozmowy" };
-
-const STATUS_LABEL: Record<string, string> = {
-  active: "w toku",
-  handoff: "przekazana",
-  closed: "zamknięta",
-};
-
-const TOPIC_LABEL: Record<string, string> = {
-  FIND_CAR: "dobór auta",
-  CHECK_AVAILABILITY: "dostępność",
-  GET_PRICE: "cena",
-  GET_DEPOSIT: "kaucja",
-  GET_MILEAGE_LIMIT: "limit km",
-  COMPARE_CARS: "porównanie",
-  AIRPORT: "lotnisko",
-  LONG_TERM: "długoterminowy",
-  B2B: "firmy",
-  FAQ: "FAQ",
-  CONTACT_HUMAN: "kontakt",
-  START_BOOKING: "rezerwacja",
-  GREETING: "powitanie",
-  UNKNOWN: "nierozpoznane",
-  OUT_OF_SCOPE: "odrzucone",
-};
+export async function generateMetadata({
+  params,
+}: {
+  params: Promise<{ locale: string }>;
+}) {
+  const { locale } = await params;
+  const t = await getTranslations({ locale, namespace: "Admin.chatbot" });
+  return { title: t("conversations.metaTitle") };
+}
 
 export default async function ConversationsPage({
   params,
@@ -45,6 +30,9 @@ export default async function ConversationsPage({
 }) {
   const { locale } = await params;
   setRequestLocale(locale);
+  const t = await getTranslations("Admin.chatbot");
+  const topic = (code: string) =>
+    t.has(`topics.${code}`) ? t(`topics.${code}`) : code;
 
   const q = await searchParams;
   const openId = typeof q.rozmowa === "string" ? q.rozmowa : null;
@@ -58,12 +46,9 @@ export default async function ConversationsPage({
   return (
     <div className="max-w-5xl">
       <header className="mb-6">
-        <h1 className="font-heading text-ink text-2xl font-bold">Rozmowy</h1>
+        <h1 className="font-heading text-ink text-2xl font-bold">{t("conversations.title")}</h1>
         <p className="text-silver mt-1 text-sm">
-          Zapisy rozmów z asystentem. Bez adresów IP i bez śladów przeglądarki —
-          transkrypty kasują się same po {RETENTION_DAYS} dniach. Numery
-          telefonów, adresy e-mail, numery kart i dokumentów są maskowane przy
-          wyświetlaniu.
+          {t("conversations.subtitle", { days: RETENTION_DAYS })}
         </p>
       </header>
 
@@ -71,30 +56,28 @@ export default async function ConversationsPage({
 
       {openId && summary && (
         <section className="border-line-strong mb-6 border p-5">
-          <h2 className="label text-ink mb-4 text-xs">Podsumowanie rozmowy</h2>
+          <h2 className="label text-ink mb-4 text-xs">{t("conversations.summaryTitle")}</h2>
           <dl className="grid gap-x-6 gap-y-2 text-sm sm:grid-cols-[13rem_1fr]">
             {(
               [
                 [
-                  "Czas",
+                  t("conversations.summary.time"),
                   `${formatDateTimePl(summary.startedAt)} → ${formatDateTimePl(summary.lastMessageAt)}`,
                 ],
-                ["Język", summary.locale.toUpperCase()],
+                [t("conversations.summary.language"), summary.locale.toUpperCase()],
                 [
-                  "Intent",
-                  summary.intent
-                    ? (TOPIC_LABEL[summary.intent] ?? summary.intent)
-                    : "—",
+                  t("conversations.summary.intent"),
+                  summary.intent ? topic(summary.intent) : "—",
                 ],
                 [
-                  "Szukany model",
+                  t("conversations.summary.model"),
                   summary.wanted
                     .filter((w) => w.model)
                     .map((w) => w.label)
                     .join(", ") || "—",
                 ],
                 [
-                  "Marka",
+                  t("conversations.summary.brand"),
                   [
                     ...new Set(
                       summary.wanted.map((w) => w.brand).filter(Boolean),
@@ -102,7 +85,7 @@ export default async function ConversationsPage({
                   ].join(", ") || "—",
                 ],
                 [
-                  "Segment",
+                  t("conversations.summary.segment"),
                   [
                     ...new Set(
                       summary.wanted.map((w) => w.segment).filter(Boolean),
@@ -110,7 +93,7 @@ export default async function ConversationsPage({
                   ].join(", ") || "—",
                 ],
                 [
-                  "Liczba pasażerów",
+                  t("conversations.summary.passengers"),
                   [
                     ...new Set(
                       summary.wanted.map((w) => w.seats).filter(Boolean),
@@ -118,56 +101,68 @@ export default async function ConversationsPage({
                   ].join(", ") || "—",
                 ],
                 [
-                  "Termin",
+                  t("conversations.summary.dates"),
                   summary.dateFrom
                     ? `${summary.dateFrom}${summary.dateTo ? ` → ${summary.dateTo}` : ""}`
                     : "—",
                 ],
-                ["Lokalizacja", summary.locationName ?? "—"],
+                [t("conversations.summary.location"), summary.locationName ?? "—"],
                 [
-                  "Czy auto było we flocie",
+                  t("conversations.summary.inFleet"),
                   summary.wanted.length === 0
-                    ? "— (nie padła nazwa auta)"
+                    ? t("conversations.values.carNotNamed")
                     : summary.wanted.every((w) => w.inFleet)
-                      ? "tak"
+                      ? t("common.yes")
                       : summary.wanted.some((w) => w.inFleet)
-                        ? "częściowo"
-                        : "nie",
+                        ? t("common.partly")
+                        : t("common.no"),
                 ],
                 [
-                  "Czy było dostępne",
+                  t("conversations.summary.available"),
                   summary.wanted.some((w) => w.unavailable)
-                    ? "nie — termin zajęty"
+                    ? t("conversations.values.unavailableYes")
                     : summary.wanted.length === 0
                       ? "—"
-                      : "nie stwierdzono braku",
+                      : t("conversations.values.noShortage"),
                 ],
                 [
-                  "Czy pokazano alternatywy",
-                  summary.alternativesShown ? "tak" : "nie",
+                  t("conversations.summary.alternatives"),
+                  summary.alternativesShown ? t("common.yes") : t("common.no"),
                 ],
                 [
-                  "Czy kliknięto „Rezerwuj”",
-                  summary.wentToBooking ? "tak" : "nie",
+                  t("conversations.summary.clickedBook"),
+                  summary.wentToBooking ? t("common.yes") : t("common.no"),
                 ],
                 [
-                  "Czy powstała rezerwacja",
-                  "nie odnotowano — rezerwacja zapisuje źródło (chatbot), ale nie numer rozmowy",
+                  t("conversations.summary.booking"),
+                  t("conversations.values.bookingNotRecorded"),
                 ],
-                ["Czy powstał lead", summary.leadCreated ? "tak" : "nie"],
                 [
-                  "Czy przekazano do pracownika",
-                  summary.handoff ? "tak" : "nie",
+                  t("conversations.summary.lead"),
+                  summary.leadCreated ? t("common.yes") : t("common.no"),
                 ],
-                ["Czy użyto Cloudflare", summary.aiUsed ? "tak" : "nie"],
                 [
-                  "Czy wystąpił fallback",
+                  t("conversations.summary.handoff"),
+                  summary.handoff ? t("common.yes") : t("common.no"),
+                ],
+                [
+                  t("conversations.summary.aiUsed"),
+                  summary.aiUsed ? t("common.yes") : t("common.no"),
+                ],
+                [
+                  t("conversations.summary.fallback"),
                   summary.aiFallback
-                    ? "tak — model nie odpowiedział, odpowiedziały reguły"
-                    : "nie",
+                    ? t("conversations.values.fallbackYes")
+                    : t("common.no"),
                 ],
-                ["Pytania bez odpowiedzi", summary.unansweredCount || "—"],
-                ["Dlaczego bez rezerwacji", summary.noBookingReason],
+                [
+                  t("conversations.summary.unanswered"),
+                  summary.unansweredCount || "—",
+                ],
+                [
+                  t("conversations.summary.noBookingReason"),
+                  pick(summary.noBookingReason, locale),
+                ],
               ] as [string, string | number][]
             ).map(([term, value]) => (
               <div key={term} className="contents">
@@ -181,20 +176,19 @@ export default async function ConversationsPage({
 
       {openId && (
         <section className="border-line-strong mb-10 border p-4">
-          <h2 className="label text-ink mb-3 text-xs">Przebieg rozmowy</h2>
+          <h2 className="label text-ink mb-3 text-xs">{t("conversations.transcriptTitle")}</h2>
           {transcript.length === 0 ? (
             <p className="text-silver text-sm">
-              Ta rozmowa już nie istnieje — mogła zostać usunięta przez
-              czyszczenie po {RETENTION_DAYS} dniach.
+              {t("conversations.gone", { days: RETENTION_DAYS })}
             </p>
           ) : (
             <div className="space-y-3">
               {transcript.map((m) => (
                 <div key={m.id}>
                   <p className="label-tight text-ink-faint text-[10px]">
-                    {m.role === "user" ? "Klient" : "Asystent"} ·{" "}
+                    {m.role === "user" ? t("conversations.roleCustomer") : t("conversations.roleAssistant")} ·{" "}
                     {formatDateTimePl(m.createdAt)}
-                    {m.intent ? ` · ${TOPIC_LABEL[m.intent] ?? m.intent}` : ""}
+                    {m.intent ? ` · ${topic(m.intent)}` : ""}
                   </p>
                   <p
                     className={`mt-1 text-sm whitespace-pre-line ${
@@ -219,31 +213,31 @@ export default async function ConversationsPage({
             href="/admin/chatbot/rozmowy"
             className="text-ink-faint hover:text-ink mt-4 inline-block text-xs"
           >
-            Zamknij
+            {t("conversations.close")}
           </Link>
         </section>
       )}
 
       {conversations.length === 0 ? (
         <p className="border-line text-silver border px-5 py-8 text-center text-sm">
-          Jeszcze nikt nie rozmawiał z asystentem.
+          {t("conversations.empty")}
         </p>
       ) : (
         <div className="overflow-x-auto">
           <table className="w-full min-w-[900px] border-collapse text-left text-sm">
             <thead>
               <tr className="border-line text-ink-faint border-y">
-                <th className="label-tight py-3 pr-4 text-[10px]">Data</th>
-                <th className="label-tight py-3 pr-4 text-[10px]">Język</th>
-                <th className="label-tight py-3 pr-4 text-[10px]">Temat</th>
-                <th className="label-tight py-3 pr-4 text-[10px]">Auto</th>
-                <th className="label-tight py-3 pr-4 text-[10px]">Termin</th>
-                <th className="label-tight py-3 pr-4 text-[10px]">Lead</th>
+                <th className="label-tight py-3 pr-4 text-[10px]">{t("conversations.headers.date")}</th>
+                <th className="label-tight py-3 pr-4 text-[10px]">{t("conversations.headers.language")}</th>
+                <th className="label-tight py-3 pr-4 text-[10px]">{t("conversations.headers.topic")}</th>
+                <th className="label-tight py-3 pr-4 text-[10px]">{t("conversations.headers.car")}</th>
+                <th className="label-tight py-3 pr-4 text-[10px]">{t("conversations.headers.dates")}</th>
+                <th className="label-tight py-3 pr-4 text-[10px]">{t("conversations.headers.lead")}</th>
                 <th className="label-tight py-3 pr-4 text-[10px]">
-                  Rezerwacja
+                  {t("conversations.headers.booking")}
                 </th>
-                <th className="label-tight py-3 pr-4 text-[10px]">Bez odp.</th>
-                <th className="label-tight py-3 text-[10px]">Status</th>
+                <th className="label-tight py-3 pr-4 text-[10px]">{t("conversations.headers.unansweredShort")}</th>
+                <th className="label-tight py-3 text-[10px]">{t("conversations.headers.status")}</th>
               </tr>
             </thead>
             <tbody>
@@ -264,7 +258,7 @@ export default async function ConversationsPage({
                     {c.locale}
                   </td>
                   <td className="text-silver py-3 pr-4 text-xs">
-                    {c.topic ? (TOPIC_LABEL[c.topic] ?? c.topic) : "—"}
+                    {c.topic ? topic(c.topic) : "—"}
                   </td>
                   <td className="text-silver py-3 pr-4 text-xs">
                     {c.carBrand ? `${c.carBrand} ${c.carModel}` : "—"}
@@ -284,7 +278,7 @@ export default async function ConversationsPage({
                     {c.unansweredCount > 0 ? c.unansweredCount : "—"}
                   </td>
                   <td className="text-ink-faint py-3 text-xs">
-                    {STATUS_LABEL[c.status] ?? c.status}
+                    {t.has(`convStatus.${c.status}`) ? t(`convStatus.${c.status}`) : c.status}
                   </td>
                 </tr>
               ))}

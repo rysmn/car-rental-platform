@@ -1,6 +1,8 @@
 "use client";
 
+import { pick } from "@/lib/i18n-pick";
 import { useActionState } from "react";
+import { useLocale, useTranslations } from "next-intl";
 import { addDeadline, completeDeadline, type DeadlineResult } from "./actions";
 import { formatPln } from "@/lib/format";
 import {
@@ -12,6 +14,24 @@ import {
 const inputCls =
   "h-11 w-full border border-line-strong bg-surface-1 px-3 text-sm text-ink";
 const labelCls = "label-tight text-[10px] text-ink-faint";
+
+/** Symbol waluty w bieżącym locale (pl: „zł”, en: „PLN”). */
+function currencySymbol(locale: string) {
+  return (
+    new Intl.NumberFormat(locale, { style: "currency", currency: "PLN" })
+      .formatToParts(0)
+      .find((p) => p.type === "currency")?.value ?? "PLN"
+  );
+}
+
+function formatDate(iso: string, locale: string): string {
+  const [y, m, d] = iso.split("-").map(Number);
+  return new Date(y, m - 1, d).toLocaleDateString(locale, {
+    day: "2-digit",
+    month: "2-digit",
+    year: "numeric",
+  });
+}
 
 /**
  * Dated obligations for one car: fines, damages, deposits, prep jobs, anything.
@@ -32,6 +52,8 @@ export function DeadlineManager({
   deadlines: DeadlineRow[];
   today: string;
 }) {
+  const t = useTranslations("Admin.fleet");
+  const locale = useLocale();
   const [addState, add, adding] = useActionState<
     DeadlineResult | null,
     FormData
@@ -47,7 +69,7 @@ export function DeadlineManager({
   return (
     <div className="border-line border p-4">
       <p className="label-tight text-ink-faint text-[10px]">
-        Terminy i obowiązki · {plate}
+        {t("deadlinesHeading", { plate })}
       </p>
 
       {open.length > 0 && (
@@ -61,15 +83,15 @@ export function DeadlineManager({
               >
                 <span className="text-sm text-ink">
                   <span className="label-tight border-line mr-2 border px-1.5 py-0.5 text-[10px]">
-                    {DEADLINE_LABEL[d.kind]}
+                    {pick(DEADLINE_LABEL[d.kind], locale)}
                   </span>
                   {d.title}
                   <span
                     className={`ml-2 text-xs ${late ? "text-red" : "text-ink-faint"}`}
                   >
-                    {d.dueOn.split("-").reverse().join(".")}
+                    {formatDate(d.dueOn, locale)}
                     {d.amountGrosze != null
-                      ? ` · ${formatPln(d.amountGrosze, "pl")}`
+                      ? ` · ${formatPln(d.amountGrosze, locale)}`
                       : ""}
                   </span>
                 </span>
@@ -77,7 +99,7 @@ export function DeadlineManager({
                   <input type="hidden" name="id" value={d.id} />
                   <input type="hidden" name="carId" value={carId} />
                   <button className="label-tight border-line-strong hover:border-ink hover:bg-ink/5 h-8 border px-3 text-[10px] transition-colors">
-                    Zrobione
+                    {t("done")}
                   </button>
                 </form>
               </li>
@@ -89,25 +111,25 @@ export function DeadlineManager({
       <form action={add} className="mt-4 grid gap-3 sm:grid-cols-5">
         <input type="hidden" name="carId" value={carId} />
         <label className="flex flex-col gap-1">
-          <span className={labelCls}>Rodzaj</span>
+          <span className={labelCls}>{t("kind")}</span>
           <select name="kind" className={inputCls}>
             {DEADLINE_KINDS.map((k) => (
               <option key={k} value={k}>
-                {DEADLINE_LABEL[k]}
+                {pick(DEADLINE_LABEL[k], locale)}
               </option>
             ))}
           </select>
         </label>
         <label className="flex flex-col gap-1 sm:col-span-2">
-          <span className={labelCls}>Nazwa</span>
+          <span className={labelCls}>{t("name")}</span>
           <input
             name="title"
-            placeholder="np. mandat ITD, kaucja Kowalski"
+            placeholder={t("deadlineTitlePlaceholder")}
             className={inputCls}
           />
         </label>
         <label className="flex flex-col gap-1">
-          <span className={labelCls}>Termin</span>
+          <span className={labelCls}>{t("due")}</span>
           <input
             type="date"
             name="dueOn"
@@ -116,7 +138,7 @@ export function DeadlineManager({
           />
         </label>
         <label className="flex flex-col gap-1">
-          <span className={labelCls}>Kwota (zł)</span>
+          <span className={labelCls}>{t("amount", { currency: currencySymbol(locale) })}</span>
           <input name="amount" inputMode="decimal" className={inputCls} />
         </label>
         <div className="sm:col-span-5">
@@ -125,7 +147,7 @@ export function DeadlineManager({
             disabled={adding}
             className="label border-line-strong hover:border-ink hover:bg-ink/5 inline-flex h-10 items-center border px-5 text-xs text-ink transition-colors disabled:opacity-60"
           >
-            {adding ? "Zapisywanie…" : "Dodaj termin"}
+            {adding ? t("saving") : t("addDeadline")}
           </button>
           {addState && !addState.ok && (
             <span className="text-red ml-3 text-xs">{addState.error}</span>
@@ -138,7 +160,7 @@ export function DeadlineManager({
 
       {closed.length > 0 && (
         <p className="text-ink-faint mt-3 text-[11px]">
-          Zamknięte: {closed.length}
+          {t("closedCount", { count: closed.length })}
         </p>
       )}
     </div>

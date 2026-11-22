@@ -11,9 +11,10 @@ export type SaveResult =
   | { ok: true; message?: string }
   | { ok: false; error: string };
 
+// Stable codes, translated by the caller (PublicStatusToggle).
 const GENERIC_ERROR: SaveResult = {
   ok: false,
-  error: "Wystąpił błąd. Spróbuj ponownie.",
+  error: "generic",
 };
 
 /**
@@ -66,9 +67,7 @@ export async function updatePublicStatus(
 
     return {
       ok: true,
-      message: next.enabled
-        ? "Statusy są widoczne na stronie."
-        : "Statusy są ukryte na stronie.",
+      message: next.enabled ? "visible" : "hidden",
     };
   } catch (err) {
     adminActionFailed("updatePublicStatus", err);

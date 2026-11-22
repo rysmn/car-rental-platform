@@ -1,6 +1,7 @@
 "use client";
 
 import { useActionState, useState, useTransition } from "react";
+import { useLocale, useTranslations } from "next-intl";
 import {
   createAdminAccount,
   updateAdminAccount,
@@ -15,6 +16,7 @@ import {
   ADMIN_ROLES,
   ROLE_LABEL as PERMISSION_ROLE_LABEL,
 } from "@/lib/auth/permissions";
+import { pick } from "@/lib/i18n-pick";
 
 /*
   Etykiety ról. „Właściciel" zamiast „Superadmin" — bo tak o tym koncie mówi
@@ -31,10 +33,11 @@ const BUTTON =
   "label border-line-strong inline-flex h-10 items-center border px-5 text-xs text-ink transition-colors hover:border-ink hover:bg-ink/5 disabled:opacity-50";
 
 function Feedback({ state }: { state: ActionResult | null }) {
+  const t = useTranslations("Admin.users");
   if (!state) return null;
   return state.ok ? (
     <span className="text-xs text-emerald-400">
-      {state.message ?? "Zapisano ✓"}
+      {state.message ?? t("savedDefault")}
     </span>
   ) : (
     <span className="text-red text-xs">{state.error}</span>
@@ -59,11 +62,12 @@ function Field({
 /* ── Own password ────────────────────────────────────────────────────────── */
 
 export function OwnPasswordForm() {
+  const t = useTranslations("Admin.users");
   const [state, action, pending] = useActionState(changeOwnPassword, null);
 
   return (
     <form action={action} className="flex flex-col gap-5">
-      <Field label="Aktualne hasło">
+      <Field label={t("fieldCurrentPassword")}>
         <input
           type="password"
           name="current"
@@ -72,7 +76,7 @@ export function OwnPasswordForm() {
           className={INPUT}
         />
       </Field>
-      <Field label={`Nowe hasło (min. ${MIN_PASSWORD_LENGTH} znaków)`}>
+      <Field label={t("fieldNewPasswordMin", { min: MIN_PASSWORD_LENGTH })}>
         <input
           type="password"
           name="password"
@@ -82,7 +86,7 @@ export function OwnPasswordForm() {
           className={INPUT}
         />
       </Field>
-      <Field label="Powtórz nowe hasło">
+      <Field label={t("fieldRepeatPassword")}>
         <input
           type="password"
           name="confirm"
@@ -94,7 +98,7 @@ export function OwnPasswordForm() {
       </Field>
       <div className="flex items-center gap-3">
         <button type="submit" disabled={pending} className={BUTTON}>
-          {pending ? "Zapisywanie…" : "Zmień hasło"}
+          {pending ? t("saving") : t("changePassword")}
         </button>
         <Feedback state={state} />
       </div>
@@ -105,6 +109,8 @@ export function OwnPasswordForm() {
 /* ── Create ──────────────────────────────────────────────────────────────── */
 
 export function CreateAdminForm() {
+  const t = useTranslations("Admin.users");
+  const locale = useLocale();
   const [state, action, pending] = useActionState(createAdminAccount, null);
   const [open, setOpen] = useState(false);
 
@@ -112,7 +118,7 @@ export function CreateAdminForm() {
     return (
       <div className="flex flex-wrap items-center gap-3">
         <button type="button" onClick={() => setOpen(true)} className={BUTTON}>
-          + Dodaj użytkownika
+          {t("addUser")}
         </button>
         {/* Keep the confirmation visible after the form collapses. */}
         <Feedback state={state} />
@@ -125,7 +131,7 @@ export function CreateAdminForm() {
       action={action}
       className="border-line flex flex-col gap-5 border p-5"
     >
-      <Field label="E-mail">
+      <Field label={t("fieldEmail")}>
         <input
           type="email"
           name="email"
@@ -134,22 +140,22 @@ export function CreateAdminForm() {
           className={INPUT}
         />
       </Field>
-      <Field label="Imię i nazwisko">
+      <Field label={t("fieldName")}>
         <input type="text" name="name" required className={INPUT} />
       </Field>
-      <Field label="Rola">
+      <Field label={t("fieldRole")}>
         <select name="role" defaultValue="admin" className={INPUT}>
           {/* Lista ról rysowana ze wspólnego słownika — dodanie czwartej roli
               w `lib/auth/permissions` pojawia się tu samo, bez szukania po
               plikach, które o niej nie wiedzą. */}
           {ADMIN_ROLES.map((r) => (
             <option key={r} value={r}>
-              {ROLE_LABEL[r]}
+              {pick(ROLE_LABEL[r], locale)}
             </option>
           ))}
         </select>
       </Field>
-      <Field label={`Hasło (min. ${MIN_PASSWORD_LENGTH} znaków)`}>
+      <Field label={t("fieldPasswordMin", { min: MIN_PASSWORD_LENGTH })}>
         <input
           type="text"
           name="password"
@@ -159,20 +165,17 @@ export function CreateAdminForm() {
           className={`${INPUT} font-mono`}
         />
       </Field>
-      <p className="text-ink-faint text-xs">
-        Hasło jest widoczne, aby dało się je przepisać i przekazać nowemu
-        użytkownikowi — potem nie da się go już odczytać, tylko ustawić nowe.
-      </p>
+      <p className="text-ink-faint text-xs">{t("passwordVisibleNote")}</p>
       <div className="flex flex-wrap items-center gap-3">
         <button type="submit" disabled={pending} className={BUTTON}>
-          {pending ? "Tworzenie…" : "Utwórz konto"}
+          {pending ? t("creating") : t("createAccount")}
         </button>
         <button
           type="button"
           onClick={() => setOpen(false)}
           className="text-ink-faint text-xs hover:text-ink"
         >
-          Anuluj
+          {t("cancel")}
         </button>
         <Feedback state={state} />
       </div>
@@ -199,6 +202,8 @@ export function AdminList({
 }
 
 function AdminRowItem({ admin, isSelf }: { admin: UiAdmin; isSelf: boolean }) {
+  const t = useTranslations("Admin.users");
+  const locale = useLocale();
   const [panel, setPanel] = useState<"none" | "edit" | "password" | "delete">(
     "none",
   );
@@ -213,32 +218,34 @@ function AdminRowItem({ admin, isSelf }: { admin: UiAdmin; isSelf: boolean }) {
           <p className="truncate text-sm text-ink">
             {admin.name}
             {isSelf && (
-              <span className="text-ink-faint ml-2 text-xs">(Ty)</span>
+              <span className="text-ink-faint ml-2 text-xs">{t("you")}</span>
             )}
           </p>
           <p className="text-silver truncate text-xs">{admin.email}</p>
         </div>
         <div className="flex flex-wrap items-center gap-2">
-          <Tag>{ROLE_LABEL[admin.role]}</Tag>
-          {!admin.active && <Tag tone="red">Nieaktywne</Tag>}
-          {admin.locked && <Tag tone="red">Zablokowane</Tag>}
+          <Tag>{pick(ROLE_LABEL[admin.role], locale)}</Tag>
+          {!admin.active && <Tag tone="red">{t("inactive")}</Tag>}
+          {admin.locked && <Tag tone="red">{t("locked")}</Tag>}
         </div>
       </div>
 
       <p className="text-ink-faint mt-2 text-xs">
-        Ostatnie logowanie: {admin.lastLoginLabel} · utworzone{" "}
-        {admin.createdLabel}
+        {t("lastLogin", {
+          last: admin.lastLoginLabel,
+          created: admin.createdLabel,
+        })}
       </p>
 
       <div className="mt-3 flex flex-wrap items-center gap-4">
         <RowLink active={panel === "edit"} onClick={() => toggle("edit")}>
-          Edytuj
+          {t("edit")}
         </RowLink>
         <RowLink
           active={panel === "password"}
           onClick={() => toggle("password")}
         >
-          Zmień hasło
+          {t("changePasswordLink")}
         </RowLink>
         {admin.locked && <UnlockButton id={admin.id} />}
         {!isSelf && (
@@ -247,7 +254,7 @@ function AdminRowItem({ admin, isSelf }: { admin: UiAdmin; isSelf: boolean }) {
             danger
             onClick={() => toggle("delete")}
           >
-            Usuń
+            {t("deleteLink")}
           </RowLink>
         )}
       </div>
@@ -308,6 +315,8 @@ function RowLink({
 }
 
 function EditForm({ admin, isSelf }: { admin: UiAdmin; isSelf: boolean }) {
+  const t = useTranslations("Admin.users");
+  const locale = useLocale();
   const [state, action, pending] = useActionState(updateAdminAccount, null);
 
   return (
@@ -316,7 +325,7 @@ function EditForm({ admin, isSelf }: { admin: UiAdmin; isSelf: boolean }) {
       className="border-line mt-4 flex flex-col gap-5 border p-5"
     >
       <input type="hidden" name="id" value={admin.id} />
-      <Field label="Imię i nazwisko">
+      <Field label={t("fieldName")}>
         <input
           type="text"
           name="name"
@@ -325,7 +334,7 @@ function EditForm({ admin, isSelf }: { admin: UiAdmin; isSelf: boolean }) {
           className={INPUT}
         />
       </Field>
-      <Field label="Rola">
+      <Field label={t("fieldRole")}>
         <select
           name="role"
           defaultValue={admin.role}
@@ -337,7 +346,7 @@ function EditForm({ admin, isSelf }: { admin: UiAdmin; isSelf: boolean }) {
               plikach, które o niej nie wiedzą. */}
           {ADMIN_ROLES.map((r) => (
             <option key={r} value={r}>
-              {ROLE_LABEL[r]}
+              {pick(ROLE_LABEL[r], locale)}
             </option>
           ))}
         </select>
@@ -350,7 +359,7 @@ function EditForm({ admin, isSelf }: { admin: UiAdmin; isSelf: boolean }) {
           disabled={isSelf}
           className="accent-red h-4 w-4"
         />
-        <span className="text-sm text-ink">Konto aktywne</span>
+        <span className="text-sm text-ink">{t("activeAccount")}</span>
       </label>
       {/* Disabled inputs are not submitted, so the own-account case posts its
           unchanged values through hidden fields instead. The server refuses
@@ -359,19 +368,13 @@ function EditForm({ admin, isSelf }: { admin: UiAdmin; isSelf: boolean }) {
         <>
           <input type="hidden" name="role" value={admin.role} />
           <input type="hidden" name="active" value={admin.active ? "on" : ""} />
-          <p className="text-ink-faint text-xs">
-            Własnej roli ani aktywności nie można zmienić — to zabezpieczenie
-            przed odcięciem sobie dostępu.
-          </p>
+          <p className="text-ink-faint text-xs">{t("selfNote")}</p>
         </>
       )}
-      <p className="text-ink-faint text-xs">
-        Nieaktywne konto nie może się zalogować i traci dostęp natychmiast, ale
-        zachowuje historię w dzienniku zdarzeń.
-      </p>
+      <p className="text-ink-faint text-xs">{t("inactiveNote")}</p>
       <div className="flex items-center gap-3">
         <button type="submit" disabled={pending} className={BUTTON}>
-          {pending ? "Zapisywanie…" : "Zapisz"}
+          {pending ? t("saving") : t("save")}
         </button>
         <Feedback state={state} />
       </div>
@@ -380,6 +383,7 @@ function EditForm({ admin, isSelf }: { admin: UiAdmin; isSelf: boolean }) {
 }
 
 function PasswordForm({ admin }: { admin: UiAdmin }) {
+  const t = useTranslations("Admin.users");
   const [state, action, pending] = useActionState(setAdminPassword, null);
 
   return (
@@ -388,7 +392,7 @@ function PasswordForm({ admin }: { admin: UiAdmin }) {
       className="border-line mt-4 flex flex-col gap-5 border p-5"
     >
       <input type="hidden" name="id" value={admin.id} />
-      <Field label={`Nowe hasło (min. ${MIN_PASSWORD_LENGTH} znaków)`}>
+      <Field label={t("fieldNewPasswordMin", { min: MIN_PASSWORD_LENGTH })}>
         <input
           type="text"
           name="password"
@@ -399,12 +403,11 @@ function PasswordForm({ admin }: { admin: UiAdmin }) {
         />
       </Field>
       <p className="text-ink-faint text-xs">
-        Ustawia nowe hasło dla {admin.email} i zdejmuje ewentualną blokadę.
-        Przekaż je bezpiecznym kanałem.
+        {t("setPasswordNote", { email: admin.email })}
       </p>
       <div className="flex items-center gap-3">
         <button type="submit" disabled={pending} className={BUTTON}>
-          {pending ? "Zapisywanie…" : "Ustaw hasło"}
+          {pending ? t("saving") : t("setPassword")}
         </button>
         <Feedback state={state} />
       </div>
@@ -413,6 +416,7 @@ function PasswordForm({ admin }: { admin: UiAdmin }) {
 }
 
 function UnlockButton({ id }: { id: string }) {
+  const t = useTranslations("Admin.users");
   const [pending, start] = useTransition();
   const [state, setState] = useState<ActionResult | null>(null);
 
@@ -426,7 +430,7 @@ function UnlockButton({ id }: { id: string }) {
         }
         className="label-tight text-silver text-[10px] transition-colors hover:text-ink disabled:opacity-50"
       >
-        {pending ? "Odblokowywanie…" : "Odblokuj"}
+        {pending ? t("unlocking") : t("unlock")}
       </button>
       <Feedback state={state} />
     </span>
@@ -440,15 +444,17 @@ function DeleteConfirm({
   admin: UiAdmin;
   onCancel: () => void;
 }) {
+  const t = useTranslations("Admin.users");
   const [pending, start] = useTransition();
   const [error, setError] = useState<string | null>(null);
 
   return (
     <div className="border-line mt-4 border p-5">
       <p className="text-silver text-sm">
-        Usunąć konto <span className="text-ink">{admin.email}</span>{" "}
-        bezpowrotnie? Wpisy w dzienniku zdarzeń pozostaną, ale bez powiązania z
-        kontem.
+        {t.rich("deleteConfirm", {
+          email: admin.email,
+          b: (chunks) => <span className="text-ink">{chunks}</span>,
+        })}
       </p>
       <div className="mt-4 flex flex-wrap items-center gap-3">
         <button
@@ -463,14 +469,14 @@ function DeleteConfirm({
           }
           className="label border-red text-red hover:bg-red inline-flex h-10 items-center border px-5 text-xs transition-colors hover:text-ink disabled:opacity-50"
         >
-          {pending ? "Usuwanie…" : "Tak, usuń konto"}
+          {pending ? t("deleting") : t("deleteYes")}
         </button>
         <button
           type="button"
           onClick={onCancel}
           className="text-ink-faint text-xs hover:text-ink"
         >
-          Anuluj
+          {t("cancel")}
         </button>
       </div>
       {error && <p className="text-red mt-3 text-sm">{error}</p>}

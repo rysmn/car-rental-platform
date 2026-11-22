@@ -9,11 +9,13 @@
  * difference is an argument instead of a number.
  */
 
+import { type Bilingual, pick } from "@/lib/i18n-pick";
+
 export type HandoverKind = "pickup" | "return";
 
-export const HANDOVER_KIND_LABEL: Record<HandoverKind, string> = {
-  pickup: "Wydanie",
-  return: "Zwrot",
+export const HANDOVER_KIND_LABEL: Record<HandoverKind, Bilingual> = {
+  pickup: { pl: "Wydanie", en: "Handover" },
+  return: { pl: "Zwrot", en: "Return" },
 };
 
 /**
@@ -21,9 +23,9 @@ export const HANDOVER_KIND_LABEL: Record<HandoverKind, string> = {
  * „protokół wydaniea". Polska odmiana nie jest sufiksem i nie da się jej
  * zrobić w szablonie.
  */
-export const HANDOVER_KIND_GENITIVE: Record<HandoverKind, string> = {
-  pickup: "wydania",
-  return: "zwrotu",
+export const HANDOVER_KIND_GENITIVE: Record<HandoverKind, Bilingual> = {
+  pickup: { pl: "wydania", en: "handover" },
+  return: { pl: "zwrotu", en: "return" },
 };
 
 /* ── Fuel ─────────────────────────────────────────────────────────────────── */
@@ -37,16 +39,16 @@ export const HANDOVER_KIND_GENITIVE: Record<HandoverKind, string> = {
  */
 export const FUEL_STEPS = [0, 1, 2, 3, 4, 5, 6, 7, 8] as const;
 
-export const FUEL_LABEL: Record<number, string> = {
-  0: "Pusty",
-  1: "1/8",
-  2: "1/4",
-  3: "3/8",
-  4: "1/2",
-  5: "5/8",
-  6: "3/4",
-  7: "7/8",
-  8: "Do pełna",
+export const FUEL_LABEL: Record<number, Bilingual> = {
+  0: { pl: "Pusty", en: "Empty" },
+  1: { pl: "1/8", en: "1/8" },
+  2: { pl: "1/4", en: "1/4" },
+  3: { pl: "3/8", en: "3/8" },
+  4: { pl: "1/2", en: "1/2" },
+  5: { pl: "5/8", en: "5/8" },
+  6: { pl: "3/4", en: "3/4" },
+  7: { pl: "7/8", en: "7/8" },
+  8: { pl: "Do pełna", en: "Full" },
 };
 
 export function isFuelEighths(v: unknown): v is number {
@@ -58,10 +60,10 @@ export function isFuelEighths(v: unknown): v is number {
 export const CLEANLINESS_STATES = ["clean", "acceptable", "dirty"] as const;
 export type Cleanliness = (typeof CLEANLINESS_STATES)[number];
 
-export const CLEANLINESS_LABEL: Record<Cleanliness, string> = {
-  clean: "Czysty",
-  acceptable: "Do przyjęcia",
-  dirty: "Brudny",
+export const CLEANLINESS_LABEL: Record<Cleanliness, Bilingual> = {
+  clean: { pl: "Czysty", en: "Clean" },
+  acceptable: { pl: "Do przyjęcia", en: "Acceptable" },
+  dirty: { pl: "Brudny", en: "Dirty" },
 };
 
 /* ── The tick-list ────────────────────────────────────────────────────────── */
@@ -70,7 +72,7 @@ export type ChecklistGroup = "equipment" | "documents";
 
 export type ChecklistItem = {
   code: string;
-  label: string;
+  label: Bilingual;
   group: ChecklistGroup;
   /** Ticked by default on a handover — the things every car leaves with. */
   standard: boolean;
@@ -82,26 +84,26 @@ export type ChecklistItem = {
  * March still says what was in the car in March.
  */
 export const CHECKLIST: ChecklistItem[] = [
-  { code: "spare_wheel", label: "Koło zapasowe / dojazdowe", group: "equipment", standard: true },
-  { code: "jack", label: "Podnośnik i klucz", group: "equipment", standard: true },
-  { code: "triangle", label: "Trójkąt ostrzegawczy", group: "equipment", standard: true },
-  { code: "first_aid", label: "Apteczka", group: "equipment", standard: true },
-  { code: "vest", label: "Kamizelka odblaskowa", group: "equipment", standard: true },
-  { code: "floor_mats", label: "Dywaniki", group: "equipment", standard: true },
-  { code: "charging_cable", label: "Kabel do ładowania", group: "equipment", standard: false },
-  { code: "child_seat", label: "Fotelik dziecięcy", group: "equipment", standard: false },
-  { code: "registration", label: "Dowód rejestracyjny", group: "documents", standard: true },
-  { code: "insurance", label: "Polisa OC", group: "documents", standard: true },
-  { code: "agreement", label: "Umowa najmu", group: "documents", standard: true },
+  { code: "spare_wheel", label: { pl: "Koło zapasowe / dojazdowe", en: "Spare wheel / temporary wheel" }, group: "equipment", standard: true },
+  { code: "jack", label: { pl: "Podnośnik i klucz", en: "Jack and wheel wrench" }, group: "equipment", standard: true },
+  { code: "triangle", label: { pl: "Trójkąt ostrzegawczy", en: "Warning triangle" }, group: "equipment", standard: true },
+  { code: "first_aid", label: { pl: "Apteczka", en: "First-aid kit" }, group: "equipment", standard: true },
+  { code: "vest", label: { pl: "Kamizelka odblaskowa", en: "High-visibility vest" }, group: "equipment", standard: true },
+  { code: "floor_mats", label: { pl: "Dywaniki", en: "Floor mats" }, group: "equipment", standard: true },
+  { code: "charging_cable", label: { pl: "Kabel do ładowania", en: "Charging cable" }, group: "equipment", standard: false },
+  { code: "child_seat", label: { pl: "Fotelik dziecięcy", en: "Child seat" }, group: "equipment", standard: false },
+  { code: "registration", label: { pl: "Dowód rejestracyjny", en: "Registration certificate" }, group: "documents", standard: true },
+  { code: "insurance", label: { pl: "Polisa OC", en: "Liability insurance (OC)" }, group: "documents", standard: true },
+  { code: "agreement", label: { pl: "Umowa najmu", en: "Rental agreement" }, group: "documents", standard: true },
 ];
 
-export const CHECKLIST_LABEL: Record<string, string> = Object.fromEntries(
+export const CHECKLIST_LABEL: Record<string, Bilingual> = Object.fromEntries(
   CHECKLIST.map((i) => [i.code, i.label]),
 );
 
-export const GROUP_LABEL: Record<ChecklistGroup, string> = {
-  equipment: "Wyposażenie",
-  documents: "Dokumenty",
+export const GROUP_LABEL: Record<ChecklistGroup, Bilingual> = {
+  equipment: { pl: "Wyposażenie", en: "Equipment" },
+  documents: { pl: "Dokumenty", en: "Documents" },
 };
 
 /* ── One protocol ─────────────────────────────────────────────────────────── */
@@ -148,29 +150,44 @@ export type Difference = {
 export function compareHandovers(
   pickup: HandoverRecord,
   ret: HandoverRecord,
+  locale: string,
 ): Difference[] {
   const out: Difference[] = [];
 
   const km = ret.odometerKm - pickup.odometerKm;
   out.push({
-    label: "Przebieg",
+    label: pick({ pl: "Przebieg", en: "Mileage" }, locale),
     from: `${pickup.odometerKm} km`,
     to: `${ret.odometerKm} km`,
     tone: km < 0 ? "problem" : "neutral",
     action:
       km < 0
-        ? "Licznik cofnięty albo pomyłka w odczycie — sprawdź przed rozliczeniem"
+        ? pick(
+            {
+              pl: "Licznik cofnięty albo pomyłka w odczycie — sprawdź przed rozliczeniem",
+              en: "Odometer went back or a reading was wrong — check before settling up",
+            },
+            locale,
+          )
         : null,
   });
 
   if (ret.fuelEighths !== pickup.fuelEighths) {
     const down = ret.fuelEighths < pickup.fuelEighths;
     out.push({
-      label: "Paliwo",
-      from: FUEL_LABEL[pickup.fuelEighths],
-      to: FUEL_LABEL[ret.fuelEighths],
+      label: pick({ pl: "Paliwo", en: "Fuel" }, locale),
+      from: pick(FUEL_LABEL[pickup.fuelEighths], locale),
+      to: pick(FUEL_LABEL[ret.fuelEighths], locale),
       tone: down ? "charge" : "neutral",
-      action: down ? "Dolej albo doliczy do rozliczenia" : null,
+      action: down
+        ? pick(
+            {
+              pl: "Dolej albo doliczy do rozliczenia",
+              en: "Refuel, or add it to the bill",
+            },
+            locale,
+          )
+        : null,
     });
   }
 
@@ -178,23 +195,32 @@ export function compareHandovers(
     const order = CLEANLINESS_STATES.indexOf(ret.cleanliness);
     const was = CLEANLINESS_STATES.indexOf(pickup.cleanliness);
     out.push({
-      label: "Czystość",
-      from: CLEANLINESS_LABEL[pickup.cleanliness],
-      to: CLEANLINESS_LABEL[ret.cleanliness],
+      label: pick({ pl: "Czystość", en: "Cleanliness" }, locale),
+      from: pick(CLEANLINESS_LABEL[pickup.cleanliness], locale),
+      to: pick(CLEANLINESS_LABEL[ret.cleanliness], locale),
       tone: order > was ? "charge" : "neutral",
-      action: order > was ? "Mycie — rozważ opłatę" : null,
+      action:
+        order > was
+          ? pick({ pl: "Mycie — rozważ opłatę", en: "Cleaning — consider a fee" }, locale)
+          : null,
     });
   }
 
   if (ret.keysCount !== pickup.keysCount) {
     out.push({
-      label: "Kluczyki",
+      label: pick({ pl: "Kluczyki", en: "Keys" }, locale),
       from: String(pickup.keysCount),
       to: String(ret.keysCount),
       tone: ret.keysCount < pickup.keysCount ? "problem" : "neutral",
       action:
         ret.keysCount < pickup.keysCount
-          ? "Brakuje kompletu — auto nie wraca na flotę bez kluczyka"
+          ? pick(
+              {
+                pl: "Brakuje kompletu — auto nie wraca na flotę bez kluczyka",
+                en: "A key is missing — the car does not go back on the fleet without it",
+              },
+              locale,
+            )
           : null,
     });
   }
@@ -206,11 +232,14 @@ export function compareHandovers(
   for (const item of CHECKLIST) {
     if (was.get(item.code) === true && now.get(item.code) === false) {
       out.push({
-        label: item.label,
-        from: "było",
-        to: "brak",
+        label: pick(item.label, locale),
+        from: pick({ pl: "było", en: "present" }, locale),
+        to: pick({ pl: "brak", en: "missing" }, locale),
         tone: "problem",
-        action: "Uzupełnij albo policz z kaucji",
+        action: pick(
+          { pl: "Uzupełnij albo policz z kaucji", en: "Supply it or deduct from the deposit" },
+          locale,
+        ),
       });
     }
   }
@@ -218,11 +247,16 @@ export function compareHandovers(
   const newDamage = (ret.damageNote ?? "").trim();
   if (newDamage && newDamage !== (pickup.damageNote ?? "").trim()) {
     out.push({
-      label: "Uszkodzenia",
-      from: (pickup.damageNote ?? "").trim() || "brak zapisu",
+      label: pick({ pl: "Uszkodzenia", en: "Damage" }, locale),
+      from:
+        (pickup.damageNote ?? "").trim() ||
+        pick({ pl: "brak zapisu", en: "no record" }, locale),
       to: newDamage,
       tone: "problem",
-      action: "Zrób zdjęcia i załóż szkodę",
+      action: pick(
+        { pl: "Zrób zdjęcia i załóż szkodę", en: "Take photos and open a damage case" },
+        locale,
+      ),
     });
   }
 

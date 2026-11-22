@@ -1,12 +1,20 @@
 import type { Metadata } from "next";
 import Image from "next/image";
-import { setRequestLocale } from "next-intl/server";
+import { getTranslations, setRequestLocale } from "next-intl/server";
 import { LoginForm } from "./LoginForm";
 
-export const metadata: Metadata = {
-  title: "Logowanie — Panel A&A",
-  robots: { index: false, follow: false },
-};
+export async function generateMetadata({
+  params,
+}: {
+  params: Promise<{ locale: string }>;
+}): Promise<Metadata> {
+  const { locale } = await params;
+  const t = await getTranslations({ locale, namespace: "Admin.login" });
+  return {
+    title: t("pageTitle"),
+    robots: { index: false, follow: false },
+  };
+}
 
 export default async function AdminLoginPage({
   params,
@@ -15,6 +23,7 @@ export default async function AdminLoginPage({
 }) {
   const { locale } = await params;
   setRequestLocale(locale);
+  const t = await getTranslations("Admin.login");
 
   return (
     // Dark-only, matching the rest of the admin panel.
@@ -34,10 +43,10 @@ export default async function AdminLoginPage({
           />
         </div>
         <h1 className="font-heading mt-8 text-center text-xl font-bold">
-          Panel administracyjny
+          {t("heading")}
         </h1>
         <p className="text-ink-muted mt-2 text-center text-xs">
-          Dostęp tylko dla autoryzowanych pracowników.
+          {t("subtitle")}
         </p>
         <div className="border-line mt-8 border p-6">
           <LoginForm />

@@ -1,11 +1,12 @@
 import { notFound } from "next/navigation";
-import { setRequestLocale } from "next-intl/server";
+import { getTranslations, setRequestLocale } from "next-intl/server";
 import { Link } from "@/i18n/navigation";
 import { getModelWithUnits } from "@/lib/admin/fleet";
 import { listModelBlocks } from "@/lib/admin/availability";
 import { listExpensesByModel } from "@/lib/admin/expenses";
 import { listRecurringByModel } from "@/lib/admin/recurring";
 import { DAMAGE_STATUS_LABEL, listDamages } from "@/lib/admin/damages";
+import { pickFrom } from "@/lib/i18n-pick";
 import { ModelForm } from "../ModelForm";
 import { UnitRow, AddUnit } from "../UnitManager";
 import { ImageManager } from "../ImageManager";
@@ -26,6 +27,7 @@ export default async function EditModelPage({
 }) {
   const { locale, id } = await params;
   setRequestLocale(locale);
+  const t = await getTranslations("Admin.fleet");
 
   if (!UUID_RE.test(id)) notFound();
   const data = await getModelWithUnits(id);
@@ -59,7 +61,7 @@ export default async function EditModelPage({
         href="/admin/fleet"
         className="-my-2 inline-flex min-h-11 items-center label-tight text-ink-faint text-[10px] transition-colors hover:text-ink"
       >
-        ← Flota
+        {t("backToFleet")}
       </Link>
       <h1 className="font-heading mt-4 mb-8 text-2xl text-ink">
         {model.brand} {model.model}
@@ -74,18 +76,15 @@ export default async function EditModelPage({
       <section className="mt-14">
         <div className="mb-4 flex items-center justify-between">
           <div>
-            <h2 className="label text-xs text-ink">Egzemplarze</h2>
-            <p className="text-ink-faint text-xs">
-              Fizyczne auta tego modelu — rezerwacje dotyczą konkretnego
-              egzemplarza.
-            </p>
+            <h2 className="label text-xs text-ink">{t("unitsHeading")}</h2>
+            <p className="text-ink-faint text-xs">{t("unitsIntro")}</p>
           </div>
         </div>
 
         <div className="border-line bg-graphite/40 border px-5">
           {units.length === 0 ? (
             <p className="text-silver py-6 text-center text-sm">
-              Brak egzemplarzy. Dodaj pierwszy poniżej.
+              {t("noUnits")}
             </p>
           ) : (
             units.map((u) => (
@@ -99,7 +98,7 @@ export default async function EditModelPage({
                     .map((d) => ({
                       id: d.id,
                       title: d.title,
-                      statusLabel: DAMAGE_STATUS_LABEL[d.status],
+                      statusLabel: pickFrom(DAMAGE_STATUS_LABEL, d.status, locale),
                     }))}
                 />
                 {/* Dated obligations for THIS unit. Anything added here shows
@@ -135,11 +134,8 @@ export default async function EditModelPage({
       />
 
       <section className="border-line mt-14 border-t pt-8">
-        <h2 className="label text-red mb-1 text-xs">Strefa niebezpieczna</h2>
-        <p className="text-ink-faint mb-4 text-xs">
-          Usunięcie jest możliwe tylko, gdy model nie ma egzemplarzy ani
-          rezerwacji. W innym wypadku ukryj model, odznaczając „Opublikowany”.
-        </p>
+        <h2 className="label text-red mb-1 text-xs">{t("dangerZone")}</h2>
+        <p className="text-ink-faint mb-4 text-xs">{t("dangerText")}</p>
         <DeleteModelButton id={model.id} />
       </section>
     </div>

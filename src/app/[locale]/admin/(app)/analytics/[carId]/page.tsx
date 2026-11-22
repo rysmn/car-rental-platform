@@ -1,5 +1,7 @@
 import { notFound } from "next/navigation";
-import { setRequestLocale } from "next-intl/server";
+import { pick } from "@/lib/i18n-pick";
+import { useLocale, useTranslations } from "next-intl";
+import { getTranslations, setRequestLocale } from "next-intl/server";
 import { Link } from "@/i18n/navigation";
 import {
   getCarEconomics,
@@ -8,7 +10,6 @@ import {
   type CarEconomics,
 } from "@/lib/admin/economics";
 import { listCarExpenses } from "@/lib/admin/expenses";
-import { EXPENSE_LABEL } from "@/lib/admin/expense-options";
 import { CAR_STATUS_LABEL, isCarStatus } from "@/lib/admin/fleet-options";
 import {
   PaybackMeter,
@@ -16,10 +17,10 @@ import {
   DailyFlow,
   OccupancyStrip,
   CostBreakdown,
+  formatDay,
+  intlLocale,
 } from "@/components/admin/economics-charts";
-import { formatPln, formatPlnPrecise, pluralPl } from "@/lib/format";
-
-export const metadata = { title: "Analiza auta" };
+import { formatPln, formatPlnPrecise } from "@/lib/format";
 
 const UUID_RE =
   /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
@@ -28,18 +29,24 @@ const UUID_RE =
 const WINDOWS = [90, 180, 365] as const;
 const DEFAULT_WINDOW = 180;
 
-/** "2026-08" → "sierpień 2026". */
-function monthLabel(month: string): string {
-  const [y, m] = month.split("-").map(Number);
-  return new Intl.DateTimeFormat("pl-PL", {
-    month: "long",
-    year: "numeric",
-  }).format(new Date(Date.UTC(y, m - 1, 1)));
+export async function generateMetadata({
+  params,
+}: {
+  params: Promise<{ locale: string }>;
+}) {
+  const { locale } = await params;
+  const t = await getTranslations({ locale, namespace: "Admin.analytics" });
+  return { title: t("car.metaTitle") };
 }
 
-function formatPl(iso: string): string {
-  const [y, m, d] = iso.split("-");
-  return `${d}.${m}.${y}`;
+/** "2026-08" → "August 2026" / "sierpień 2026". */
+function monthLabel(month: string, locale: string): string {
+  const [y, m] = month.split("-").map(Number);
+  return new Intl.DateTimeFormat(intlLocale(locale), {
+    month: "long",
+    year: "numeric",
+    timeZone: "UTC",
+  }).format(new Date(Date.UTC(y, m - 1, 1)));
 }
 
 /** A headline figure. `tone` colours only the number, never the label. */
@@ -82,23 +89,31 @@ function Stat({
  * does or does not get there.
  */
 function Payback({ e }: { e: CarEconomics }) {
+  const t = useTranslations("Admin.analytics");
+  const locale = useLocale();
+  const money = (grosze: number) => formatPln(grosze, locale);
+  const fleetLink = (chunks: React.ReactNode, modelId: string) => (
+    <Link
+      href={{
+        pathname: "/admin/fleet/[id]",
+        params: { id: modelId },
+      }}
+      className="text-ink tap-area underline underline-offset-4"
+    >
+      {chunks}
+    </Link>
+  );
+
   if (e.purchasePriceGrosze == null) {
     return (
       <div className="border-line border border-dashed p-6">
-        <p className="label-tight text-ink-faint text-[10px]">Zwrot z zakupu</p>
+        <p className="label-tight text-ink-faint text-[10px]">
+          {t("car.payback.title")}
+        </p>
         <p className="text-silver mt-3 text-sm">
-          Nie policzę zwrotu bez ceny zakupu. Wpisz ją przy egzemplarzu{" "}
-          <Link
-            href={{
-              pathname: "/admin/fleet/[id]",
-              params: { id: e.modelId },
-            }}
-            className="text-ink tap-area underline underline-offset-4"
-          >
-            w zakładce Flota
-          </Link>{" "}
-          — marża i wykorzystanie liczą się już teraz, brakuje tylko celu, do
-          którego mają dojść.
+          {t.rich("car.payback.noPrice", {
+            link: (chunks) => fleetLink(chunks, e.modelId),
+          })}
         </p>
       </div>
     );
@@ -108,7 +123,9 @@ function Payback({ e }: { e: CarEconomics }) {
 
   return (
     <div className="border-line border p-6">
-      <p className="label-tight text-ink-faint text-[10px]">Zwrot z zakupu</p>
+      <p className="label-tight text-ink-faint text-[10px]">
+        {t("car.payback.title")}
+      </p>
       <div className="mt-4">
         <PaybackMeter
           recoveredGrosze={e.recoveredGrosze ?? 0}
@@ -118,37 +135,40 @@ function Payback({ e }: { e: CarEconomics }) {
       <div className="mt-5 space-y-1 text-xs">
         {paidBack ? (
           <p className="text-emerald-400">
-            Auto zwróciło koszt zakupu. Nadwyżka:{" "}
+            {t("car.payback.paidBack")}{" "}
             <span className="tabular-nums">
-              {formatPln(e.marginGrosze - e.purchasePriceGrosze, "pl")}
+              {money(e.marginGrosze - e.purchasePriceGrosze)}
             </span>
-            .
           </p>
         ) : (
           <>
             <p className="text-silver">
-              Zostało do odrobienia:{" "}
+              {t("car.payback.remaining")}{" "}
               <span className="tabular-nums">
-                {formatPln(e.remainingGrosze ?? 0, "pl")}
+                {money(e.remainingGrosze ?? 0)}
               </span>
             </p>
             {e.paybackOn ? (
               <p className="text-silver">
-                Przy obecnym tempie ({formatPln(e.netPerDayGrosze, "pl")} /
-                dobę) zwrot ok.{" "}
+                {t("car.payback.onPace", {
+                  perDay: t("perDay", { amount: money(e.netPerDayGrosze) }),
+                })}{" "}
                 <span className="text-ink tabular-nums">
-                  {formatPl(e.paybackOn)}
+                  {formatDay(e.paybackOn, locale)}
                 </span>{" "}
                 <span className="text-ink-faint">
-                  (za {e.paybackDaysLeft}{" "}
-                  {pluralPl(e.paybackDaysLeft ?? 0, "dzień", "dni", "dni")})
+                  {t("car.payback.daysLeft", {
+                    duration: t("units.days", {
+                      count: e.paybackDaysLeft ?? 0,
+                    }),
+                  })}
                 </span>
               </p>
             ) : (
               <p className="text-red">
                 {e.netPerDayGrosze > 0
-                  ? "Przy obecnym tempie zwrot wypada za ponad 27 lat — to arytmetyka, nie prognoza."
-                  : "Przy obecnym tempie auto się nie zwróci: koszty przewyższają przychód."}
+                  ? t("car.payback.overTwentySeven")
+                  : t("car.payback.never")}
               </p>
             )}
           </>
@@ -168,6 +188,8 @@ export default async function CarAnalyticsPage({
   const { locale, carId } = await params;
   setRequestLocale(locale);
   if (!UUID_RE.test(carId)) notFound();
+  const t = await getTranslations("Admin.analytics");
+  const money = (grosze: number) => formatPln(grosze, locale);
 
   const requested = Number((await searchParams).okno);
   const windowDays = (WINDOWS as readonly number[]).includes(requested)
@@ -186,33 +208,46 @@ export default async function CarAnalyticsPage({
   const windowRevenue = days.reduce((n, d) => n + d.revenueGrosze, 0);
   const windowExpense = days.reduce((n, d) => n + d.expenseGrosze, 0);
 
+  const fleetLink = (chunks: React.ReactNode) => (
+    <Link
+      href={{
+        pathname: "/admin/fleet/[id]",
+        params: { id: e.modelId },
+      }}
+      className="text-ink tap-area underline underline-offset-4"
+    >
+      {chunks}
+    </Link>
+  );
+
   return (
     <div>
       <Link
         href="/admin/analytics"
         className="-my-2 inline-flex min-h-11 items-center label-tight text-ink-faint text-[10px] transition-colors hover:text-ink"
       >
-        ← Analityka
+        {t("car.back")}
       </Link>
 
       <div className="mt-4 flex flex-wrap items-baseline gap-x-4 gap-y-1">
         <h1 className="font-heading text-3xl font-bold">{e.plate}</h1>
         <span className="text-silver text-sm">{e.carName}</span>
         <span className="border-line text-ink-faint border px-2 py-0.5 text-[10px]">
-          {isCarStatus(e.status) ? CAR_STATUS_LABEL[e.status] : e.status}
+          {isCarStatus(e.status) ? pick(CAR_STATUS_LABEL[e.status], locale) : e.status}
         </span>
       </div>
       <p className="text-ink-muted mt-2 text-sm">
-        Liczone od {formatPl(e.since)} — {e.daysOwned}{" "}
-        {pluralPl(e.daysOwned, "dzień", "dni", "dni")} w firmie. Przychód tylko
-        z rezerwacji potwierdzonych i zakończonych, rozłożony na dni wynajmu.
-        Cena zakupu nie wchodzi w koszty — jest celem, do którego marża ma
-        dojść.
+        {t("car.since", {
+          date: formatDay(e.since, locale),
+          days: t("units.days", { count: e.daysOwned }),
+        })}
       </p>
 
       {/* Filters in one row above the charts. */}
       <div className="mt-6 flex flex-wrap items-center gap-2">
-        <span className="label-tight text-ink-faint text-[10px]">Okres</span>
+        <span className="label-tight text-ink-faint text-[10px]">
+          {t("car.period")}
+        </span>
         {WINDOWS.map((w) => (
           <Link
             key={w}
@@ -227,7 +262,7 @@ export default async function CarAnalyticsPage({
                 : "border-line-strong text-silver hover:border-ink hover:text-ink"
             }`}
           >
-            {w} dni
+            {t("units.days", { count: w })}
           </Link>
         ))}
         <span className="flex-1" />
@@ -238,7 +273,7 @@ export default async function CarAnalyticsPage({
           }}
           className="label border-line-strong tap inline-flex h-9 items-center border px-4 text-xs text-ink transition-colors hover:border-ink hover:bg-ink/5"
         >
-          Raport / PDF
+          {t("car.report")}
         </Link>
         {/* Plain anchor — a file download, not a client-side navigation. */}
         {}
@@ -246,38 +281,40 @@ export default async function CarAnalyticsPage({
           href={`/api/admin/report?auto=${carId}`}
           className="label border-line-strong tap inline-flex h-9 items-center border px-4 text-xs text-ink transition-colors hover:border-ink hover:bg-ink/5"
         >
-          Excel (.xlsx)
+          {t("car.excel")}
         </a>
       </div>
 
       <div className="border-line bg-line mt-6 grid gap-px border sm:grid-cols-2 lg:grid-cols-4">
         <Stat
-          label="Przychód (całość)"
-          value={formatPln(e.revenueGrosze, "pl")}
-          hint={`${e.rentals} ${pluralPl(e.rentals, "wynajem", "wynajmy", "wynajmów")} · ${e.daysRented} ${pluralPl(e.daysRented, "dzień", "dni", "dni")}`}
+          label={t("car.stat.revenue")}
+          value={money(e.revenueGrosze)}
+          hint={`${t("units.rentals", { count: e.rentals })} · ${t("units.days", { count: e.daysRented })}`}
         />
         <Stat
-          label="Wydatki (całość)"
-          value={formatPln(e.expensesGrosze, "pl")}
-          hint={`${formatPln(e.costPerDayGrosze, "pl")} / dobę`}
+          label={t("car.stat.expenses")}
+          value={money(e.expensesGrosze)}
+          hint={t("perDay", { amount: money(e.costPerDayGrosze) })}
         />
         <Stat
-          label="Marża"
-          value={formatPln(e.marginGrosze, "pl")}
+          label={t("car.stat.margin")}
+          value={money(e.marginGrosze)}
           hint={
             e.marginPct == null
-              ? "brak przychodu"
-              : `${Math.round(e.marginPct * 100)}% przychodu`
+              ? t("cards.noRevenue")
+              : t("cards.marginOfRevenue", {
+                  percent: Math.round(e.marginPct * 100),
+                })
           }
           tone={e.marginGrosze >= 0 ? "good" : "bad"}
         />
         <Stat
-          label="Wynik na dobę"
-          value={formatPln(e.netPerDayGrosze, "pl")}
+          label={t("car.stat.netPerDay")}
+          value={money(e.netPerDayGrosze)}
           hint={
             e.netPerDayGrosze >= 0
-              ? "tyle auto zarabia każdego dnia posiadania"
-              : "tyle auto traci każdego dnia posiadania"
+              ? t("car.stat.netPositive")
+              : t("car.stat.netNegative")
           }
           tone={e.netPerDayGrosze >= 0 ? "good" : "bad"}
         />
@@ -288,44 +325,42 @@ export default async function CarAnalyticsPage({
 
         <div className="border-line border p-6">
           <p className="label-tight text-ink-faint text-[10px]">
-            Postój i koszt stały
+            {t("car.idle.title")}
           </p>
           <p className="font-heading mt-3 text-2xl font-bold text-ink tabular-nums">
-            {e.daysIdle} {pluralPl(e.daysIdle, "dzień", "dni", "dni")}
+            {t("units.days", { count: e.daysIdle })}
           </p>
           <p className="text-ink-faint mt-1 text-xs">
-            {Math.round((1 - e.utilisation) * 100)}% czasu posiadania auto stoi.
+            {t("car.idle.share", {
+              percent: Math.round((1 - e.utilisation) * 100),
+            })}
           </p>
           <div className="border-line mt-4 space-y-1 border-t pt-4 text-xs">
             <p className="text-silver">
-              Wolne (dostępne, nikt nie zarezerwował):{" "}
+              {t("car.idle.free")}{" "}
               <span className="tabular-nums">{e.daysFree}</span> —{" "}
-              <span className="text-ink-faint">to problem sprzedaży</span>
+              <span className="text-ink-faint">{t("car.idle.freeNote")}</span>
             </p>
             <p className="text-silver">
-              Zablokowane (serwis, blokady):{" "}
+              {t("car.idle.blocked")}{" "}
               <span className="tabular-nums">{e.daysBlocked}</span> —{" "}
-              <span className="text-ink-faint">to problem operacyjny</span>
+              <span className="text-ink-faint">{t("car.idle.blockedNote")}</span>
             </p>
           </div>
           <div className="border-line mt-4 space-y-1 border-t pt-4 text-xs">
             <p className="text-silver">
-              Koszty stałe (ubezpieczenie, leasing, podatki, parking):{" "}
+              {t("car.idle.standing")}{" "}
               <span className="tabular-nums">
-                {formatPln(e.standingPerDayGrosze, "pl")} / dobę
+                {t("perDay", { amount: money(e.standingPerDayGrosze) })}
               </span>
             </p>
             <p className="text-silver">
-              Koszt samego postoju:{" "}
+              {t("car.idle.idleCost")}{" "}
               <span className="text-red tabular-nums">
-                {formatPln(e.idleCostGrosze, "pl")}
+                {money(e.idleCostGrosze)}
               </span>
             </p>
-            <p className="text-ink-faint">
-              To koszty stałe pomnożone przez dni postoju — pieniądze wydane na
-              auto, które w tym czasie nic nie zarobiło. Zero oznacza, że nie
-              wpisano jeszcze żadnego kosztu stałego.
-            </p>
+            <p className="text-ink-faint">{t("car.idle.explain")}</p>
           </div>
         </div>
       </div>
@@ -333,34 +368,24 @@ export default async function CarAnalyticsPage({
       <div className="mt-6 grid gap-6 lg:grid-cols-2">
         <div className="border-line border p-6">
           <p className="label-tight text-ink-faint text-[10px]">
-            Amortyzacja (utrata wartości)
+            {t("car.dep.title")}
           </p>
           {e.depreciationToDateGrosze == null ? (
             <p className="text-silver mt-3 text-sm">
-              Nie policzę bez wartości po amortyzacji i okresu. Uzupełnisz je
-              przy egzemplarzu{" "}
-              <Link
-                href={{
-                  pathname: "/admin/fleet/[id]",
-                  params: { id: e.modelId },
-                }}
-                className="text-ink tap-area underline underline-offset-4"
-              >
-                w zakładce Flota
-              </Link>
-              . To zwykle największy koszt auta i nie przychodzi na żadnej
-              fakturze — bez niego marża wygląda lepiej, niż jest.
+              {t.rich("car.dep.missing", {
+                link: fleetLink,
+              })}
             </p>
           ) : (
             <>
               <p className="font-heading mt-3 text-2xl font-bold text-ink tabular-nums">
-                {formatPln(e.depreciationToDateGrosze, "pl")}
+                {money(e.depreciationToDateGrosze)}
               </p>
               <div className="border-line mt-4 space-y-1 border-t pt-4 text-xs">
                 <p className="text-silver">
-                  Wartość księgowa dziś:{" "}
+                  {t("car.dep.bookValue")}{" "}
                   <span className="tabular-nums">
-                    {formatPln(e.bookValueGrosze ?? 0, "pl")}
+                    {money(e.bookValueGrosze ?? 0)}
                   </span>
                 </p>
                 <p
@@ -370,15 +395,12 @@ export default async function CarAnalyticsPage({
                       : "text-red"
                   }
                 >
-                  Marża po amortyzacji:{" "}
+                  {t("car.dep.marginAfter")}{" "}
                   <span className="tabular-nums">
-                    {formatPln(e.tcoMarginGrosze ?? 0, "pl")}
+                    {money(e.tcoMarginGrosze ?? 0)}
                   </span>
                 </p>
-                <p className="text-ink-faint">
-                  Amortyzacja nie wchodzi do marży wyżej — marża to „przychód
-                  minus realnie wydane pieniądze”. Tu widzisz pełny obraz.
-                </p>
+                <p className="text-ink-faint">{t("car.dep.explain")}</p>
               </div>
             </>
           )}
@@ -386,37 +408,41 @@ export default async function CarAnalyticsPage({
 
         <div className="border-line border p-6">
           <p className="label-tight text-ink-faint text-[10px]">
-            Koszt i przychód na kilometr
+            {t("car.km.title")}
           </p>
           {e.costPerKmGrosze == null ? (
-            <p className="text-silver mt-3 text-sm">
-              Brak stanów licznika. Wpisz je przy rezerwacjach (wydanie i zwrot)
-              — to jedyna miara, którą uczciwie porównasz auto tanie z drogim.
-            </p>
+            <p className="text-silver mt-3 text-sm">{t("car.km.missing")}</p>
           ) : (
             <>
               <p className="font-heading mt-3 text-2xl font-bold text-ink tabular-nums">
-                {formatPlnPrecise(e.costPerKmGrosze, "pl")} / km
+                {t("perKm", {
+                  amount: formatPlnPrecise(e.costPerKmGrosze, locale),
+                })}
               </p>
               <div className="border-line mt-4 space-y-1 border-t pt-4 text-xs">
                 <p className="text-silver">
-                  Przychód:{" "}
+                  {t("car.km.revenue")}{" "}
                   <span className="tabular-nums">
-                    {formatPlnPrecise(e.revenuePerKmGrosze ?? 0, "pl")} / km
+                    {t("perKm", {
+                      amount: formatPlnPrecise(
+                        e.revenuePerKmGrosze ?? 0,
+                        locale,
+                      ),
+                    })}
                   </span>
                 </p>
                 <p className="text-silver">
-                  Przejechano:{" "}
+                  {t("car.km.driven")}{" "}
                   <span className="tabular-nums">
-                    {e.kmDriven.toLocaleString("pl-PL")} km
+                    {t("units.km", { km: e.kmDriven })}
                   </span>
                 </p>
                 <p className="text-ink-faint">
-                  Liczone z {e.rentalsWithKm} z {e.rentals}{" "}
-                  {pluralPl(e.rentals, "wynajmu", "wynajmów", "wynajmów")} —
-                  tylko te mają oba stany licznika.
-                  {e.rentalsWithKm < e.rentals &&
-                    " Przy niepełnych danych stawka jest zawyżona, bo cały koszt dzieli się przez część kilometrów."}
+                  {t("car.km.basis", {
+                    withKm: e.rentalsWithKm,
+                    rentalsLabel: t("units.rentals", { count: e.rentals }),
+                  })}
+                  {e.rentalsWithKm < e.rentals && ` ${t("car.km.lowData")}`}
                 </p>
               </div>
             </>
@@ -425,75 +451,79 @@ export default async function CarAnalyticsPage({
       </div>
 
       <section className="mt-14">
-        <h2 className="label text-xs text-ink">Narastający wynik</h2>
-        <p className="text-ink-faint mt-1 text-xs">
-          Przychód minus wydatki, dzień po dniu, w wybranym okresie. Przerywana
-          linia to cena zakupu — przecięcie z krzywą to moment zwrotu.
-        </p>
+        <h2 className="label text-xs text-ink">{t("car.net.title")}</h2>
+        <p className="text-ink-faint mt-1 text-xs">{t("car.net.intro")}</p>
         <NetCurve days={days} targetGrosze={e.purchasePriceGrosze} />
       </section>
 
       <section className="mt-14">
-        <h2 className="label text-xs text-ink">Dzień po dniu</h2>
+        <h2 className="label text-xs text-ink">{t("car.day.title")}</h2>
         <p className="text-ink-faint mt-1 text-xs">
-          W okresie {windowDays} dni: przychód {formatPln(windowRevenue, "pl")},
-          wydatki {formatPln(windowExpense, "pl")}. Najedź na słupek, by
-          zobaczyć konkretny dzień.
+          {t("car.day.intro", {
+            days: windowDays,
+            revenue: money(windowRevenue),
+            expenses: money(windowExpense),
+          })}
         </p>
         <DailyFlow days={days} />
       </section>
 
       <section className="mt-14">
-        <h2 className="label text-xs text-ink">Zajętość</h2>
-        <p className="text-ink-faint mt-1 text-xs">
-          Każde pole to jedna doba wybranego okresu.
-        </p>
+        <h2 className="label text-xs text-ink">{t("car.strip.title")}</h2>
+        <p className="text-ink-faint mt-1 text-xs">{t("car.strip.intro")}</p>
         <OccupancyStrip days={days} />
       </section>
 
       <section className="mt-14">
-        <h2 className="label text-xs text-ink">Struktura kosztów</h2>
-        <p className="text-ink-faint mt-1 text-xs">
-          Wszystkie wydatki tego egzemplarza, od początku.
-        </p>
+        <h2 className="label text-xs text-ink">{t("car.costs.title")}</h2>
+        <p className="text-ink-faint mt-1 text-xs">{t("car.costs.intro")}</p>
         <CostBreakdown byGroup={e.byGroup} byCategory={e.byCategory} />
       </section>
 
       <section className="mt-14">
-        <h2 className="label text-xs text-ink">Miesiąc po miesiącu</h2>
+        <h2 className="label text-xs text-ink">{t("car.months.title")}</h2>
         <p className="text-ink-faint mt-1 mb-4 text-xs">
-          Ostatnie 12 miesięcy tego egzemplarza, niezależnie od wybranego okresu
-          wykresów.
+          {t("car.months.intro")}
         </p>
         <div className="overflow-x-auto">
           <table className="w-full min-w-[560px] border-collapse text-left text-sm">
             <thead>
               <tr className="border-line text-ink-faint border-y">
-                <th className="label-tight py-3 pr-6 text-[10px]">Miesiąc</th>
-                <th className="label-tight py-3 pr-6 text-[10px]">Przychód</th>
-                <th className="label-tight py-3 pr-6 text-[10px]">Wydatki</th>
-                <th className="label-tight py-3 pr-6 text-[10px]">Marża</th>
-                <th className="label-tight py-3 text-[10px]">Dni wynajęte</th>
+                <th className="label-tight py-3 pr-6 text-[10px]">
+                  {t("monthly.col.month")}
+                </th>
+                <th className="label-tight py-3 pr-6 text-[10px]">
+                  {t("monthly.col.revenue")}
+                </th>
+                <th className="label-tight py-3 pr-6 text-[10px]">
+                  {t("monthly.col.expenses")}
+                </th>
+                <th className="label-tight py-3 pr-6 text-[10px]">
+                  {t("monthly.col.margin")}
+                </th>
+                <th className="label-tight py-3 text-[10px]">
+                  {t("monthly.col.daysRented")}
+                </th>
               </tr>
             </thead>
             <tbody>
               {months.map((m) => (
                 <tr key={m.month} className="border-line border-b">
                   <td className="py-3 pr-6 text-ink">
-                    {monthLabel(m.month)}
+                    {monthLabel(m.month, locale)}
                   </td>
                   <td className="text-silver py-3 pr-6 whitespace-nowrap tabular-nums">
-                    {formatPln(m.revenueGrosze, "pl")}
+                    {money(m.revenueGrosze)}
                   </td>
                   <td className="text-silver py-3 pr-6 whitespace-nowrap tabular-nums">
-                    {formatPln(m.expenseGrosze, "pl")}
+                    {money(m.expenseGrosze)}
                   </td>
                   <td
                     className={`py-3 pr-6 whitespace-nowrap tabular-nums ${
                       m.marginGrosze >= 0 ? "text-silver" : "text-red"
                     }`}
                   >
-                    {formatPln(m.marginGrosze, "pl")}
+                    {money(m.marginGrosze)}
                   </td>
                   <td className="text-silver py-3 tabular-nums">
                     {m.daysRented}
@@ -506,54 +536,53 @@ export default async function CarAnalyticsPage({
       </section>
 
       <section className="mt-14">
-        <h2 className="label text-xs text-ink">Wszystkie wydatki</h2>
+        <h2 className="label text-xs text-ink">{t("car.expenses.title")}</h2>
         <p className="text-ink-faint mt-1 mb-4 text-xs">
-          Ta sama treść co wykresy powyżej, w formie tabeli. Wydatki dodajesz i
-          poprawiasz przy egzemplarzu{" "}
-          <Link
-            href={{
-              pathname: "/admin/fleet/[id]",
-              params: { id: e.modelId },
-            }}
-            className="text-ink tap-area underline underline-offset-4"
-          >
-            w zakładce Flota
-          </Link>
-          .
+          {t.rich("car.expenses.intro", {
+            link: fleetLink,
+          })}
         </p>
         {expenses.length === 0 ? (
           <p className="border-line text-silver border px-5 py-6 text-center text-sm">
-            Brak zapisanych wydatków.
+            {t("empty.expenses")}
           </p>
         ) : (
           <div className="overflow-x-auto">
             <table className="w-full min-w-[640px] border-collapse text-left text-sm">
               <thead>
                 <tr className="border-line text-ink-faint border-y">
-                  <th className="label-tight py-3 pr-6 text-[10px]">Data</th>
-                  <th className="label-tight py-3 pr-6 text-[10px]">Rodzaj</th>
-                  <th className="label-tight py-3 pr-6 text-[10px]">Kwota</th>
                   <th className="label-tight py-3 pr-6 text-[10px]">
-                    Przebieg
+                    {t("col.date")}
                   </th>
-                  <th className="label-tight py-3 text-[10px]">Opis</th>
+                  <th className="label-tight py-3 pr-6 text-[10px]">
+                    {t("col.kind")}
+                  </th>
+                  <th className="label-tight py-3 pr-6 text-[10px]">
+                    {t("col.amount")}
+                  </th>
+                  <th className="label-tight py-3 pr-6 text-[10px]">
+                    {t("col.mileage")}
+                  </th>
+                  <th className="label-tight py-3 text-[10px]">
+                    {t("col.note")}
+                  </th>
                 </tr>
               </thead>
               <tbody>
                 {expenses.map((x) => (
                   <tr key={x.id} className="border-line border-b">
                     <td className="text-silver py-3 pr-6 whitespace-nowrap tabular-nums">
-                      {formatPl(x.incurredOn)}
+                      {formatDay(x.incurredOn, locale)}
                     </td>
                     <td className="py-3 pr-6 text-ink">
-                      {EXPENSE_LABEL[x.category]}
+                      {t(`expense.category.${x.category}`)}
                     </td>
                     <td className="py-3 pr-6 text-ink tabular-nums">
-                      {formatPln(x.amountGrosze, "pl")}
+                      {money(x.amountGrosze)}
                     </td>
                     <td className="text-silver py-3 pr-6 tabular-nums">
                       {x.odometerKm != null
-                        ? `${x.odometerKm.toLocaleString("pl-PL")} km`
+                        ? t("units.km", { km: x.odometerKm })
                         : "—"}
                     </td>
                     <td className="text-silver py-3">{x.note ?? "—"}</td>

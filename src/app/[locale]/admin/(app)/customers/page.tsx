@@ -1,4 +1,4 @@
-import { setRequestLocale } from "next-intl/server";
+import { getTranslations, setRequestLocale } from "next-intl/server";
 import { guardPage } from "@/lib/auth/guard";
 import { listCustomers } from "@/lib/admin/customers";
 import {
@@ -6,10 +6,19 @@ import {
   CUSTOMER_FLAG_TONE,
 } from "@/lib/admin/customer-flags";
 import { formatDatePl } from "@/lib/format";
+import { pickFrom } from "@/lib/i18n-pick";
 import { Link } from "@/i18n/navigation";
 import { CustomerForm } from "./CustomerForm";
 
-export const metadata = { title: "Klienci" };
+export async function generateMetadata({
+  params,
+}: {
+  params: Promise<{ locale: string }>;
+}) {
+  const { locale } = await params;
+  const t = await getTranslations({ locale, namespace: "Admin.customers" });
+  return { title: t("metaTitle") };
+}
 
 export default async function CustomersPage({
   params,
@@ -19,18 +28,14 @@ export default async function CustomersPage({
   const { locale } = await params;
   setRequestLocale(locale);
   await guardPage("klienci.podglad");
+  const t = await getTranslations("Admin.customers");
 
   const customers = await listCustomers();
 
   return (
     <div>
-      <h1 className="font-heading text-3xl font-bold">Klienci</h1>
-      <p className="text-ink-muted mt-2 max-w-2xl text-sm">
-        Książka adresowa, nie rejestr najmów. Przy rezerwacji telefonicznej
-        wystarczy wpisać numer — dane podstawią się same. Każda rezerwacja
-        zachowuje własną kopię danych z dnia zawarcia umowy, więc poprawka
-        nazwiska tutaj nie zmienia historycznych rezerwacji.
-      </p>
+      <h1 className="font-heading text-3xl font-bold">{t("title")}</h1>
+      <p className="text-ink-muted mt-2 max-w-2xl text-sm">{t("intro")}</p>
 
       <div className="mt-8 max-w-3xl">
         <CustomerForm />
@@ -38,24 +43,23 @@ export default async function CustomersPage({
 
       <section className="mt-12">
         <h2 className="label text-xs text-ink">
-          W bazie: {customers.length}
+          {t("inDatabase", { count: customers.length })}
         </h2>
         {customers.length === 0 ? (
           <p className="border-line bg-graphite/40 text-silver mt-4 border p-8 text-center text-sm">
-            Nikogo jeszcze nie ma. Pierwsza rezerwacja telefoniczna dopisze
-            klienta automatycznie.
+            {t("empty")}
           </p>
         ) : (
           <div className="mt-4 overflow-x-auto">
             <table className="w-full min-w-[720px] border-collapse text-left text-sm">
               <thead>
                 <tr className="border-line text-ink-faint border-y">
-                  <th className="label-tight py-3 pr-6 text-[10px]">Klient</th>
-                  <th className="label-tight py-3 pr-6 text-[10px]">Telefon</th>
-                  <th className="label-tight py-3 pr-6 text-[10px]">E-mail</th>
-                  <th className="label-tight py-3 pr-6 text-[10px]">Najmy</th>
-                  <th className="label-tight py-3 pr-6 text-[10px]">Szkody</th>
-                  <th className="label-tight py-3 text-[10px]">Ostatni</th>
+                  <th className="label-tight py-3 pr-6 text-[10px]">{t("colCustomer")}</th>
+                  <th className="label-tight py-3 pr-6 text-[10px]">{t("colPhone")}</th>
+                  <th className="label-tight py-3 pr-6 text-[10px]">{t("colEmail")}</th>
+                  <th className="label-tight py-3 pr-6 text-[10px]">{t("colRentals")}</th>
+                  <th className="label-tight py-3 pr-6 text-[10px]">{t("colDamages")}</th>
+                  <th className="label-tight py-3 text-[10px]">{t("colLast")}</th>
                 </tr>
               </thead>
               <tbody>
@@ -75,7 +79,7 @@ export default async function CustomersPage({
                         <span
                           className={`label-tight ml-2 border px-2 py-0.5 text-[10px] ${CUSTOMER_FLAG_TONE[c.flag]}`}
                         >
-                          {CUSTOMER_FLAG_LABEL[c.flag]}
+                          {pickFrom(CUSTOMER_FLAG_LABEL, c.flag, locale)}
                         </span>
                       )}
                       {c.notes && (
@@ -111,8 +115,12 @@ export default async function CustomersPage({
                             c.damagesOpen > 0 ? "text-red" : "text-silver"
                           }
                         >
-                          {c.damages}
-                          {c.damagesOpen > 0 ? ` (${c.damagesOpen} w toku)` : ""}
+                          {c.damagesOpen > 0
+                            ? t("damagesWithOpen", {
+                                total: c.damages,
+                                open: c.damagesOpen,
+                              })
+                            : c.damages}
                         </span>
                       )}
                     </td>

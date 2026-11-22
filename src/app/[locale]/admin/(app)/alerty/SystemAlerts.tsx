@@ -1,9 +1,6 @@
 import type { AlertRow } from "@/lib/alerts/repo";
-import {
-  MODULE_LABEL,
-  SEVERITY_LABEL,
-  type AlertSeverity,
-} from "@/lib/alerts/types";
+import type { AlertSeverity } from "@/lib/alerts/types";
+import { useLocale, useTranslations } from "next-intl";
 import { alertOperation } from "./actions";
 
 /**
@@ -22,30 +19,6 @@ const SEVERITY_STYLE: Record<AlertSeverity, string> = {
   warning: "border-line-strong text-ink border",
   info: "border-line text-ink-faint border",
 };
-
-/** "przed chwilą", "3 godz. temu", "12.08, 14:03" — whichever is readable. */
-function ago(date: Date): string {
-  const mins = Math.round((Date.now() - date.getTime()) / 60000);
-  if (mins < 1) return "przed chwilą";
-  if (mins < 60) return `${mins} min temu`;
-  const hours = Math.round(mins / 60);
-  if (hours < 24) return `${hours} godz. temu`;
-  return date.toLocaleString("pl-PL", {
-    day: "2-digit",
-    month: "2-digit",
-    hour: "2-digit",
-    minute: "2-digit",
-  });
-}
-
-const stamp = (date: Date): string =>
-  date.toLocaleString("pl-PL", {
-    day: "2-digit",
-    month: "2-digit",
-    year: "numeric",
-    hour: "2-digit",
-    minute: "2-digit",
-  });
 
 /** One button, one form — see `alertOperation`. */
 function Op({
@@ -84,6 +57,33 @@ export function SystemAlerts({
   alerts: AlertRow[];
   showingResolved: boolean;
 }) {
+  const t = useTranslations("Admin.alerts");
+  const locale = useLocale();
+
+  /** "just now", "3 h ago", or a locale date for older entries. */
+  const ago = (date: Date): string => {
+    const mins = Math.round((Date.now() - date.getTime()) / 60000);
+    if (mins < 1) return t("ago.justNow");
+    if (mins < 60) return t("ago.minutes", { count: mins });
+    const hours = Math.round(mins / 60);
+    if (hours < 24) return t("ago.hours", { count: hours });
+    return date.toLocaleString(locale, {
+      day: "2-digit",
+      month: "2-digit",
+      hour: "2-digit",
+      minute: "2-digit",
+    });
+  };
+
+  const stamp = (date: Date): string =>
+    date.toLocaleString(locale, {
+      day: "2-digit",
+      month: "2-digit",
+      year: "numeric",
+      hour: "2-digit",
+      minute: "2-digit",
+    });
+
   const demanding = alerts.filter(
     (a) => a.state !== "resolved" && (a.severity === "critical" || a.severity === "error"),
   ).length;
@@ -91,12 +91,17 @@ export function SystemAlerts({
   return (
     <section>
       <div className="mb-3 flex flex-wrap items-center justify-between gap-3">
-        <h2 className="label text-ink text-xs">Awarie systemu</h2>
+        <h2 className="label text-ink text-xs">{t("system.title")}</h2>
         <div className="flex items-center gap-3">
           <span className="text-ink-faint text-[11px]">
             {alerts.length === 0
               ? "0"
-              : `${alerts.length}${demanding > 0 ? `, w tym ${demanding} wymagających reakcji` : ""}`}
+              : demanding > 0
+                ? t("system.countDemanding", {
+                    count: alerts.length,
+                    demanding,
+                  })
+                : String(alerts.length)}
           </span>
           {/* A link, not a toggle: the page is a server component and this is
               one query parameter. A client-side switch here would be a state
@@ -105,7 +110,7 @@ export function SystemAlerts({
             href={showingResolved ? "/admin/alerty" : "/admin/alerty?rozwiazane=1"}
             className="label-tight border-line text-ink-faint hover:text-ink tap-block border px-3 py-2 text-[10px] transition-colors"
           >
-            {showingResolved ? "Ukryj rozwiązane" : "Pokaż rozwiązane"}
+            {showingResolved ? t("system.hideResolved") : t("system.showResolved")}
           </a>
         </div>
       </div>
@@ -113,8 +118,8 @@ export function SystemAlerts({
       {alerts.length === 0 ? (
         <p className="border-line bg-graphite/40 text-silver border p-8 text-center text-sm">
           {showingResolved
-            ? "Rejestr awarii jest pusty."
-            : "Żadna awaria nie czeka na reakcję."}
+            ? t("system.emptyRegistry")
+            : t("system.emptyOpen")}
         </p>
       ) : (
         <ul className="border-line divide-line divide-y border">
@@ -129,10 +134,10 @@ export function SystemAlerts({
                 <span
                   className={`label-tight rounded-pill shrink-0 px-2 py-0.5 text-[10px] ${SEVERITY_STYLE[a.severity]}`}
                 >
-                  {SEVERITY_LABEL[a.severity]}
+                  {t(`severity.${a.severity}`)}
                 </span>
                 <span className="label-tight border-line text-ink-faint shrink-0 border px-2 py-0.5 text-[10px]">
-                  {MODULE_LABEL[a.module] ?? a.module}
+                  {t.has(`modules.${a.module}`) ? t(`modules.${a.module}`) : a.module}
                 </span>
                 {/* min-w-0 so a long title wraps instead of widening the row
                     past the viewport — the whole page would then scroll
@@ -150,26 +155,28 @@ export function SystemAlerts({
 
               <div className="text-ink-faint flex flex-wrap items-center gap-x-4 gap-y-1 text-[11px]">
                 <span>
-                  <span className="text-silver">Ostatnio:</span> {ago(a.lastSeen)}
+                  <span className="text-silver">{t("fields.lastSeen")}</span> {ago(a.lastSeen)}
                 </span>
                 <span>
-                  <span className="text-silver">Pierwszy raz:</span> {stamp(a.firstSeen)}
+                  <span className="text-silver">{t("fields.firstSeen")}</span> {stamp(a.firstSeen)}
                 </span>
                 <span>
-                  <span className="text-silver">Wystąpień:</span>{" "}
+                  <span className="text-silver">{t("fields.occurrences")}</span>{" "}
                   <span className={a.occurrences > 1 ? "text-ink" : ""}>
                     {a.occurrences}
                   </span>
                 </span>
                 {a.reopenedAt && (
                   <span className="text-red">
-                    wróciło po rozwiązaniu — {stamp(a.reopenedAt)}
+                    {t("fields.reopened", { when: stamp(a.reopenedAt) })}
                   </span>
                 )}
-                {a.state === "acknowledged" && <span>oznaczone jako przeczytane</span>}
+                {a.state === "acknowledged" && <span>{t("fields.acknowledged")}</span>}
                 {a.state === "resolved" && (
                   <span>
-                    rozwiązane {a.resolvedAt ? stamp(a.resolvedAt) : ""}
+                    {t("fields.resolvedAt", {
+                      when: a.resolvedAt ? stamp(a.resolvedAt) : "",
+                    })}
                     {a.resolvedBy ? ` · ${a.resolvedBy}` : ""}
                   </span>
                 )}
@@ -177,12 +184,12 @@ export function SystemAlerts({
 
               <div className="flex flex-wrap gap-2">
                 {a.state === "active" && (
-                  <Op id={a.id} op="read" label="Przeczytane" />
+                  <Op id={a.id} op="read" label={t("ops.markRead")} />
                 )}
                 {a.state !== "resolved" ? (
-                  <Op id={a.id} op="resolve" label="Rozwiązane" emphasis />
+                  <Op id={a.id} op="resolve" label={t("ops.resolve")} emphasis />
                 ) : (
-                  <Op id={a.id} op="open" label="Otwórz ponownie" />
+                  <Op id={a.id} op="open" label={t("ops.reopen")} />
                 )}
               </div>
             </li>

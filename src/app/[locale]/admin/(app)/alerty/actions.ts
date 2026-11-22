@@ -1,6 +1,7 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
+import { getTranslations } from "next-intl/server";
 import { recordAudit } from "@/lib/auth/audit";
 import { requirePermission } from "@/lib/auth/guard";
 import {
@@ -26,7 +27,10 @@ import { adminActionFailed } from "@/lib/alerts/admin";
 
 type Result = { ok: true } | { ok: false; error: string };
 
-const FAILED: Result = { ok: false, error: "Nie udało się zapisać zmiany." };
+async function failed(): Promise<Result> {
+  const t = await getTranslations("Admin.alerts");
+  return { ok: false, error: t("errors.saveFailed") };
+}
 
 export async function markAlertRead(id: string): Promise<Result> {
   const admin = await requirePermission("alerty.podglad");
@@ -44,7 +48,7 @@ export async function markAlertRead(id: string): Promise<Result> {
     return { ok: true };
   } catch (err) {
     adminActionFailed("markAlertRead", err);
-    return FAILED;
+    return failed();
   }
 }
 
@@ -62,7 +66,7 @@ export async function markAlertResolved(id: string): Promise<Result> {
     return { ok: true };
   } catch (err) {
     adminActionFailed("markAlertResolved", err);
-    return FAILED;
+    return failed();
   }
 }
 
@@ -80,7 +84,7 @@ export async function markAlertOpen(id: string): Promise<Result> {
     return { ok: true };
   } catch (err) {
     adminActionFailed("markAlertOpen", err);
-    return FAILED;
+    return failed();
   }
 }
 

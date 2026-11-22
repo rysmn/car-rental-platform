@@ -1,6 +1,8 @@
 "use client";
 
 import { useActionState, useState } from "react";
+import { useLocale, useTranslations } from "next-intl";
+import { pick } from "@/lib/i18n-pick";
 import { saveHandover, type HandoverResult } from "./handover-actions";
 import { SignaturePad } from "./SignaturePad";
 import {
@@ -10,7 +12,6 @@ import {
   FUEL_LABEL,
   FUEL_STEPS,
   GROUP_LABEL,
-  HANDOVER_KIND_GENITIVE,
 
   type Cleanliness,
   type HandoverKind,
@@ -40,6 +41,8 @@ export function HandoverForm({
   existing: HandoverRecord | null;
   suggestedOdometer: number | null;
 }) {
+  const t = useTranslations("Admin.reservations.handover");
+  const locale = useLocale();
   const [state, save, saving] = useActionState<HandoverResult | null, FormData>(
     saveHandover,
     null,
@@ -67,10 +70,12 @@ export function HandoverForm({
       <input type="hidden" name="signature" value={signature} />
 
       <section className="border-line bg-graphite/40 border p-5">
-        <h2 className="label-tight text-ink-faint mb-4 text-[10px]">Odczyty</h2>
+        <h2 className="label-tight text-ink-faint mb-4 text-[10px]">
+          {t("readings")}
+        </h2>
 
         <label className="flex flex-col gap-1">
-          <span className={labelCls}>Przebieg (km)</span>
+          <span className={labelCls}>{t("odometer")}</span>
           <input
             name="odometerKm"
             inputMode="numeric"
@@ -84,12 +89,12 @@ export function HandoverForm({
           />
           {suggestedOdometer != null && !existing && (
             <span className="text-ink-faint text-[11px]">
-              Ostatni znany stan licznika tego auta: {suggestedOdometer} km
+              {t("lastKnownOdometer", { km: suggestedOdometer })}
             </span>
           )}
         </label>
 
-        <p className={`${labelCls} mt-5`}>Paliwo</p>
+        <p className={`${labelCls} mt-5`}>{t("fuel")}</p>
         <div className="mt-2 grid grid-cols-3 gap-2 sm:grid-cols-5">
           {FUEL_STEPS.map((f) => (
             <button
@@ -102,12 +107,12 @@ export function HandoverForm({
                   : "border-line-strong text-ink-faint hover:border-ink hover:text-ink"
               }`}
             >
-              {FUEL_LABEL[f]}
+              {pick(FUEL_LABEL[f], locale)}
             </button>
           ))}
         </div>
 
-        <p className={`${labelCls} mt-5`}>Czystość</p>
+        <p className={`${labelCls} mt-5`}>{t("cleanliness")}</p>
         <div className="mt-2 grid grid-cols-3 gap-2">
           {CLEANLINESS_STATES.map((c) => (
             <button
@@ -120,13 +125,13 @@ export function HandoverForm({
                   : "border-line-strong text-ink-faint hover:border-ink hover:text-ink"
               }`}
             >
-              {CLEANLINESS_LABEL[c]}
+              {pick(CLEANLINESS_LABEL[c], locale)}
             </button>
           ))}
         </div>
 
         <label className="mt-5 flex flex-col gap-1">
-          <span className={labelCls}>Kluczyki (komplety)</span>
+          <span className={labelCls}>{t("keys")}</span>
           <input
             name="keysCount"
             inputMode="numeric"
@@ -139,7 +144,7 @@ export function HandoverForm({
       {(["equipment", "documents"] as const).map((group) => (
         <section key={group} className="border-line bg-graphite/40 border p-5">
           <h2 className="label-tight text-ink-faint mb-2 text-[10px]">
-            {GROUP_LABEL[group]}
+            {pick(GROUP_LABEL[group], locale)}
           </h2>
           <ul className="divide-line divide-y">
             {CHECKLIST.filter((i) => i.group === group).map((item) => (
@@ -147,7 +152,7 @@ export function HandoverForm({
                 {/* Cały wiersz jest celem dotknięcia — na telefonie palec ląduje
                     w etykietę, nie w kratkę 16 px (audyt etapu 32). */}
                 <label className="flex min-h-12 cursor-pointer items-center justify-between gap-4 py-2">
-                  <span className="text-ink text-sm">{item.label}</span>
+                  <span className="text-ink text-sm">{pick(item.label, locale)}</span>
                   <input
                     type="checkbox"
                     name={`item_${item.code}`}
@@ -163,22 +168,25 @@ export function HandoverForm({
 
       <section className="border-line bg-graphite/40 border p-5">
         <h2 className="label-tight text-ink-faint mb-4 text-[10px]">
-          Uszkodzenia i uwagi
+          {t("damageHeading")}
         </h2>
         <label className="flex flex-col gap-1">
           <span className={labelCls}>
-            Uszkodzenia widoczne przy {kind === "pickup" ? "wydaniu" : "zwrocie"}
+            {t("damageAt", {
+              when:
+                kind === "pickup" ? t("whenPickup") : t("whenReturn"),
+            })}
           </span>
           <textarea
             name="damageNote"
             rows={3}
             defaultValue={existing?.damageNote ?? ""}
-            placeholder="np. rysa na zderzaku tylnym, odprysk na masce"
+            placeholder={t("damagePlaceholder")}
             className="border-line-strong bg-surface-1 text-ink w-full border px-3 py-2 text-base"
           />
         </label>
         <label className="mt-4 flex flex-col gap-1">
-          <span className={labelCls}>Uwagi</span>
+          <span className={labelCls}>{t("notes")}</span>
           <textarea
             name="note"
             rows={2}
@@ -191,9 +199,7 @@ export function HandoverForm({
       <SignaturePad
         existingUrl={existing?.signatureUrl ?? null}
         label={
-          kind === "pickup"
-            ? "Podpis klienta przy wydaniu"
-            : "Podpis klienta przy zwrocie"
+          kind === "pickup" ? t("signaturePickup") : t("signatureReturn")
         }
         onChange={setSignature}
       />
@@ -203,7 +209,7 @@ export function HandoverForm({
       )}
       {state && state.ok && (
         <p className="text-sm text-emerald-400">
-          Protokół {HANDOVER_KIND_GENITIVE[kind]} zapisany.
+          {kind === "pickup" ? t("savedPickup") : t("savedReturn")}
         </p>
       )}
 
@@ -212,7 +218,11 @@ export function HandoverForm({
         disabled={saving}
         className="label bg-red hover:bg-red-hover inline-flex h-14 w-full items-center justify-center px-6 text-sm text-white transition-colors disabled:opacity-60 sm:w-auto"
       >
-        {saving ? "Zapisywanie…" : `Zapisz protokół ${HANDOVER_KIND_GENITIVE[kind]}`}
+        {saving
+          ? t("saving")
+          : kind === "pickup"
+            ? t("savePickup")
+            : t("saveReturn")}
       </button>
     </form>
   );

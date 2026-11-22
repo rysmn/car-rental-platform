@@ -1,4 +1,5 @@
-import { setRequestLocale } from "next-intl/server";
+import { useLocale, useTranslations } from "next-intl";
+import { getTranslations, setRequestLocale } from "next-intl/server";
 import { notFound } from "next/navigation";
 import { Link } from "@/i18n/navigation";
 import {
@@ -9,26 +10,29 @@ import {
   type CarEconomics,
 } from "@/lib/admin/economics";
 import { listCarExpenses } from "@/lib/admin/expenses";
-import {
-  EXPENSE_LABEL,
-  EXPENSE_GROUP_LABEL,
-  EXPENSE_GROUP_OF,
-} from "@/lib/admin/expense-options";
+import { EXPENSE_GROUP_OF } from "@/lib/admin/expense-options";
 import { getSetting } from "@/lib/admin/settings";
 import { PrintButton } from "@/components/admin/PrintButton";
 import {
-  formatPln,
-  formatPlnPrecise,
-  formatDatePl,
-  pluralPl,
-} from "@/lib/format";
-
-export const metadata = { title: "Raport" };
+  formatDay,
+  intlLocale,
+} from "@/components/admin/economics-charts";
+import { formatPln, formatPlnPrecise } from "@/lib/format";
 
 const UUID_RE =
   /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 const MONTHS = 12;
+
+export async function generateMetadata({
+  params,
+}: {
+  params: Promise<{ locale: string }>;
+}) {
+  const { locale } = await params;
+  const t = await getTranslations({ locale, namespace: "Admin.analytics" });
+  return { title: t("report.metaTitle") };
+}
 
 /**
  * The printable report — this is the PDF.
@@ -49,11 +53,12 @@ function pct(v: number | null): string {
   return v == null ? "—" : `${Math.round(v * 100)}%`;
 }
 
-function monthLabel(month: string): string {
+function monthLabel(month: string, locale: string): string {
   const [y, m] = month.split("-").map(Number);
-  return new Intl.DateTimeFormat("pl-PL", {
+  return new Intl.DateTimeFormat(intlLocale(locale), {
     month: "long",
     year: "numeric",
+    timeZone: "UTC",
   }).format(new Date(Date.UTC(y, m - 1, 1)));
 }
 
@@ -103,30 +108,32 @@ function MonthsTable({
 }: {
   months: Awaited<ReturnType<typeof getMonthlySeries>>;
 }) {
+  const t = useTranslations("Admin.analytics");
+  const locale = useLocale();
   return (
     <div className="overflow-x-auto">
       <table className="w-full min-w-[34rem] border-collapse text-left text-sm">
         <thead>
           <tr className="text-ink-faint">
-            <th className={th}>Miesiąc</th>
-            <th className={th}>Przychód</th>
-            <th className={th}>Wydatki</th>
-            <th className={th}>Marża</th>
-            <th className={th}>Dni wynajęte</th>
+            <th className={th}>{t("monthly.col.month")}</th>
+            <th className={th}>{t("monthly.col.revenue")}</th>
+            <th className={th}>{t("monthly.col.expenses")}</th>
+            <th className={th}>{t("monthly.col.margin")}</th>
+            <th className={th}>{t("monthly.col.daysRented")}</th>
           </tr>
         </thead>
         <tbody>
           {months.map((m) => (
             <tr key={m.month}>
-              <td className={td}>{monthLabel(m.month)}</td>
+              <td className={td}>{monthLabel(m.month, locale)}</td>
               <td className={`${td} tabular-nums`}>
-                {formatPln(m.revenueGrosze, "pl")}
+                {formatPln(m.revenueGrosze, locale)}
               </td>
               <td className={`${td} tabular-nums`}>
-                {formatPln(m.expenseGrosze, "pl")}
+                {formatPln(m.expenseGrosze, locale)}
               </td>
               <td className={`${td} tabular-nums`}>
-                {formatPln(m.marginGrosze, "pl")}
+                {formatPln(m.marginGrosze, locale)}
               </td>
               <td className={`${td} tabular-nums`}>{m.daysRented}</td>
             </tr>
@@ -144,111 +151,125 @@ function CarReport({
   e: CarEconomics;
   expenses: Awaited<ReturnType<typeof listCarExpenses>>;
 }) {
+  const t = useTranslations("Admin.analytics");
+  const locale = useLocale();
+  const money = (grosze: number) => formatPln(grosze, locale);
   return (
     <>
       <section className="mt-8">
-        <h2 className="label text-xs">Podsumowanie</h2>
+        <h2 className="label text-xs">{t("report.summary")}</h2>
         <div className="mt-3 grid grid-cols-2 gap-3 md:grid-cols-4">
           <Figure
-            label="Przychód"
-            value={formatPln(e.revenueGrosze, "pl")}
-            hint={`${e.rentals} ${pluralPl(e.rentals, "wynajem", "wynajmy", "wynajmów")}`}
+            label={t("sections.revenue")}
+            value={money(e.revenueGrosze)}
+            hint={t("units.rentals", { count: e.rentals })}
           />
           <Figure
-            label="Wydatki"
-            value={formatPln(e.expensesGrosze, "pl")}
-            hint={`${formatPln(e.costPerDayGrosze, "pl")} / dobę`}
+            label={t("sections.costs")}
+            value={money(e.expensesGrosze)}
+            hint={t("perDay", { amount: money(e.costPerDayGrosze) })}
           />
           <Figure
-            label="Marża"
-            value={formatPln(e.marginGrosze, "pl")}
-            hint={pct(e.marginPct) + " przychodu"}
+            label={t("cards.margin")}
+            value={money(e.marginGrosze)}
+            hint={t("report.ofRevenue", { percent: pct(e.marginPct) })}
           />
           <Figure
-            label="Wynik na dobę"
-            value={formatPln(e.netPerDayGrosze, "pl")}
-            hint={`${e.daysOwned} ${pluralPl(e.daysOwned, "dzień", "dni", "dni")} w firmie`}
+            label={t("report.netPerDay")}
+            value={money(e.netPerDayGrosze)}
+            hint={t("report.daysInCompany", {
+              days: t("units.days", { count: e.daysOwned }),
+            })}
           />
         </div>
       </section>
 
       <section className="mt-8" data-print-keep>
-        <h2 className="label text-xs">Zwrot i wykorzystanie</h2>
+        <h2 className="label text-xs">{t("report.recovery")}</h2>
         <div className="overflow-x-auto">
           <table className="mt-3 w-full min-w-[34rem] border-collapse text-left text-sm">
             <tbody>
               <tr>
-                <td className={`${td} w-72`}>Cena zakupu</td>
+                <td className={`${td} w-72`}>{t("report.purchasePrice")}</td>
                 <td className={`${td} tabular-nums`}>
                   {e.purchasePriceGrosze == null
-                    ? "nie podano"
-                    : `${formatPln(e.purchasePriceGrosze, "pl")}${e.purchasedOn ? ` (${formatDatePl(e.purchasedOn)})` : ""}`}
+                    ? t("report.notEntered")
+                    : `${money(e.purchasePriceGrosze)}${e.purchasedOn ? ` (${formatDay(e.purchasedOn, locale)})` : ""}`}
                 </td>
               </tr>
               <tr>
-                <td className={td}>Zwrócone z zakupu</td>
+                <td className={td}>{t("report.recoveredFromPurchase")}</td>
                 <td className={td}>
                   {e.recoveredPct == null ? (
-                    "brak ceny zakupu"
+                    t("report.noPurchasePrice")
                   ) : (
                     <Bar value={e.recoveredPct} />
                   )}
                 </td>
               </tr>
               <tr>
-                <td className={td}>Przewidywany zwrot</td>
+                <td className={td}>{t("report.expectedPayback")}</td>
                 <td className={`${td} tabular-nums`}>
                   {e.purchasePriceGrosze == null
                     ? "—"
                     : e.marginGrosze >= e.purchasePriceGrosze
-                      ? "zwrócone"
+                      ? t("economics.returned")
                       : e.paybackOn
-                        ? formatDatePl(e.paybackOn)
-                        : "nie przy obecnym tempie"}
+                        ? formatDay(e.paybackOn, locale)
+                        : t("report.notAtCurrentPace")}
                 </td>
               </tr>
               <tr>
-                <td className={td}>Dni wynajęte</td>
+                <td className={td}>{t("report.daysRented")}</td>
                 <td className={`${td} tabular-nums`}>
                   {e.daysRented} <Bar value={e.utilisation} />
                 </td>
               </tr>
               <tr>
-                <td className={td}>Dni wolne (nikt nie zarezerwował)</td>
+                <td className={td}>{t("report.daysFreeFull")}</td>
                 <td className={`${td} tabular-nums`}>{e.daysFree}</td>
               </tr>
               <tr>
-                <td className={td}>Dni zablokowane (serwis, blokady)</td>
+                <td className={td}>{t("report.daysBlockedFull")}</td>
                 <td className={`${td} tabular-nums`}>{e.daysBlocked}</td>
               </tr>
               <tr>
-                <td className={td}>Koszt postoju</td>
+                <td className={td}>{t("report.idleCost")}</td>
                 <td className={`${td} tabular-nums`}>
-                  {formatPln(e.idleCostGrosze, "pl")}
+                  {money(e.idleCostGrosze)}
                 </td>
               </tr>
               <tr>
-                <td className={td}>Amortyzacja do dziś</td>
+                <td className={td}>{t("report.depreciationToDate")}</td>
                 <td className={`${td} tabular-nums`}>
                   {e.depreciationToDateGrosze == null
-                    ? "brak ustawień amortyzacji"
-                    : formatPln(e.depreciationToDateGrosze, "pl")}
+                    ? t("report.noDepreciationSettings")
+                    : money(e.depreciationToDateGrosze)}
                 </td>
               </tr>
               <tr>
-                <td className={td}>Marża po amortyzacji</td>
+                <td className={td}>{t("report.marginAfterDepreciation")}</td>
                 <td className={`${td} tabular-nums`}>
                   {e.tcoMarginGrosze == null
                     ? "—"
-                    : formatPln(e.tcoMarginGrosze, "pl")}
+                    : money(e.tcoMarginGrosze)}
                 </td>
               </tr>
               <tr>
-                <td className={td}>Koszt / przychód na km</td>
+                <td className={td}>{t("report.costRevenuePerKm")}</td>
                 <td className={`${td} tabular-nums`}>
                   {e.costPerKmGrosze == null
-                    ? "brak stanów licznika"
-                    : `${formatPlnPrecise(e.costPerKmGrosze, "pl")} / ${formatPlnPrecise(e.revenuePerKmGrosze ?? 0, "pl")} — ${e.kmDriven.toLocaleString("pl-PL")} km z ${e.rentalsWithKm}/${e.rentals} wynajmów`}
+                    ? t("report.noOdometer")
+                    : t("report.kmBasis", {
+                        cost: formatPlnPrecise(e.costPerKmGrosze, locale),
+                        revenue: formatPlnPrecise(
+                          e.revenuePerKmGrosze ?? 0,
+                          locale,
+                        ),
+                        km: e.kmDriven,
+                        withKm: e.rentalsWithKm,
+                        rentalsLabel: t("units.rentals", { count: e.rentals }),
+                      })}
                 </td>
               </tr>
             </tbody>
@@ -257,40 +278,40 @@ function CarReport({
       </section>
 
       <section className="mt-8">
-        <h2 className="label text-xs">Wydatki</h2>
+        <h2 className="label text-xs">{t("report.expenses")}</h2>
         {expenses.length === 0 ? (
-          <p className="text-ink-faint mt-3 text-sm">
-            Brak zapisanych wydatków.
-          </p>
+          <p className="text-ink-faint mt-3 text-sm">{t("empty.expenses")}</p>
         ) : (
           <div className="overflow-x-auto">
             <table className="mt-3 w-full min-w-[34rem] border-collapse text-left text-sm">
               <thead>
                 <tr className="text-ink-faint">
-                  <th className={th}>Data</th>
-                  <th className={th}>Grupa</th>
-                  <th className={th}>Rodzaj</th>
-                  <th className={th}>Kwota</th>
-                  <th className={th}>Przebieg</th>
-                  <th className={th}>Opis</th>
+                  <th className={th}>{t("col.date")}</th>
+                  <th className={th}>{t("col.group")}</th>
+                  <th className={th}>{t("col.kind")}</th>
+                  <th className={th}>{t("col.amount")}</th>
+                  <th className={th}>{t("col.mileage")}</th>
+                  <th className={th}>{t("col.note")}</th>
                 </tr>
               </thead>
               <tbody>
                 {expenses.map((x) => (
                   <tr key={x.id}>
                     <td className={`${td} whitespace-nowrap tabular-nums`}>
-                      {formatDatePl(x.incurredOn)}
+                      {formatDay(x.incurredOn, locale)}
                     </td>
                     <td className={td}>
-                      {EXPENSE_GROUP_LABEL[EXPENSE_GROUP_OF[x.category]]}
+                      {t(`expense.group.${EXPENSE_GROUP_OF[x.category]}`)}
                     </td>
-                    <td className={td}>{EXPENSE_LABEL[x.category]}</td>
+                    <td className={td}>
+                      {t(`expense.category.${x.category}`)}
+                    </td>
                     <td className={`${td} whitespace-nowrap tabular-nums`}>
-                      {formatPln(x.amountGrosze, "pl")}
+                      {money(x.amountGrosze)}
                     </td>
                     <td className={`${td} tabular-nums`}>
                       {x.odometerKm != null
-                        ? `${x.odometerKm.toLocaleString("pl-PL")} km`
+                        ? t("units.km", { km: x.odometerKm })
                         : "—"}
                     </td>
                     <td className={td}>{x.note ?? "—"}</td>
@@ -314,12 +335,13 @@ export default async function ReportPage({
 }) {
   const { locale } = await params;
   setRequestLocale(locale);
+  const t = await getTranslations("Admin.analytics");
 
   const carId = (await searchParams).auto;
   if (carId && !UUID_RE.test(carId)) notFound();
 
   const company = await getSetting("company");
-  const today = formatDatePl(new Date().toISOString().slice(0, 10));
+  const today = formatDay(new Date().toISOString().slice(0, 10), locale);
 
   if (carId) {
     const [e, months, expenses] = await Promise.all([
@@ -333,7 +355,9 @@ export default async function ReportPage({
       <div data-print="report" className="mx-auto max-w-4xl">
         <Header
           title={`${e.plate} — ${e.carName}`}
-          subtitle={`Raport za okres od ${formatDatePl(e.since)}`}
+          subtitle={t("report.periodSince", {
+            date: formatDay(e.since, locale),
+          })}
           company={company.email}
           today={today}
           xlsxHref={`/api/admin/report?auto=${e.carId}`}
@@ -344,7 +368,9 @@ export default async function ReportPage({
         />
         <CarReport e={e} expenses={expenses} />
         <section className="mt-8">
-          <h2 className="label text-xs">Ostatnie {MONTHS} miesięcy</h2>
+          <h2 className="label text-xs">
+            {t("report.lastMonths", { count: MONTHS })}
+          </h2>
           <div className="mt-3">
             <MonthsTable months={months} />
           </div>
@@ -359,12 +385,13 @@ export default async function ReportPage({
     getMonthlySeries(MONTHS),
   ]);
   const totals = totalsOf(cars);
+  const money = (grosze: number) => formatPln(grosze, locale);
 
   return (
     <div data-print="report" className="mx-auto max-w-5xl">
       <Header
-        title="Raport floty"
-        subtitle={`${totals.cars} ${pluralPl(totals.cars, "egzemplarz", "egzemplarze", "egzemplarzy")}`}
+        title={t("report.fleetTitle")}
+        subtitle={t("units.cars", { count: totals.cars })}
         company={company.email}
         today={today}
         xlsxHref="/api/admin/report"
@@ -373,41 +400,38 @@ export default async function ReportPage({
 
       <section className="mt-8">
         <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
+          <Figure label={t("sections.revenue")} value={money(totals.revenueGrosze)} />
+          <Figure label={t("sections.costs")} value={money(totals.expensesGrosze)} />
           <Figure
-            label="Przychód"
-            value={formatPln(totals.revenueGrosze, "pl")}
+            label={t("cards.margin")}
+            value={money(totals.marginGrosze)}
+            hint={t("report.ofRevenue", { percent: pct(totals.marginPct) })}
           />
           <Figure
-            label="Wydatki"
-            value={formatPln(totals.expensesGrosze, "pl")}
-          />
-          <Figure
-            label="Marża"
-            value={formatPln(totals.marginGrosze, "pl")}
-            hint={pct(totals.marginPct) + " przychodu"}
-          />
-          <Figure
-            label="Zwrot z kapitału"
+            label={t("report.capitalRecovery")}
             value={pct(totals.recoveredPct)}
-            hint={`${formatPln(totals.recoveredGrosze, "pl")} z ${formatPln(totals.investedGrosze, "pl")}`}
+            hint={t("cards.recoveredOf", {
+              recovered: money(totals.recoveredGrosze),
+              invested: money(totals.investedGrosze),
+            })}
           />
         </div>
       </section>
 
       <section className="mt-8">
-        <h2 className="label text-xs">Egzemplarze</h2>
+        <h2 className="label text-xs">{t("economics.title")}</h2>
         <div className="overflow-x-auto">
           <table className="mt-3 w-full min-w-[34rem] border-collapse text-left text-sm">
             <thead>
               <tr className="text-ink-faint">
-                <th className={th}>Egzemplarz</th>
-                <th className={th}>Przychód</th>
-                <th className={th}>Wydatki</th>
-                <th className={th}>Marża</th>
-                <th className={th}>Wykorz.</th>
-                <th className={th}>Wolne</th>
-                <th className={th}>Blok.</th>
-                <th className={th}>Zwrot</th>
+                <th className={th}>{t("economics.col.unit")}</th>
+                <th className={th}>{t("economics.col.revenue")}</th>
+                <th className={th}>{t("economics.col.expenses")}</th>
+                <th className={th}>{t("economics.col.margin")}</th>
+                <th className={th}>{t("report.col.utilisation")}</th>
+                <th className={th}>{t("report.col.free")}</th>
+                <th className={th}>{t("report.col.blocked")}</th>
+                <th className={th}>{t("report.col.recovery")}</th>
               </tr>
             </thead>
             <tbody>
@@ -420,13 +444,13 @@ export default async function ReportPage({
                     </span>
                   </td>
                   <td className={`${td} whitespace-nowrap tabular-nums`}>
-                    {formatPln(c.revenueGrosze, "pl")}
+                    {money(c.revenueGrosze)}
                   </td>
                   <td className={`${td} whitespace-nowrap tabular-nums`}>
-                    {formatPln(c.expensesGrosze, "pl")}
+                    {money(c.expensesGrosze)}
                   </td>
                   <td className={`${td} whitespace-nowrap tabular-nums`}>
-                    {formatPln(c.marginGrosze, "pl")}
+                    {money(c.marginGrosze)}
                   </td>
                   <td className={td}>
                     <Bar value={c.utilisation} />
@@ -444,7 +468,9 @@ export default async function ReportPage({
       </section>
 
       <section className="mt-8">
-        <h2 className="label text-xs">Ostatnie {MONTHS} miesięcy</h2>
+        <h2 className="label text-xs">
+          {t("report.lastMonths", { count: MONTHS })}
+        </h2>
         <div className="mt-3">
           <MonthsTable months={months} />
         </div>
@@ -470,6 +496,7 @@ function Header({
   xlsxHref: string;
   backHref: React.ComponentProps<typeof Link>["href"];
 }) {
+  const t = useTranslations("Admin.analytics");
   return (
     <>
       <div className="mb-6 flex flex-wrap items-center gap-3 print:hidden">
@@ -477,7 +504,7 @@ function Header({
           href={backHref}
           className="label-tight text-ink-faint hover:text-ink -my-2 inline-flex min-h-11 items-center text-[10px]"
         >
-          ← Wróć
+          {t("report.back")}
         </Link>
         <span className="flex-1" />
         <PrintButton />
@@ -488,7 +515,7 @@ function Header({
           href={xlsxHref}
           className="label border-line-strong text-ink hover:border-ink hover:bg-ink/5 tap inline-flex h-9 items-center border px-4 text-xs transition-colors"
         >
-          Pobierz Excel (.xlsx)
+          {t("actions.excel")}
         </a>
       </div>
 
@@ -500,7 +527,7 @@ function Header({
         <div className="text-ink-faint text-right text-xs">
           <p className="font-medium">A&amp;A Corporation</p>
           <p>{company}</p>
-          <p>Wygenerowano {today}</p>
+          <p>{t("report.generated", { date: today })}</p>
         </div>
       </div>
     </>
@@ -508,12 +535,10 @@ function Header({
 }
 
 function Footer() {
+  const t = useTranslations("Admin.analytics");
   return (
     <p className="border-line text-ink-faint mt-10 border-t pt-4 text-[11px]">
-      Przychód liczony z rezerwacji potwierdzonych i zakończonych, rozłożony na
-      dni wynajmu. Wydatki pochodzą z kosztów wpisanych przy egzemplarzach. Cena
-      zakupu nie jest kosztem — jest celem, do którego marża ma dojść. Dokument
-      wygenerowany automatycznie; nie jest dokumentem księgowym.
+      {t("report.footer")}
     </p>
   );
 }

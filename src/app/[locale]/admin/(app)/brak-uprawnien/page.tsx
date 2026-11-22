@@ -1,8 +1,16 @@
+import { getTranslations, setRequestLocale } from "next-intl/server";
 import { Link } from "@/i18n/navigation";
 import { requireAdmin } from "@/lib/auth/guard";
-import { ROLE_LABEL } from "@/lib/auth/permissions";
 
-export const metadata = { title: "Brak uprawnień" };
+export async function generateMetadata({
+  params,
+}: {
+  params: Promise<{ locale: string }>;
+}) {
+  const { locale } = await params;
+  const t = await getTranslations({ locale, namespace: "Admin.noPermission" });
+  return { title: t("metaTitle") };
+}
 
 /**
  * Ekran, na który trafia ktoś, kto wszedł tam, gdzie mu nie wolno.
@@ -15,29 +23,36 @@ export const metadata = { title: "Brak uprawnień" };
  * cennika" mówiłoby pracownikowi, że cennik jest w panelu i pod jakim adresem;
  * to nie jest tajemnica, ale nie ma też powodu jej rozgłaszać.
  */
-export default async function BrakUprawnienPage() {
+export default async function BrakUprawnienPage({
+  params,
+}: {
+  params: Promise<{ locale: string }>;
+}) {
+  const { locale } = await params;
+  setRequestLocale(locale);
+  const t = await getTranslations("Admin.noPermission");
   const admin = await requireAdmin();
 
   return (
     <div className="max-w-xl py-10">
       <h1 className="font-heading text-ink text-2xl font-bold">
-        Ta sekcja nie jest dla Twojego konta
+        {t("heading")}
       </h1>
       <p className="text-ink-muted mt-4 text-sm leading-relaxed">
-        Jesteś zalogowany jako <strong className="text-ink">{admin.name}</strong>{" "}
-        z rolą <strong className="text-ink">{ROLE_LABEL[admin.role]}</strong>.
-        Ta rola nie obejmuje tego, co jest pod tym adresem.
+        {t.rich("loggedIn", {
+          name: admin.name,
+          role: t(`roles.${admin.role}`),
+          strong: (chunks) => <strong className="text-ink">{chunks}</strong>,
+        })}
       </p>
       <p className="text-ink-muted mt-3 text-sm leading-relaxed">
-        Jeżeli potrzebujesz tu wejść do pracy, poproś właściciela o zmianę roli
-        — panel nie rozszerza uprawnień sam z siebie i nie ma jak tego obejść
-        z przeglądarki.
+        {t("hint")}
       </p>
       <Link
         href="/admin"
         className="label border-line-strong text-ink hover:border-ink hover:bg-ink/5 mt-8 inline-flex h-10 items-center border px-5 text-xs transition-colors"
       >
-        Wróć na pulpit
+        {t("back")}
       </Link>
     </div>
   );

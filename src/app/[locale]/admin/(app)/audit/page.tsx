@@ -1,4 +1,5 @@
-import { setRequestLocale } from "next-intl/server";
+import { getTranslations, setRequestLocale } from "next-intl/server";
+import { useTranslations } from "next-intl";
 import { guardPage } from "@/lib/auth/guard";
 import { Link } from "@/i18n/navigation";
 import {
@@ -6,41 +7,8 @@ import {
   isAuditCategory,
   AUDIT_CATEGORIES,
   type AuditEntry,
-  type AuditCategory,
 } from "@/lib/admin/audit";
 import { formatDateTimePl } from "@/lib/format";
-
-const CATEGORY_LABEL: Record<AuditCategory, string> = {
-  login: "Logowanie",
-  reservation: "Rezerwacje",
-  fleet: "Flota",
-  pricing: "Cennik",
-  admin: "Konta",
-};
-
-const ACTION_LABEL: Record<string, string> = {
-  "login.success": "Zalogowano",
-  "login.fail": "Nieudane logowanie",
-  "reservation.confirmed": "Rezerwacja potwierdzona",
-  "reservation.rejected": "Rezerwacja odrzucona",
-  "reservation.cancelled": "Rezerwacja anulowana",
-  "reservation.completed": "Rezerwacja zakończona",
-  "pricing.model.update": "Zmiana cen modelu",
-  "pricing.fee.update": "Zmiana opłaty",
-  "pricing.location.update": "Zmiana opłaty za odbiór",
-  "fleet.model.create": "Dodano model",
-  "fleet.model.update": "Zmieniono model",
-  "fleet.model.delete": "Usunięto model",
-  "fleet.car.create": "Dodano egzemplarz",
-  "fleet.car.update": "Zmieniono egzemplarz",
-  "fleet.car.delete": "Usunięto egzemplarz",
-  "admin.create": "Dodano użytkownika",
-  "admin.update": "Zmieniono użytkownika",
-  "admin.delete": "Usunięto użytkownika",
-  "admin.password.reset": "Zresetowano hasło użytkownika",
-  "admin.password.change": "Zmieniono własne hasło",
-  "admin.unlock": "Odblokowano konto",
-};
 
 export default async function AuditPage({
   params,
@@ -60,6 +28,7 @@ export default async function AuditPage({
   const { locale } = await params;
   setRequestLocale(locale);
   const sp = await searchParams;
+  const t = await getTranslations("Admin.audit");
 
   const category = isAuditCategory(sp.category) ? sp.category : undefined;
   const page = Math.max(1, Number(sp.page) || 1);
@@ -77,26 +46,26 @@ export default async function AuditPage({
   return (
     <div>
       <header className="mb-8">
-        <h1 className="font-heading text-ink text-2xl">Dziennik zdarzeń</h1>
+        <h1 className="font-heading text-ink text-2xl">{t("title")}</h1>
         <p className="text-silver mt-1 text-sm">
-          Niezmienialny zapis działań w panelu. {total} wpisów.
+          {t("subtitle", { count: total })}
         </p>
       </header>
 
       <form method="get" className="mb-6 flex flex-wrap items-end gap-3">
         <label className="flex flex-col gap-1">
           <span className="label-tight text-ink-faint text-[10px]">
-            Kategoria
+            {t("filter.category")}
           </span>
           <select
             name="category"
             defaultValue={category ?? ""}
             className="border-line-strong bg-surface-1 text-ink h-11 border px-3 text-sm"
           >
-            <option value="">Wszystkie</option>
+            <option value="">{t("filter.all")}</option>
             {AUDIT_CATEGORIES.map((c) => (
               <option key={c} value={c}>
-                {CATEGORY_LABEL[c]}
+                {t(`categories.${c}`)}
               </option>
             ))}
           </select>
@@ -105,21 +74,21 @@ export default async function AuditPage({
           type="submit"
           className="label border-line-strong text-ink hover:border-ink hover:bg-ink/5 inline-flex h-11 items-center border px-6 text-xs transition-colors"
         >
-          Filtruj
+          {t("filter.apply")}
         </button>
         {category && (
           <Link
             href="/admin/audit"
             className="label text-ink-faint hover:text-ink inline-flex h-11 items-center px-3 text-xs transition-colors"
           >
-            Wyczyść
+            {t("filter.clear")}
           </Link>
         )}
       </form>
 
       {items.length === 0 ? (
         <p className="border-line bg-graphite/40 text-silver border p-10 text-center text-sm">
-          Brak zdarzeń.
+          {t("empty")}
         </p>
       ) : (
         <ul className="divide-line border-line divide-y border">
@@ -136,23 +105,23 @@ export default async function AuditPage({
               href={pageHref(page - 1)}
               className="text-silver hover:text-ink tap"
             >
-              ← Nowsze
+              {t("newer")}
             </Link>
           ) : (
-            <span className="text-ink-faint opacity-40">← Nowsze</span>
+            <span className="text-ink-faint opacity-40">{t("newer")}</span>
           )}
           <span className="text-ink-faint">
-            Strona {page} z {pages}
+            {t("pageOf", { page, pages })}
           </span>
           {page < pages ? (
             <Link
               href={pageHref(page + 1)}
               className="text-silver hover:text-ink tap"
             >
-              Starsze →
+              {t("older")}
             </Link>
           ) : (
-            <span className="text-ink-faint opacity-40">Starsze →</span>
+            <span className="text-ink-faint opacity-40">{t("older")}</span>
           )}
         </nav>
       )}
@@ -161,8 +130,15 @@ export default async function AuditPage({
 }
 
 function AuditRow({ entry }: { entry: AuditEntry }) {
+  const t = useTranslations("Admin.audit");
   const category = entry.action.split(".")[0];
-  const actionLabel = ACTION_LABEL[entry.action] ?? entry.action;
+  const actionKey = entry.action
+    .split(".")
+    .map((p, i) => (i === 0 ? p : p.charAt(0).toUpperCase() + p.slice(1)))
+    .join("");
+  const actionLabel = t.has(`actions.${actionKey}`)
+    ? t(`actions.${actionKey}`)
+    : entry.action;
   const hasDetail = entry.before != null || entry.after != null;
 
   return (
@@ -170,7 +146,7 @@ function AuditRow({ entry }: { entry: AuditEntry }) {
       <div className="flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1">
         <div className="flex min-w-0 flex-wrap items-baseline gap-x-3 gap-y-1">
           <span className="label-tight text-ink-faint w-24 shrink-0 text-[10px]">
-            {isAuditCategory(category) ? CATEGORY_LABEL[category] : category}
+            {isAuditCategory(category) ? t(`categories.${category}`) : category}
           </span>
           <span className="text-ink text-sm">{actionLabel}</span>
           {entry.entity && (
@@ -181,7 +157,7 @@ function AuditRow({ entry }: { entry: AuditEntry }) {
           )}
         </div>
         <div className="text-ink-faint flex min-w-0 flex-wrap items-baseline gap-x-3 gap-y-1 text-xs">
-          <span>{entry.adminEmail ?? "system"}</span>
+          <span>{entry.adminEmail ?? t("system")}</span>
           {entry.ip && <span className="font-mono">{entry.ip}</span>}
           <time className="text-silver">
             {formatDateTimePl(entry.createdAt)}
@@ -191,11 +167,11 @@ function AuditRow({ entry }: { entry: AuditEntry }) {
       {hasDetail && (
         <details className="mt-2">
           <summary className="text-ink-faint hover:text-ink tap-area cursor-pointer text-xs">
-            Szczegóły
+            {t("details")}
           </summary>
           <div className="mt-2 grid gap-3 sm:grid-cols-2 [&>*]:min-w-0">
-            <JsonBlock title="Przed" value={entry.before} />
-            <JsonBlock title="Po" value={entry.after} />
+            <JsonBlock title={t("before")} value={entry.before} />
+            <JsonBlock title={t("after")} value={entry.after} />
           </div>
         </details>
       )}

@@ -1,6 +1,6 @@
 import { Link } from "@/i18n/navigation";
+import { useTranslations } from "next-intl";
 import {
-  RANGE_LABEL,
   filtersToQuery,
   type DemandFilters,
   type DemandRange,
@@ -41,11 +41,12 @@ function Chip({
 }
 
 export function Filters({ f }: { f: DemandFilters }) {
+  const t = useTranslations("Admin.chatbot");
   return (
     <section className="border-line mb-10 border p-4">
       <div className="flex flex-wrap items-center gap-2">
         <span className="label-tight text-ink-faint mr-1 text-[10px]">
-          Okres
+          {t("analytics.filters.period")}
         </span>
         {RANGES.map((r) => (
           <Chip
@@ -56,7 +57,7 @@ export function Filters({ f }: { f: DemandFilters }) {
               ...(r === "custom" ? {} : { od: null, do: null }),
             })}
           >
-            {RANGE_LABEL[r]}
+            {t(`analytics.ranges.${r}`)}
           </Chip>
         ))}
       </div>
@@ -75,7 +76,7 @@ export function Filters({ f }: { f: DemandFilters }) {
           )}
           <label className="block">
             <span className="label-tight text-ink-faint block text-[10px]">
-              Od
+              {t("analytics.filters.from")}
             </span>
             <input
               type="date"
@@ -86,7 +87,7 @@ export function Filters({ f }: { f: DemandFilters }) {
           </label>
           <label className="block">
             <span className="label-tight text-ink-faint block text-[10px]">
-              Do
+              {t("analytics.filters.to")}
             </span>
             <input
               type="date"
@@ -99,17 +100,17 @@ export function Filters({ f }: { f: DemandFilters }) {
             type="submit"
             className="label border-line-strong text-ink hover:border-ink hover:bg-ink/5 h-8 border px-4 text-[10px] transition-colors"
           >
-            Pokaż
+            {t("analytics.filters.show")}
           </button>
         </form>
       )}
 
       <div className="mt-4 flex flex-wrap items-center gap-2">
         <span className="label-tight text-ink-faint mr-1 text-[10px]">
-          Język
+          {t("analytics.filters.language")}
         </span>
         <Chip active={!f.locale} href={filtersToQuery(f, { jezyk: null })}>
-          Oba
+          {t("analytics.filters.both")}
         </Chip>
         <Chip
           active={f.locale === "pl"}
@@ -125,57 +126,57 @@ export function Filters({ f }: { f: DemandFilters }) {
         </Chip>
 
         <span className="label-tight text-ink-faint mr-1 ml-4 text-[10px]">
-          Rodzaj zapytania
+          {t("analytics.filters.queryKind")}
         </span>
         <Chip active={!f.kind} href={filtersToQuery(f, { rodzaj: null })}>
-          Wszystkie
+          {t("analytics.filters.kindAll")}
         </Chip>
         <Chip
           active={f.kind === "model"}
           href={filtersToQuery(f, { rodzaj: "model" })}
         >
-          Model
+          {t("analytics.filters.kindModel")}
         </Chip>
         <Chip
           active={f.kind === "brand"}
           href={filtersToQuery(f, { rodzaj: "brand" })}
         >
-          Marka
+          {t("analytics.filters.kindBrand")}
         </Chip>
         <Chip
           active={f.kind === "segment"}
           href={filtersToQuery(f, { rodzaj: "segment" })}
         >
-          Segment
+          {t("analytics.filters.kindSegment")}
         </Chip>
 
         <span className="label-tight text-ink-faint mr-1 ml-4 text-[10px]">
-          Rezerwacja
+          {t("analytics.filters.booking")}
         </span>
         <Chip
           active={f.booked == null}
           href={filtersToQuery(f, { rezerwacja: null })}
         >
-          Wszystkie
+          {t("analytics.filters.bookingAll")}
         </Chip>
         <Chip
           active={f.booked === true}
           href={filtersToQuery(f, { rezerwacja: "tak" })}
         >
-          Z rezerwacją
+          {t("analytics.filters.withBooking")}
         </Chip>
         <Chip
           active={f.booked === false}
           href={filtersToQuery(f, { rezerwacja: "nie" })}
         >
-          Bez rezerwacji
+          {t("analytics.filters.withoutBooking")}
         </Chip>
       </div>
 
       {(f.model || f.segment) && (
         <div className="mt-4 flex flex-wrap items-center gap-2">
           <span className="label-tight text-ink-faint mr-1 text-[10px]">
-            Zawężone do
+            {t("analytics.filters.narrowed")}
           </span>
           <Chip active href={filtersToQuery(f, { model: null, segment: null })}>
             {f.model ?? f.segment} ✕
@@ -184,9 +185,7 @@ export function Filters({ f }: { f: DemandFilters }) {
       )}
 
       <p className="text-ink-faint mt-4 text-xs">
-        Filtr „źródło” nie istnieje celowo: wszystkie rozmowy pochodzą z jednego
-        miejsca — widgetu na stronie. Rozwijana lista z jedną pozycją sugeruje
-        wybór, którego nie ma.
+        {t("analytics.filters.sourceNote")}
       </p>
     </section>
   );

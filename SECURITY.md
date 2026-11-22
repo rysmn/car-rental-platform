@@ -99,9 +99,12 @@ pickup fees), fleet CRUD (models + physical units), audit-log viewer.
 
 ## Open items (tracked)
 
-- **Per-IP login rate-limiting** — TODO. Account lockout is in place; add an IP-based
-  limiter on the login endpoint (and reuse it on public write endpoints) to blunt
-  distributed brute-force. Needs a small store (in-memory for one node, or DB/Redis).
+- **Login rate-limiting** — implemented (10 attempts / 5 min per client IP or per
+  e-mail, checked before the password in `admin/login/actions.ts` via `REGULY.logowanie`).
+  Account lockout (5 failures / 15 min) remains in place. Store is in-memory per process:
+  it resets on restart and is looser with several processes. Revisit with a shared store
+  (DB/Redis) before running more than one node. Public write endpoints still lack a
+  per-IP limit on login-like paths; not covered here.
 - **2FA (TOTP)** — schema field (`admins.totp_secret`) reserved; enrollment/verification
   deferred by decision (structure-for-later).
 

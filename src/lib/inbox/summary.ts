@@ -1,4 +1,5 @@
 import type { LeadReason, LeadStatus, RequestSource } from "@/lib/db/schema";
+import { pick, type Bilingual } from "@/lib/i18n-pick";
 import { REASON_LABEL, SOURCE_LABEL } from "./labels";
 
 /**
@@ -59,11 +60,23 @@ export type SummaryLine = { label: string; value: string };
  * wartość, której nie znamy, po prostu nie dostaje linii — zamiast wyświetlić
  * operatorowi surowe `strategic` albo pustą etykietę.
  */
-export const PARTNER_MODEL_LABEL: Record<string, string> = {
-  vehicle: "Partner pojazdowy — wnosi konkretny samochód",
-  fleet: "Inwestor flotowy — udział w rozwoju floty",
-  strategic: "Partner strategiczny — szersza współpraca",
-  unsure: "Do ustalenia — prosi o rozmowę",
+export const PARTNER_MODEL_LABEL: Record<string, Bilingual> = {
+  vehicle: {
+    pl: "Partner pojazdowy — wnosi konkretny samochód",
+    en: "Vehicle partner — brings a specific car",
+  },
+  fleet: {
+    pl: "Inwestor flotowy — udział w rozwoju floty",
+    en: "Fleet investor — a stake in growing the fleet",
+  },
+  strategic: {
+    pl: "Partner strategiczny — szersza współpraca",
+    en: "Strategic partner — broader cooperation",
+  },
+  unsure: {
+    pl: "Do ustalenia — prosi o rozmowę",
+    en: "To be agreed — asks for a conversation",
+  },
 };
 
 const dmy = (iso: string) => {
@@ -89,33 +102,53 @@ const dmy = (iso: string) => {
  * Puste `budget_kind` znaczy „na dobę" — tak wyglądały wszystkie wiersze
  * sprzed migracji 0039 i tak też były wtedy czytane.
  */
-export function formatBudgetPl(lead: {
-  budgetGrosze: number | null;
-  budgetMinGrosze: number | null;
-  budgetKind: string | null;
-  budgetCurrency: string | null;
-  budgetPlnPerEur: string | null;
-}): string | null {
+export function formatBudgetPl(
+  lead: {
+    budgetGrosze: number | null;
+    budgetMinGrosze: number | null;
+    budgetKind: string | null;
+    budgetCurrency: string | null;
+    budgetPlnPerEur: string | null;
+  },
+  locale: string,
+): string | null {
   const { budgetGrosze: max, budgetMinGrosze: min } = lead;
   if (max === null && min === null) return null;
+  const en = locale === "en";
 
-  const zl = (grosze: number) => `${Math.round(grosze / 100)} zł`;
-  const unit = lead.budgetKind === "total" ? "za całość" : "za dobę";
+  const zl = (grosze: number) =>
+    en ? `${Math.round(grosze / 100)} PLN` : `${Math.round(grosze / 100)} zł`;
+  const unit =
+    lead.budgetKind === "total"
+      ? en
+        ? "for the whole rental"
+        : "za całość"
+      : en
+        ? "per day"
+        : "za dobę";
 
   const amount =
     min !== null && max !== null
       ? `${zl(min)}–${zl(max)}`
       : max !== null
-        ? `do ${zl(max)}`
-        : `od ${zl(min as number)}`;
+        ? en
+          ? `up to ${zl(max)}`
+          : `do ${zl(max)}`
+        : en
+          ? `from ${zl(min as number)}`
+          : `od ${zl(min as number)}`;
 
   // Klient podał w euro: pokazujemy przelicznik, żeby liczba w złotych dała
   // się z jego liczbą pogodzić. Kurs tylko wtedy, gdy go zapisaliśmy.
   const euro =
     lead.budgetCurrency === "eur"
       ? lead.budgetPlnPerEur
-        ? ` · podane w EUR, kurs ${lead.budgetPlnPerEur}`
-        : " · podane w EUR"
+        ? en
+          ? ` · given in EUR, rate ${lead.budgetPlnPerEur}`
+          : ` · podane w EUR, kurs ${lead.budgetPlnPerEur}`
+        : en
+          ? " · given in EUR"
+          : " · podane w EUR"
       : "";
 
   return `${amount} ${unit}${euro}`;
@@ -128,32 +161,40 @@ export function formatBudgetPl(lead: {
  * Podsumowanie ma się czytać w trzy sekundy, a puste etykiety to trzy czwarte
  * wysokości karty poświęcone na powiedzenie, że nic nie wiemy.
  */
-export function summarise(lead: LeadFacts): SummaryLine[] {
+export function summarise(lead: LeadFacts, locale: string): SummaryLine[] {
   const lines: SummaryLine[] = [];
+  const en = locale === "en";
   const add = (label: string, value: string | null | undefined) => {
     if (value) lines.push({ label, value });
   };
 
-  add("Klient", lead.name);
-  add("Firma", lead.company);
-  add("Sprawa", lead.reason ? REASON_LABEL[lead.reason] : null);
+  add(en ? "Customer" : "Klient", lead.name);
+  add(en ? "Company" : "Firma", lead.company);
+  add(
+    en ? "Matter" : "Sprawa",
+    lead.reason ? pick(REASON_LABEL[lead.reason], locale) : null,
+  );
   /*
    * Model współpracy i zakres stoją TUŻ POD sprawą, a nie na końcu listy:
    * przy zgłoszeniu partnerskim to są dwie pierwsze rzeczy, które operator
    * musi wiedzieć, zanim oddzwoni. Puste nie zajmują miejsca — jak wszystko
    * inne w tym podsumowaniu.
    */
-  add("Model współpracy", PARTNER_MODEL_LABEL[lead.partnerModel ?? ""] ?? null);
-  add("Zakres", lead.investRange);
-  add("Temat", lead.subject);
-  add("Samochód", lead.car);
+  const partner = PARTNER_MODEL_LABEL[lead.partnerModel ?? ""];
+  add(
+    en ? "Partnership model" : "Model współpracy",
+    partner ? pick(partner, locale) : null,
+  );
+  add(en ? "Scope" : "Zakres", lead.investRange);
+  add(en ? "Topic" : "Temat", lead.subject);
+  add(en ? "Car" : "Samochód", lead.car);
 
   if (lead.dateFrom) {
     add(
-      "Termin",
+      en ? "Dates" : "Termin",
       lead.dateTo
         ? `${dmy(lead.dateFrom)} → ${dmy(lead.dateTo)}`
-        : `od ${dmy(lead.dateFrom)}`,
+        : `${en ? "from" : "od"} ${dmy(lead.dateFrom)}`,
     );
   }
 
@@ -168,27 +209,37 @@ export function summarise(lead: LeadFacts): SummaryLine[] {
    * co jest prawdą, i nie udaje pola formularza.
    */
   if (lead.location) {
-    lines.push({ label: "Odbiór i zwrot", value: lead.location });
+    lines.push({
+      label: en ? "Pick-up and return" : "Odbiór i zwrot",
+      value: lead.location,
+    });
   }
 
-  if (lead.seats !== null) add("Osoby", String(lead.seats));
-  add("Budżet", formatBudgetPl(lead));
+  if (lead.seats !== null) add(en ? "Passengers" : "Osoby", String(lead.seats));
+  add(en ? "Budget" : "Budżet", formatBudgetPl(lead, locale));
 
   const contact = [lead.phone, lead.email].filter(Boolean).join(" · ");
-  add("Kontakt", contact || null);
+  add(en ? "Contact" : "Kontakt", contact || null);
   /* Język oddzwonienia. Polski jest domyślny, więc wypisujemy tylko wyjątek. */
   if (lead.locale && lead.locale !== "pl") {
-    add("Język", lead.locale.toUpperCase());
+    add(en ? "Language" : "Język", lead.locale.toUpperCase());
   }
-  add("Rezerwacja", lead.reservationRef);
-  add("Kanał", SOURCE_LABEL[lead.source] ?? lead.source);
+  add(en ? "Reservation" : "Rezerwacja", lead.reservationRef);
+  add(
+    en ? "Channel" : "Kanał",
+    SOURCE_LABEL[lead.source] ? pick(SOURCE_LABEL[lead.source], locale) : lead.source,
+  );
 
   return lines;
 }
 
-/** To samo podsumowanie jako tekst — do treści powiadomienia e-mail. */
+/**
+ * To samo podsumowanie jako tekst — do treści powiadomienia e-mail do zespołu.
+ * Mail dla obsługi zostaje po polsku (decyzja: wewnętrzne powiadomienie,
+ * nie zapis w panelu), dlatego locale jest tu na sztywno `pl`.
+ */
 export function summariseAsText(lead: LeadFacts): string {
-  const body = summarise(lead)
+  const body = summarise(lead, "pl")
     .map((l) => `${l.label}: ${l.value}`)
     .join("\n");
   return lead.question ? `${body}\n\nPytanie klienta:\n${lead.question}` : body;
@@ -207,6 +258,7 @@ export function subjectFor(lead: {
   subject: string | null;
 }): string {
   if (lead.subject) return lead.subject;
-  const what = lead.reason ? REASON_LABEL[lead.reason] : "Zapytanie";
+  // Temat e-maila do zespołu — po polsku, jak treść powiadomienia.
+  const what = lead.reason ? pick(REASON_LABEL[lead.reason], "pl") : "Zapytanie";
   return lead.car ? `${what} — ${lead.car}` : what;
 }

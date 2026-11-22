@@ -50,7 +50,6 @@ import {
 } from "@/lib/format";
 import { BookingSummary } from "@/components/booking/BookingSummary";
 import { Money } from "@/components/currency/Money";
-import { CurrencyNote } from "@/components/currency/CurrencyNote";
 import { cn } from "@/lib/utils";
 import type { FleetCar } from "@/lib/fleet/types";
 import type { DepositVariant, FeeCatalog } from "@/lib/booking/types";
@@ -1024,7 +1023,6 @@ export function BookingPanel({
             sumie, a nie gdzieś na dole strony. Renderuje się tylko wtedy, gdy
             czyta ceny w euro — w złotówkach nie ma czego zastrzegać.
           */}
-          <CurrencyNote note={tn("currencyNote")} className="pt-1" />
         </div>
       )}
 

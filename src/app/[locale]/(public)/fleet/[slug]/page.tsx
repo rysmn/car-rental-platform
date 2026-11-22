@@ -38,7 +38,6 @@ import {
 import { getFreeUnitsByModel } from "@/lib/booking/availability";
 import { getVisiblePublicModelStates } from "@/lib/fleet/status-repo";
 import { Money, MoneyRange } from "@/components/currency/Money";
-import { CurrencyNote } from "@/components/currency/CurrencyNote";
 import { priceOnRequestLabel } from "@/lib/format";
 import { siteConfig } from "@/lib/config/site";
 import { getSetting } from "@/lib/admin/settings";
@@ -678,7 +677,6 @@ export default async function CarDetailPage({
 
             {/* Pełne zdanie o EUR — tylko wtedy, gdy klient naprawdę czyta
                 ceny w euro. W złotówkach nie ma czego zastrzegać. */}
-            <CurrencyNote note={tn("currencyNote")} className="mt-3" />
           </Reveal>
 
           {/*

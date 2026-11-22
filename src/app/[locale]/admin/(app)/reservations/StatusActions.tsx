@@ -2,22 +2,15 @@
 
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
+import { useLocale, useTranslations } from "next-intl";
 import { updateReservationStatus } from "./actions";
 import {
   ACTION_LABEL,
   STATUS_TRANSITIONS,
   type ReservationStatus,
 } from "@/lib/admin/reservation-status";
+import { pickFrom } from "@/lib/i18n-pick";
 import { cn } from "@/lib/utils";
-
-const ERR: Record<string, string> = {
-  overlap:
-    "Termin nakłada się na istniejącą potwierdzoną rezerwację tego auta.",
-  illegal: "Niedozwolona zmiana statusu.",
-  not_found: "Nie znaleziono rezerwacji.",
-  invalid: "Nieprawidłowe dane.",
-  server: "Wystąpił błąd. Spróbuj ponownie.",
-};
 
 export function StatusActions({
   id,
@@ -26,6 +19,8 @@ export function StatusActions({
   id: string;
   status: ReservationStatus;
 }) {
+  const t = useTranslations("Admin.reservations.statusActions");
+  const locale = useLocale();
   const router = useRouter();
   const [pending, start] = useTransition();
   const [error, setError] = useState<string | null>(null);
@@ -33,6 +28,14 @@ export function StatusActions({
   // sends it. Every other transition stays a single click.
   const [rejecting, setRejecting] = useState(false);
   const [reason, setReason] = useState("");
+
+  const ERR: Record<string, string> = {
+    overlap: t("errOverlap"),
+    illegal: t("errIllegal"),
+    not_found: t("errNotFound"),
+    invalid: t("errInvalid"),
+    server: t("errServer"),
+  };
   /*
     `?? []` NIE jest tu zamiataniem problemu pod dywan — prawdziwa naprawa
     stoi w `reservation-status.ts`, gdzie doszedł brakujący status i gdzie
@@ -83,7 +86,7 @@ export function StatusActions({
               to === "rejected" && rejecting && "border-white bg-white/5",
             )}
           >
-            {ACTION_LABEL[to]}
+            {pickFrom(ACTION_LABEL, to, locale)}
           </button>
         ))}
       </div>
@@ -94,7 +97,7 @@ export function StatusActions({
             htmlFor="reject-reason"
             className="label-tight text-ink-faint text-[10px]"
           >
-            Powód odrzucenia (trafi do wiadomości e-mail dla klienta)
+            {t("rejectReason")}
           </label>
           <textarea
             id="reject-reason"
@@ -102,12 +105,10 @@ export function StatusActions({
             onChange={(e) => setReason(e.target.value)}
             rows={3}
             maxLength={1000}
-            placeholder="np. Wybrany termin jest już niedostępny."
+            placeholder={t("rejectPlaceholder")}
             className="border-line-strong mt-2 w-full border bg-surface-1 px-3 py-2 text-sm text-ink"
           />
-          <p className="text-ink-faint mt-1 text-[11px]">
-            Możesz zostawić puste — klient otrzyma wtedy ogólną wiadomość.
-          </p>
+          <p className="text-ink-faint mt-1 text-[11px]">{t("rejectHint")}</p>
           <div className="mt-3 flex flex-wrap items-center gap-3">
             <button
               type="button"
@@ -115,14 +116,14 @@ export function StatusActions({
               onClick={() => act("rejected", reason)}
               className="label bg-red hover:bg-red-hover inline-flex h-10 items-center px-5 text-xs text-white transition-colors disabled:opacity-50"
             >
-              {pending ? "Wysyłanie…" : "Odrzuć i powiadom klienta"}
+              {pending ? t("sending") : t("rejectAndNotify")}
             </button>
             <button
               type="button"
               onClick={() => setRejecting(false)}
               className="text-ink-faint text-xs transition-colors hover:text-ink"
             >
-              Anuluj
+              {t("cancel")}
             </button>
           </div>
         </div>

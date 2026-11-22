@@ -1,6 +1,10 @@
+import { useLocale, useTranslations } from "next-intl";
 import { Link } from "@/i18n/navigation";
 import { formatPln } from "@/lib/format";
-import { CostBreakdown } from "@/components/admin/economics-charts";
+import {
+  CostBreakdown,
+  intlLocale,
+} from "@/components/admin/economics-charts";
 import {
   EXPENSE_GROUP_OF,
   type ExpenseCategory,
@@ -17,6 +21,7 @@ import type {
   WindowMetrics,
 } from "@/lib/admin/insights";
 import { delta } from "@/lib/admin/insights";
+import { pick } from "@/lib/i18n-pick";
 
 /** "+12,4%" against the previous period, coloured by direction, or nothing. */
 function Delta({
@@ -29,6 +34,7 @@ function Delta({
   /** Costs going up is bad news; revenue going up is good. */
   invert?: boolean;
 }) {
+  const locale = useLocale();
   if (before == null) return null;
   const d = delta(now, before);
   if (d == null) return <span className="text-ink-faint text-[11px]">—</span>;
@@ -39,7 +45,10 @@ function Delta({
       className={`text-[11px] tabular-nums ${good ? "text-emerald-400" : "text-red"}`}
     >
       {rounded > 0 ? "+" : rounded < 0 ? "−" : ""}
-      {Math.abs(rounded).toLocaleString("pl-PL", { maximumFractionDigits: 1 })}%
+      {Math.abs(rounded).toLocaleString(intlLocale(locale), {
+        maximumFractionDigits: 1,
+      })}
+      %
     </span>
   );
 }
@@ -77,10 +86,13 @@ const OCCUPANCY_DOT: Record<CarOccupancy["level"], string> = {
 
 const pct = (v: number) => `${Math.round(v * 100)}%`;
 
-/** "2026-08" → "sie" — twelve of these have to fit on one line. */
-function shortMonth(month: string): string {
+/** "2026-08" → "Aug" / "sie" — twelve of these have to fit on one line. */
+function shortMonth(month: string, locale: string): string {
   const [y, m] = month.split("-").map(Number);
-  return new Intl.DateTimeFormat("pl-PL", { month: "short" })
+  return new Intl.DateTimeFormat(intlLocale(locale), {
+    month: "short",
+    timeZone: "UTC",
+  })
     .format(new Date(Date.UTC(y, m - 1, 1)))
     .replace(".", "");
 }
@@ -106,6 +118,10 @@ export function InsightSections({
   mix: CustomerMix;
   highlights: Highlight[];
 }) {
+  const t = useTranslations("Admin.analytics");
+  const locale = useLocale();
+  const money = (grosze: number) => formatPln(grosze, locale);
+
   const byCategory: Partial<Record<ExpenseCategory, number>> = {};
   const byGroup: Record<ExpenseGroup, number> = {
     wear: 0,
@@ -126,29 +142,32 @@ export function InsightSections({
     <>
       {/* ── Headline, with the comparison ────────────────────────────────── */}
       <div className="border-line bg-line mt-6 grid grid-cols-2 gap-px border lg:grid-cols-4">
-        <Tile label="Przychód" value={formatPln(metrics.revenueGrosze, "pl")}>
+        <Tile label={t("sections.revenue")} value={money(metrics.revenueGrosze)}>
           <Delta
             now={metrics.revenueGrosze}
             before={before?.revenueGrosze ?? null}
           />
         </Tile>
-        <Tile label="Koszty" value={formatPln(metrics.expenseGrosze, "pl")}>
+        <Tile label={t("sections.costs")} value={money(metrics.expenseGrosze)}>
           <Delta
             now={metrics.expenseGrosze}
             before={before?.expenseGrosze ?? null}
             invert
           />
         </Tile>
-        <Tile label="Wynik" value={formatPln(metrics.marginGrosze, "pl")}>
+        <Tile label={t("sections.result")} value={money(metrics.marginGrosze)}>
           <Delta
             now={metrics.marginGrosze}
             before={before?.marginGrosze ?? null}
           />
         </Tile>
         <Tile
-          label="Obłożenie"
+          label={t("sections.occupancy")}
           value={pct(metrics.occupancy)}
-          hint={`${metrics.daysRented} z ${metrics.carDays} dni`}
+          hint={t("sections.daysOfTotal", {
+            rented: metrics.daysRented,
+            total: metrics.carDays,
+          })}
         >
           <Delta now={metrics.occupancy} before={before?.occupancy ?? null} />
         </Tile>
@@ -156,18 +175,18 @@ export function InsightSections({
 
       <div className="border-line bg-line mt-px grid grid-cols-2 gap-px border lg:grid-cols-4">
         <Tile
-          label="Liczba wynajmów"
-          value={String(metrics.rentals)}
-          hint="rozpoczętych w okresie"
+          label={t("sections.rentals")}
+          value={metrics.rentals.toLocaleString(intlLocale(locale))}
+          hint={t("sections.rentalsHint")}
         >
           <Delta now={metrics.rentals} before={before?.rentals ?? null} />
         </Tile>
         <Tile
-          label="Średnia wartość rezerwacji"
+          label={t("sections.avgBooking")}
           value={
             metrics.avgBookingValueGrosze == null
               ? "—"
-              : formatPln(metrics.avgBookingValueGrosze, "pl")
+              : money(metrics.avgBookingValueGrosze)
           }
         >
           {metrics.avgBookingValueGrosze != null && (
@@ -178,11 +197,11 @@ export function InsightSections({
           )}
         </Tile>
         <Tile
-          label="Średnia cena za dobę"
+          label={t("sections.avgDailyRate")}
           value={
             metrics.avgDailyRateGrosze == null
               ? "—"
-              : formatPln(metrics.avgDailyRateGrosze, "pl")
+              : money(metrics.avgDailyRateGrosze)
           }
         >
           {metrics.avgDailyRateGrosze != null && (
@@ -193,46 +212,54 @@ export function InsightSections({
           )}
         </Tile>
         <Tile
-          label="Średnia długość wynajmu"
+          label={t("sections.avgLength")}
           value={
             metrics.avgRentalDays == null
               ? "—"
-              : `${metrics.avgRentalDays.toLocaleString("pl-PL", { maximumFractionDigits: 1 })} dnia`
+              : t("units.days", {
+                  count:
+                    Math.round(metrics.avgRentalDays * 10) / 10,
+                })
           }
         />
       </div>
 
       <div className="border-line bg-line mt-px grid grid-cols-2 gap-px border lg:grid-cols-4">
         <Tile
-          label="Dni wynajęte"
+          label={t("sections.daysRented")}
           value={String(metrics.daysRented)}
-          hint={`niewynajęte: ${metrics.daysIdle}`}
+          hint={t("sections.idleHint", { count: metrics.daysIdle })}
         />
         <Tile
-          label="Dni zablokowane"
+          label={t("sections.daysBlocked")}
           value={String(metrics.daysBlocked)}
-          hint="serwis, przygotowanie"
+          hint={t("sections.blockedHint")}
         />
         <Tile
-          label="Przejechano"
+          label={t("sections.driven")}
           value={
             metrics.kmDriven > 0
-              ? `${metrics.kmDriven.toLocaleString("pl-PL")} km`
+              ? t("units.km", { km: metrics.kmDriven })
               : "—"
           }
-          hint={metrics.kmDriven > 0 ? undefined : "brak odczytów licznika"}
+          hint={
+            metrics.kmDriven > 0 ? undefined : t("sections.noOdometer")
+          }
         />
         <Tile
-          label="Zysk na kilometr"
+          label={t("sections.profitPerKm")}
           value={
             metrics.profitPerKmGrosze == null
               ? "—"
-              : formatPln(metrics.profitPerKmGrosze, "pl")
+              : money(metrics.profitPerKmGrosze)
           }
           hint={
             metrics.revenuePerKmGrosze == null
               ? undefined
-              : `przychód ${formatPln(metrics.revenuePerKmGrosze, "pl")} · koszt ${formatPln(metrics.costPerKmGrosze ?? 0, "pl")}`
+              : t("sections.perKmHint", {
+                  revenue: money(metrics.revenuePerKmGrosze),
+                  cost: money(metrics.costPerKmGrosze ?? 0),
+                })
           }
         />
       </div>
@@ -240,16 +267,16 @@ export function InsightSections({
       {/* ── Best and worst ───────────────────────────────────────────────── */}
       {highlights.length > 0 && (
         <section className="mt-12">
-          <h2 className="label text-ink text-xs">TOP i wymaga uwagi</h2>
+          <h2 className="label text-ink text-xs">{t("sections.highlights")}</h2>
           <div className="border-line bg-line mt-4 grid grid-cols-2 gap-px border lg:grid-cols-5">
             {highlights.map((h) => (
-              <div key={h.label} className="bg-void p-5">
+              <div key={h.label.en} className="bg-void p-5">
                 <p className="label-tight text-ink-faint text-[10px]">
-                  {h.label}
+                  {pick(h.label, locale)}
                 </p>
                 <p className="text-ink mt-3 text-sm">{h.subject}</p>
                 <p className="font-heading text-ink mt-1 text-lg font-bold tabular-nums">
-                  {h.value}
+                  {pick(h.value, locale)}
                 </p>
               </div>
             ))}
@@ -260,23 +287,34 @@ export function InsightSections({
       {/* ── Occupancy per car ────────────────────────────────────────────── */}
       <section className="mt-12">
         <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
-          <h2 className="label text-ink text-xs">Obłożenie floty</h2>
-          <span className="text-ink-faint text-[11px]">
-            🟢 powyżej 75% · 🟡 50–75% · 🔴 poniżej 50%
+          <h2 className="label text-ink text-xs">{t("sections.fleetOccupancy")}</h2>
+          <span className="text-ink-faint flex flex-wrap items-center gap-x-3 gap-y-1 text-[11px]">
+            <span className="flex items-center gap-1.5">
+              <span aria-hidden className="rounded-pill h-2 w-2 bg-emerald-400" />
+              {t("sections.legendGood")}
+            </span>
+            <span className="flex items-center gap-1.5">
+              <span aria-hidden className="rounded-pill h-2 w-2 bg-amber-400" />
+              {t("sections.legendWatch")}
+            </span>
+            <span className="flex items-center gap-1.5">
+              <span aria-hidden className="rounded-pill bg-red h-2 w-2" />
+              {t("sections.legendBad")}
+            </span>
           </span>
         </div>
         <div className="overflow-x-auto">
           <table className="w-full min-w-[720px] border-collapse text-left text-sm">
             <thead>
               <tr className="border-line text-ink-faint border-y">
-                <th className="label-tight py-3 pr-6 text-[10px]">Auto</th>
-                <th className="label-tight py-3 pr-6 text-[10px]">Obłożenie</th>
+                <th className="label-tight py-3 pr-6 text-[10px]">{t("sections.col.car")}</th>
+                <th className="label-tight py-3 pr-6 text-[10px]">{t("sections.col.occupancy")}</th>
                 <th className="label-tight py-3 pr-6 text-[10px]">
-                  Dni wynajęte
+                  {t("sections.col.daysRented")}
                 </th>
-                <th className="label-tight py-3 pr-6 text-[10px]">Przychód</th>
-                <th className="label-tight py-3 pr-6 text-[10px]">Koszty</th>
-                <th className="label-tight py-3 text-[10px]">Wynik</th>
+                <th className="label-tight py-3 pr-6 text-[10px]">{t("sections.col.revenue")}</th>
+                <th className="label-tight py-3 pr-6 text-[10px]">{t("sections.col.costs")}</th>
+                <th className="label-tight py-3 text-[10px]">{t("sections.col.result")}</th>
               </tr>
             </thead>
             <tbody>
@@ -317,17 +355,17 @@ export function InsightSections({
                     {c.daysRented} / {window.days}
                   </td>
                   <td className="text-silver py-3 pr-6 whitespace-nowrap tabular-nums">
-                    {formatPln(c.revenueGrosze, "pl")}
+                    {money(c.revenueGrosze)}
                   </td>
                   <td className="text-silver py-3 pr-6 whitespace-nowrap tabular-nums">
-                    {formatPln(c.expenseGrosze, "pl")}
+                    {money(c.expenseGrosze)}
                   </td>
                   <td
                     className={`py-3 whitespace-nowrap tabular-nums ${
                       c.marginGrosze >= 0 ? "text-silver" : "text-red"
                     }`}
                   >
-                    {formatPln(c.marginGrosze, "pl")}
+                    {money(c.marginGrosze)}
                   </td>
                 </tr>
               ))}
@@ -338,29 +376,23 @@ export function InsightSections({
 
       {/* ── Where the money goes ─────────────────────────────────────────── */}
       <section className="mt-12">
-        <h2 className="label text-ink text-xs">Gdzie wydajemy pieniądze</h2>
-        <p className="text-ink-faint mt-1 text-xs">
-          Koszty z wybranego okresu, rozłożone na dni — roczna polisa liczy się
-          jako 1/365 dziennie, nie jako jeden skok. Wpisujesz je przy
-          egzemplarzu: Flota → auto → Wydatki (jednorazowe) i Koszty cykliczne
-          (leasing, OC, parking).
-        </p>
+        <h2 className="label text-ink text-xs">{t("sections.costsTitle")}</h2>
+        <p className="text-ink-faint mt-1 text-xs">{t("sections.costsIntro")}</p>
         <CostBreakdown byGroup={byGroup} byCategory={byCategory} />
       </section>
 
       {/* ── Rhythm ───────────────────────────────────────────────────────── */}
       <section className="mt-12 grid gap-10 lg:grid-cols-2">
         <div>
-          <h2 className="label text-ink text-xs">Dni tygodnia</h2>
+          <h2 className="label text-ink text-xs">{t("sections.weekdays")}</h2>
           <p className="text-ink-faint mt-1 mb-4 text-xs">
-            Obłożenie w wybranym okresie, dzień po dniu tygodnia. To jest
-            podstawa pod cenę weekendową.
+            {t("sections.weekdaysIntro")}
           </p>
           <ul className="flex flex-col gap-2">
             {weekdays.map((d) => (
               <li key={d.weekday} className="flex items-center gap-3">
                 <span className="text-ink-faint w-24 shrink-0 text-xs">
-                  {d.label}
+                  {pick(d.label, locale)}
                 </span>
                 <span className="bg-line h-3 flex-1">
                   <span
@@ -379,10 +411,9 @@ export function InsightSections({
         </div>
 
         <div>
-          <h2 className="label text-ink text-xs">Sezonowość — 12 miesięcy</h2>
+          <h2 className="label text-ink text-xs">{t("sections.season")}</h2>
           <p className="text-ink-faint mt-1 mb-4 text-xs">
-            Obłożenie miesiąc po miesiącu. Nabiera wartości po pełnym roku —
-            wtedy widać, czy luty jest słaby, czy tylko był.
+            {t("sections.seasonIntro")}
           </p>
           <ul className="flex h-40 items-end gap-1">
             {season.map((s) => (
@@ -391,14 +422,18 @@ export function InsightSections({
                 className="flex flex-1 flex-col items-center gap-1"
               >
                 <span
-                  title={`${s.month} — ${pct(s.occupancy)} · ${formatPln(s.revenueGrosze, "pl")}`}
+                  title={t("sections.seasonTooltip", {
+                    month: s.month,
+                    occupancy: pct(s.occupancy),
+                    revenue: money(s.revenueGrosze),
+                  })}
                   className="bg-red w-full"
                   style={{
                     height: `${Math.max((s.occupancy / peakSeason) * 100, s.occupancy > 0 ? 3 : 1)}%`,
                   }}
                 />
                 <span className="text-ink-faint text-[9px]">
-                  {shortMonth(s.month)}
+                  {shortMonth(s.month, locale)}
                 </span>
               </li>
             ))}
@@ -408,35 +443,33 @@ export function InsightSections({
 
       {/* ── Who is renting ───────────────────────────────────────────────── */}
       <section className="mt-12">
-        <h2 className="label text-ink text-xs">Nowi i powracający</h2>
+        <h2 className="label text-ink text-xs">{t("sections.mix")}</h2>
         <div className="border-line bg-line mt-4 grid gap-px border sm:grid-cols-3">
           <Tile
-            label="Nowi klienci"
+            label={t("sections.newCustomers")}
             value={String(mix.newCustomers)}
-            hint="pierwszy wynajem"
+            hint={t("sections.newCustomersHint")}
           />
           <Tile
-            label="Powracający"
+            label={t("sections.returning")}
             value={String(mix.returning)}
             hint={
               mix.newCustomers + mix.returning > 0
-                ? `${Math.round(
-                    (mix.returning / (mix.newCustomers + mix.returning)) * 100,
-                  )}% wynajmów`
+                ? t("sections.returningHint", {
+                    percent: Math.round(
+                      (mix.returning / (mix.newCustomers + mix.returning)) * 100,
+                    ),
+                  })
                 : undefined
             }
           />
           <Tile
-            label="Bez przypisania"
+            label={t("sections.unknown")}
             value={String(mix.unknown)}
-            hint="rezerwacje sprzed kartoteki"
+            hint={t("sections.unknownHint")}
           />
         </div>
-        <p className="text-ink-faint mt-3 text-[11px]">
-          Rozpoznawanie po numerze telefonu z kartoteki, nie po nazwisku — dwóch
-          Kowalskich to dwie osoby, a jedna osoba pisze swoje nazwisko na trzy
-          sposoby.
-        </p>
+        <p className="text-ink-faint mt-3 text-[11px]">{t("sections.mixNote")}</p>
       </section>
     </>
   );

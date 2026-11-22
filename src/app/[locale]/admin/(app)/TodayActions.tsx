@@ -2,6 +2,7 @@
 
 import { useTransition, useState } from "react";
 import { useRouter } from "next/navigation";
+import { useTranslations } from "next-intl";
 import { updateReservationStatus } from "./reservations/actions";
 
 /**
@@ -30,6 +31,7 @@ export function TodayActions({
   kind: "pickup" | "return";
 }) {
   const router = useRouter();
+  const t = useTranslations("Admin.dashboard");
   const [pending, startTransition] = useTransition();
   const [error, setError] = useState<string | null>(null);
 
@@ -42,7 +44,7 @@ export function TodayActions({
         }
         className="label-tight border-line-strong hover:border-ink hover:bg-ink/5 tap inline-flex h-8 items-center border px-3 text-[10px] whitespace-nowrap transition-colors"
       >
-        Wydaj →
+        {t("today.handOver")}
       </button>
     );
   }
@@ -56,7 +58,7 @@ export function TodayActions({
         }
         className="label-tight border-line-strong hover:border-ink hover:bg-ink/5 tap inline-flex h-8 items-center border px-3 text-[10px] whitespace-nowrap transition-colors"
       >
-        Zwrot →
+        {t("today.returnAction")}
       </button>
       <button
         type="button"
@@ -68,12 +70,12 @@ export function TodayActions({
               to: "completed",
             });
             if (res.ok) router.refresh();
-            else setError("Nie udało się");
+            else setError(t("today.failed"));
           })
         }
         className="label-tight bg-red hover:bg-red-hover inline-flex h-8 items-center px-3 text-[10px] whitespace-nowrap text-white transition-colors disabled:opacity-60"
       >
-        {pending ? "…" : "Przyjmij"}
+        {pending ? "…" : t("today.accept")}
       </button>
       {error && <span className="text-red text-[10px]">{error}</span>}
     </span>

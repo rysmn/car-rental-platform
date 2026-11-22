@@ -1,6 +1,7 @@
 "use client";
 
 import { useActionState, useState, useTransition } from "react";
+import { useLocale, useTranslations } from "next-intl";
 import {
   createBusinessExpense,
   updateBusinessExpense,
@@ -10,10 +11,10 @@ import {
 import type { BusinessExpenseRow } from "@/lib/admin/business-expenses";
 import {
   BUSINESS_EXPENSE_GROUPS,
-  BUSINESS_EXPENSE_LABEL,
   type BusinessExpenseCategory,
 } from "@/lib/admin/business-expense-options";
-import { formatPln, formatDatePl } from "@/lib/format";
+import { formatPln } from "@/lib/format";
+import { formatIsoDate } from "./date-format";
 
 const inputCls =
   "h-10 w-full border border-line-strong bg-surface-1 px-3 text-sm text-ink placeholder:text-ink-faint";
@@ -26,9 +27,10 @@ function todayValue(): string {
 }
 
 function Feedback({ state }: { state: FormResult | null }) {
+  const t = useTranslations("Admin.finance");
   if (!state) return null;
   if (state.ok)
-    return <span className="text-xs text-emerald-400">Zapisano ✓</span>;
+    return <span className="text-xs text-emerald-400">{t("actions.saved")}</span>;
   return <span className="text-red text-xs">{state.error}</span>;
 }
 
@@ -39,19 +41,20 @@ function Feedback({ state }: { state: FormResult | null }) {
  * operator learns while entering costs is the shape they later read them in.
  */
 function CategorySelect({ value }: { value?: BusinessExpenseCategory }) {
+  const t = useTranslations("Admin.finance");
   return (
     <label className="flex flex-col gap-1">
-      <span className={labelCls}>Rodzaj *</span>
+      <span className={labelCls}>{t("form.kind")}</span>
       <select
         name="category"
         defaultValue={value ?? "ads_google"}
         className={inputCls}
       >
         {BUSINESS_EXPENSE_GROUPS.map((g) => (
-          <optgroup key={g.key} label={g.label}>
+          <optgroup key={g.key} label={t(`groups.${g.key}`)}>
             {g.categories.map((c) => (
               <option key={c} value={c}>
-                {BUSINESS_EXPENSE_LABEL[c]}
+                {t(`categories.${c}`)}
               </option>
             ))}
           </optgroup>
@@ -62,22 +65,23 @@ function CategorySelect({ value }: { value?: BusinessExpenseCategory }) {
 }
 
 function ExpenseFields({ expense }: { expense?: BusinessExpenseRow }) {
+  const t = useTranslations("Admin.finance");
   return (
     <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
       <CategorySelect value={expense?.category} />
       <label className="flex flex-col gap-1">
-        <span className={labelCls}>Kwota (zł) *</span>
+        <span className={labelCls}>{t("form.amount")}</span>
         <input
           name="amount"
           inputMode="decimal"
           required
           defaultValue={expense ? (expense.amountGrosze / 100).toFixed(2) : ""}
-          placeholder="450,00"
+          placeholder={t("form.amountPlaceholder")}
           className={inputCls}
         />
       </label>
       <label className="flex flex-col gap-1">
-        <span className={labelCls}>Data *</span>
+        <span className={labelCls}>{t("form.date")}</span>
         <input
           name="incurredOn"
           type="date"
@@ -87,7 +91,7 @@ function ExpenseFields({ expense }: { expense?: BusinessExpenseRow }) {
         />
       </label>
       <label className="flex flex-col gap-1">
-        <span className={labelCls}>Kontrahent</span>
+        <span className={labelCls}>{t("form.vendor")}</span>
         <input
           name="vendor"
           defaultValue={expense?.vendor ?? ""}
@@ -99,7 +103,7 @@ function ExpenseFields({ expense }: { expense?: BusinessExpenseRow }) {
           spread over the days it buys — a year of hosting then shows as a
           twelfth a month instead of one cliff that distorts every comparison. */}
       <label className="flex flex-col gap-1">
-        <span className={labelCls}>Okres od (opcjonalnie)</span>
+        <span className={labelCls}>{t("expenses.periodStart")}</span>
         <input
           name="periodStart"
           type="date"
@@ -108,7 +112,7 @@ function ExpenseFields({ expense }: { expense?: BusinessExpenseRow }) {
         />
       </label>
       <label className="flex flex-col gap-1">
-        <span className={labelCls}>Okres do</span>
+        <span className={labelCls}>{t("expenses.periodEnd")}</span>
         <input
           name="periodEnd"
           type="date"
@@ -118,8 +122,8 @@ function ExpenseFields({ expense }: { expense?: BusinessExpenseRow }) {
       </label>
       <label className="flex flex-col gap-1">
         <span className={labelCls}>
-          Faktura (PDF, JPG, PNG)
-          {expense?.invoicePath ? " — wybierz plik, by podmienić" : ""}
+          {t("expenses.invoice")}
+          {expense?.invoicePath ? t("expenses.invoiceReplace") : ""}
         </span>
         <input
           type="file"
@@ -129,11 +133,11 @@ function ExpenseFields({ expense }: { expense?: BusinessExpenseRow }) {
         />
       </label>
       <label className="flex flex-col gap-1">
-        <span className={labelCls}>Opis</span>
+        <span className={labelCls}>{t("form.note")}</span>
         <input
           name="note"
           defaultValue={expense?.note ?? ""}
-          placeholder="Kampania sierpień, faktura 12/2026"
+          placeholder={t("expenses.notePlaceholder")}
           className={inputCls}
         />
       </label>
@@ -142,6 +146,8 @@ function ExpenseFields({ expense }: { expense?: BusinessExpenseRow }) {
 }
 
 function ExpenseRow({ expense }: { expense: BusinessExpenseRow }) {
+  const t = useTranslations("Admin.finance");
+  const locale = useLocale();
   const [state, action, pending] = useActionState(updateBusinessExpense, null);
   const [editing, setEditing] = useState(false);
   const [deleting, startDelete] = useTransition();
@@ -163,13 +169,13 @@ function ExpenseRow({ expense }: { expense: BusinessExpenseRow }) {
     return (
       <div className="border-line/60 flex flex-wrap items-baseline gap-x-4 gap-y-1 border-b py-3 last:border-0">
         <span className="text-ink-faint w-20 shrink-0 text-xs tabular-nums">
-          {formatDatePl(expense.incurredOn)}
+          {formatIsoDate(expense.incurredOn, locale)}
         </span>
         <span className="text-ink min-w-[9rem] text-sm">
-          {BUSINESS_EXPENSE_LABEL[expense.category]}
+          {t(`categories.${expense.category}`)}
         </span>
         <span className="text-ink text-sm tabular-nums">
-          {formatPln(expense.amountGrosze, "pl")}
+          {formatPln(expense.amountGrosze, locale)}
         </span>
         {expense.vendor && (
           <span className="text-silver text-xs">{expense.vendor}</span>
@@ -183,18 +189,18 @@ function ExpenseRow({ expense }: { expense: BusinessExpenseRow }) {
             rel="noopener noreferrer"
             className="text-silver hover:text-ink text-xs underline underline-offset-2"
           >
-            faktura
+            {t("expenses.invoiceLink")}
           </a>
         )}
         {expense.recurringId && (
           <span className="border-line text-ink-faint border px-1.5 text-[10px]">
-            abonament
+            {t("expenses.recurringBadge")}
           </span>
         )}
         {expense.periodStart && expense.periodEnd && (
           <span className="text-ink-faint text-xs tabular-nums">
-            {formatDatePl(expense.periodStart)}–
-            {formatDatePl(expense.periodEnd)}
+            {formatIsoDate(expense.periodStart, locale)}–
+            {formatIsoDate(expense.periodEnd, locale)}
           </span>
         )}
         {expense.note && (
@@ -206,7 +212,7 @@ function ExpenseRow({ expense }: { expense: BusinessExpenseRow }) {
             onClick={() => setEditing(true)}
             className="text-ink-faint hover:text-ink tap text-xs"
           >
-            Edytuj
+            {t("actions.edit")}
           </button>
           {confirm ? (
             <>
@@ -216,14 +222,14 @@ function ExpenseRow({ expense }: { expense: BusinessExpenseRow }) {
                 disabled={deleting}
                 className="text-red text-xs disabled:opacity-50"
               >
-                {deleting ? "Usuwanie…" : "Na pewno?"}
+                {deleting ? t("actions.deleting") : t("actions.confirmDelete")}
               </button>
               <button
                 type="button"
                 onClick={() => setConfirm(false)}
                 className="text-ink-faint hover:text-ink tap text-xs"
               >
-                Anuluj
+                {t("actions.cancel")}
               </button>
             </>
           ) : (
@@ -232,7 +238,7 @@ function ExpenseRow({ expense }: { expense: BusinessExpenseRow }) {
               onClick={() => setConfirm(true)}
               className="text-ink-faint hover:text-red tap text-xs"
             >
-              Usuń
+              {t("actions.delete")}
             </button>
           )}
         </span>
@@ -257,14 +263,14 @@ function ExpenseRow({ expense }: { expense: BusinessExpenseRow }) {
           disabled={pending}
           className="label border-line-strong text-ink hover:border-ink hover:bg-ink/5 inline-flex h-9 items-center border px-4 text-xs transition-colors disabled:opacity-50"
         >
-          {pending ? "Zapisywanie…" : "Zapisz"}
+          {pending ? t("actions.saving") : t("actions.save")}
         </button>
         <button
           type="button"
           onClick={() => setEditing(false)}
           className="text-ink-faint hover:text-ink tap text-xs"
         >
-          Zamknij
+          {t("actions.close")}
         </button>
         <Feedback state={state} />
       </div>
@@ -273,6 +279,7 @@ function ExpenseRow({ expense }: { expense: BusinessExpenseRow }) {
 }
 
 function AddExpense() {
+  const t = useTranslations("Admin.finance");
   const [state, action, pending] = useActionState(createBusinessExpense, null);
   const [open, setOpen] = useState(false);
 
@@ -283,7 +290,7 @@ function AddExpense() {
         onClick={() => setOpen(true)}
         className="label bg-red hover:bg-red-hover mt-4 inline-flex h-10 items-center px-5 text-xs text-white transition-colors"
       >
-        + Dodaj koszt
+        {t("expenses.add")}
       </button>
     );
   }
@@ -300,7 +307,7 @@ function AddExpense() {
       encType="multipart/form-data"
       className="border-line-strong bg-graphite/60 mt-4 border p-4"
     >
-      <p className="label text-ink mb-3 text-xs">Nowy koszt firmowy</p>
+      <p className="label text-ink mb-3 text-xs">{t("expenses.newTitle")}</p>
       <ExpenseFields />
       <div className="mt-3 flex flex-wrap items-center gap-3">
         <button
@@ -308,14 +315,14 @@ function AddExpense() {
           disabled={pending}
           className="label bg-red hover:bg-red-hover inline-flex h-9 items-center px-5 text-xs text-white transition-colors disabled:opacity-50"
         >
-          {pending ? "Dodawanie…" : "Dodaj"}
+          {pending ? t("actions.adding") : t("actions.add")}
         </button>
         <button
           type="button"
           onClick={() => setOpen(false)}
           className="text-ink-faint hover:text-ink tap text-xs"
         >
-          Zamknij
+          {t("actions.close")}
         </button>
         <Feedback state={state} />
       </div>
@@ -334,6 +341,8 @@ export function ExpenseManager({
 }: {
   expenses: BusinessExpenseRow[];
 }) {
+  const t = useTranslations("Admin.finance");
+  const locale = useLocale();
   const total = expenses.reduce((n, e) => n + e.amountGrosze, 0);
 
   return (
@@ -346,12 +355,12 @@ export function ExpenseManager({
       <div className="border-line text-ink-faint flex flex-wrap items-baseline justify-between gap-3 border-b pb-2">
         <span className="label-tight text-[10px]">
           {expenses.length === 0
-            ? "Brak kosztów w tym okresie"
-            : `${expenses.length} pozycji`}
+            ? t("expenses.none")
+            : t("expenses.count", { count: expenses.length })}
         </span>
         {expenses.length > 0 && (
           <span className="text-ink text-sm tabular-nums">
-            wystawione w tym okresie: {formatPln(total, "pl")}
+            {t("expenses.total", { amount: formatPln(total, locale) })}
           </span>
         )}
       </div>

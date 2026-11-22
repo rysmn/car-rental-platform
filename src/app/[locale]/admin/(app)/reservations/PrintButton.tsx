@@ -1,5 +1,7 @@
 "use client";
 
+import { useTranslations } from "next-intl";
+
 /**
  * „Drukuj / Zapisz PDF" — jedno dotknięcie do pliku.
  *
@@ -8,13 +10,14 @@
  * rzeczy naraz: kto chce papier, dostanie papier, kto chce plik — plik.
  */
 export function PrintButton() {
+  const t = useTranslations("Admin.reservations.print");
   return (
     <button
       type="button"
       onClick={() => window.print()}
       className="label bg-red hover:bg-red-hover tap inline-flex h-11 items-center px-6 text-xs text-white transition-colors"
     >
-      Drukuj / Zapisz PDF
+      {t("button")}
     </button>
   );
 }

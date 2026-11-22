@@ -3,6 +3,7 @@ import path from "node:path";
 import { ImageResponse } from "next/og";
 import { siteConfig } from "@/lib/config/site";
 import { MEDIA_URL_PREFIX, resolveMediaPath } from "@/lib/storage/media";
+import { getStorage } from "@/lib/storage";
 
 /**
  * The social preview card, rendered on demand.
@@ -46,10 +47,6 @@ const BRAND = {
  * still escapes.
  */
 function resolveImageFile(src: string): string | null {
-  if (src.startsWith(`${MEDIA_URL_PREFIX}/`)) {
-    // Validates the name and confines the result to UPLOAD_DIR.
-    return resolveMediaPath([src.slice(MEDIA_URL_PREFIX.length + 1)]);
-  }
   if (!src.startsWith("/") || src.startsWith("//")) return null;
 
   const root = path.resolve("public");
@@ -76,11 +73,18 @@ function resolveImageFile(src: string): string | null {
  */
 async function loadPhoto(sources: string[]): Promise<string | null> {
   for (const src of sources) {
-    const file = resolveImageFile(src);
-    if (!file) continue;
+    // Media (uploaded photos) live in the storage driver; `public/` assets on disk.
+    const mediaKey = src.startsWith(`${MEDIA_URL_PREFIX}/`)
+      ? resolveMediaPath([src.slice(MEDIA_URL_PREFIX.length + 1)])
+      : null;
+    const file = mediaKey ? null : resolveImageFile(src);
+    if (!mediaKey && !file) continue;
 
     try {
-      const bytes = await fs.readFile(file);
+      const bytes = mediaKey
+        ? await getStorage().get(mediaKey)
+        : await fs.readFile(file!);
+      if (!bytes) continue;
       const { default: sharp } = await import("sharp");
       const jpeg = await sharp(bytes)
         .rotate() // honour EXIF orientation before the dimensions are fixed

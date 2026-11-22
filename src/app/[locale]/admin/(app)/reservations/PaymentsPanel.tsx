@@ -1,6 +1,8 @@
 "use client";
 
 import { useActionState } from "react";
+import { useLocale, useTranslations } from "next-intl";
+import { pick, pickFrom } from "@/lib/i18n-pick";
 import { addPayment, deletePayment, type PaymentResult } from "./actions";
 import { formatPln } from "@/lib/format";
 import {
@@ -46,6 +48,9 @@ export function PaymentsPanel({
   payments: Row[];
   today: string;
 }) {
+  const t = useTranslations("Admin.reservations.payments");
+  const tm = useTranslations("Admin.reservations.methods");
+  const locale = useLocale();
   const [addState, add, adding] = useActionState<
     PaymentResult | null,
     FormData
@@ -55,38 +60,44 @@ export function PaymentsPanel({
     FormData
   >(deletePayment, null);
 
+  const dayLabel = (iso: string) =>
+    new Intl.DateTimeFormat(locale === "en" ? "en-GB" : "pl-PL", {
+      timeZone: "UTC",
+      dateStyle: "short",
+    }).format(new Date(`${iso}T00:00:00Z`));
+
   return (
     <div className="border-line bg-graphite/40 mt-6 border p-6">
       <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
-        <h2 className="label-tight text-ink-faint text-[10px]">Płatności</h2>
+        <h2 className="label-tight text-ink-faint text-[10px]">{t("heading")}</h2>
         <span
           className={`label-tight border px-2 py-1 text-[10px] ${PAYMENT_STATUS_TONE[status]}`}
         >
-          {PAYMENT_STATUS_LABEL[status]}
+          {pickFrom(PAYMENT_STATUS_LABEL, status, locale)}
         </span>
       </div>
 
       <div className="grid gap-4 sm:grid-cols-3">
         <div>
-          <p className={labelCls}>Wartość</p>
+          <p className={labelCls}>{t("total")}</p>
           <p className="font-heading text-ink mt-1 text-lg tabular-nums">
-            {formatPln(totalGrosze, "pl")}
+            {formatPln(totalGrosze, locale)}
           </p>
         </div>
         <div>
-          <p className={labelCls}>Zapłacono</p>
+          <p className={labelCls}>{t("paid")}</p>
           <p className="font-heading mt-1 text-lg text-emerald-400 tabular-nums">
-            {formatPln(paidGrosze, "pl")}
+            {formatPln(paidGrosze, locale)}
           </p>
         </div>
         <div>
-          <p className={labelCls}>Pozostało</p>
+          <p className={labelCls}>{t("outstanding")}</p>
           <p
             className={`font-heading mt-1 text-lg tabular-nums ${
               outstandingGrosze === 0 ? "text-ink" : "text-red"
             }`}
           >
-            {formatPln(outstandingGrosze, "pl")}
+            {formatPln(outstandingGrosze, locale)}
           </p>
         </div>
       </div>
@@ -99,10 +110,13 @@ export function PaymentsPanel({
               className="flex flex-wrap items-center justify-between gap-3 py-3"
             >
               <span className="text-ink text-sm tabular-nums">
-                {formatPln(p.amountGrosze, "pl")}
+                {formatPln(p.amountGrosze, locale)}
                 <span className="text-ink-faint ml-3 text-xs">
-                  {PAYMENT_METHOD_LABEL[p.method] ?? p.method} ·{" "}
-                  {p.paidOn.split("-").reverse().join(".")}
+                  {PAYMENT_METHOD_LABEL[p.method]
+                    ? pick(PAYMENT_METHOD_LABEL[p.method], locale)
+                    : p.method}{" "}
+                  ·{" "}
+                  {dayLabel(p.paidOn)}
                   {p.note ? ` · ${p.note}` : ""}
                 </span>
               </span>
@@ -117,7 +131,7 @@ export function PaymentsPanel({
                   disabled={removing}
                   className="label-tight text-ink-faint hover:text-red text-[10px] transition-colors disabled:opacity-60"
                 >
-                  Usuń
+                  {t("remove")}
                 </button>
               </form>
             </li>
@@ -129,7 +143,7 @@ export function PaymentsPanel({
         <input type="hidden" name="reservationId" value={reservationId} />
         <div className="grid gap-3 sm:grid-cols-4">
           <label className="flex flex-col gap-1">
-            <span className={labelCls}>Kwota (zł)</span>
+            <span className={labelCls}>{t("amount")}</span>
             <input
               name="amount"
               inputMode="decimal"
@@ -142,16 +156,16 @@ export function PaymentsPanel({
             />
           </label>
           <label className="flex flex-col gap-1">
-            <span className={labelCls}>Forma</span>
+            <span className={labelCls}>{t("method")}</span>
             <select name="method" className={inputCls}>
-              <option value="cash">Gotówka</option>
-              <option value="card">Karta</option>
-              <option value="transfer">Przelew</option>
-              <option value="online">Online</option>
+              <option value="cash">{tm("cash")}</option>
+              <option value="card">{tm("card")}</option>
+              <option value="transfer">{tm("transfer")}</option>
+              <option value="online">{tm("online")}</option>
             </select>
           </label>
           <label className="flex flex-col gap-1">
-            <span className={labelCls}>Data</span>
+            <span className={labelCls}>{t("date")}</span>
             <input
               type="date"
               name="paidOn"
@@ -160,10 +174,10 @@ export function PaymentsPanel({
             />
           </label>
           <label className="flex flex-col gap-1">
-            <span className={labelCls}>Opis</span>
+            <span className={labelCls}>{t("note")}</span>
             <input
               name="note"
-              placeholder="np. zaliczka"
+              placeholder={t("notePlaceholder")}
               className={inputCls}
             />
           </label>
@@ -181,11 +195,9 @@ export function PaymentsPanel({
           disabled={adding}
           className="label bg-red hover:bg-red-hover mt-4 inline-flex h-11 items-center px-6 text-xs text-white transition-colors disabled:opacity-60"
         >
-          {adding ? "Zapisywanie…" : "Dodaj wpłatę"}
+          {adding ? t("saving") : t("add")}
         </button>
-        <p className="text-ink-faint mt-3 text-[11px]">
-          Kwota ujemna to zwrot — np. oddana kaucja albo korekta nadpłaty.
-        </p>
+        <p className="text-ink-faint mt-3 text-[11px]">{t("hint")}</p>
       </form>
     </div>
   );

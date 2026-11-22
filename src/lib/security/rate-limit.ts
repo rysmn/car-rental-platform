@@ -123,6 +123,12 @@ export const REGULY = {
   zapytanie: { nazwa: "zapytanie", ile: 10, oknoMs: 60 * 60_000 },
   zapytanieSzybkie: { nazwa: "zapytanie-min", ile: 3, oknoMs: 60_000 },
   potwierdzenie: { nazwa: "potwierdzenie", ile: 20, oknoMs: 60 * 60_000 },
+  /**
+   * Logowanie do panelu. 10 prób na 5 minut z jednego adresu LUB na jeden
+   * e-mail. Działa przed weryfikacją hasła, więc każda próba (także z dobrym
+   * hasłem) liczy się tutaj. Uzupełnia blokadę konta w `auth/config`.
+   */
+  logowanie: { nazwa: "logowanie", ile: 10, oknoMs: 5 * 60_000 },
   /** Publiczne API floty — patrz `security/scraping.ts`. */
   publiczne: { nazwa: "publiczne", ile: 240, oknoMs: 60_000 },
 } satisfies Record<string, Regula>;

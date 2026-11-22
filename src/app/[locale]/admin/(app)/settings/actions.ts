@@ -1,6 +1,7 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
+import { getTranslations } from "next-intl/server";
 import { requirePermission } from "@/lib/auth/guard";
 import { recordAudit } from "@/lib/auth/audit";
 import {
@@ -24,10 +25,10 @@ import { adminActionFailed } from "@/lib/alerts/admin";
 export type SaveResult =
   { ok: true; message?: string } | { ok: false; error: string };
 
-const GENERIC_ERROR: SaveResult = {
-  ok: false,
-  error: "Wystąpił błąd. Spróbuj ponownie.",
-};
+async function genericError(): Promise<SaveResult> {
+  const t = await getTranslations("Admin.settings.actions");
+  return { ok: false, error: t("generic") };
+}
 
 /**
  * Every public page renders from these settings, so each action revalidates the
@@ -60,6 +61,7 @@ export async function updateSocialLinks(
   formData: FormData,
 ): Promise<SaveResult> {
   const admin = await requirePermission("ustawienia.zmien");
+  const t = await getTranslations("Admin.settings.actions");
 
   const before = await getSetting("social");
 
@@ -93,17 +95,14 @@ export async function updateSocialLinks(
     });
     revalidatePublic();
     revalidateSettings();
-    return { ok: true, message: "Linki zapisane." };
+    return { ok: true, message: t("socialSaved") };
   } catch (err) {
     // A zod failure here means a malformed URL — worth telling the admin exactly.
     if (err instanceof Error && err.name === "ZodError") {
-      return {
-        ok: false,
-        error: "Każdy link musi zaczynać się od http:// lub https://",
-      };
+      return { ok: false, error: t("socialUrl") };
     }
     adminActionFailed("updateSocialLinks", err);
-    return GENERIC_ERROR;
+    return genericError();
   }
 }
 
@@ -114,6 +113,7 @@ export async function updatePageVisibility(
   formData: FormData,
 ): Promise<SaveResult> {
   const admin = await requirePermission("ustawienia.zmien");
+  const t = await getTranslations("Admin.settings.actions");
 
   const next: PagesSettings = {
     faq: formData.get("faq") === "on",
@@ -136,21 +136,31 @@ export async function updatePageVisibility(
     });
     revalidatePublic();
     revalidateSettings();
-    return { ok: true, message: "Widoczność stron zapisana." };
+    return { ok: true, message: t("pagesSaved") };
   } catch (err) {
     adminActionFailed("updatePageVisibility", err);
-    return GENERIC_ERROR;
+    return genericError();
   }
 }
 
 /* ── Hero background image ───────────────────────────────────────────────── */
 
-const UPLOAD_ERRORS: Record<string, string> = {
-  empty: "Nie wybrano pliku.",
-  too_large: "Plik jest za duży — maksymalnie 8 MB.",
-  unsupported_type: "Nieobsługiwany format. Dozwolone: JPG, PNG, WEBP.",
-  write_failed: "Nie udało się zapisać pliku.",
-};
+/** The message for an upload that `saveImage` refused, by its error code. */
+async function uploadErrorMessage(code: string): Promise<string> {
+  const t = await getTranslations("Admin.settings.actions");
+  switch (code) {
+    case "empty":
+      return t("upload.empty");
+    case "too_large":
+      return t("upload.tooLarge");
+    case "unsupported_type":
+      return t("upload.unsupportedType");
+    case "write_failed":
+      return t("upload.writeFailed");
+    default:
+      return t("upload.saveFailed");
+  }
+}
 
 /**
  * Hero photos — a library of three slots per theme, one of them on the page.
@@ -164,7 +174,6 @@ const UPLOAD_ERRORS: Record<string, string> = {
  * given. The other theme, and the other two slots, are carried through
  * untouched — deleting one photo must never cost the operator the other two.
  */
-const SLOT_ERROR = "Nieprawidłowy numer zdjęcia.";
 
 function heroVariant(value: unknown): HeroVariant | null {
   return value === "dark" || value === "light" ? value : null;
@@ -211,19 +220,22 @@ export async function updateHeroImage(
   formData: FormData,
 ): Promise<SaveResult> {
   const admin = await requirePermission("ustawienia.zmien");
+  const t = await getTranslations("Admin.settings.actions");
 
   const variant = heroVariant(formData.get("variant"));
-  if (!variant) return { ok: false, error: "Nieprawidłowe dane." };
+  if (!variant) return { ok: false, error: t("badData") };
   const slot = heroSlot(formData.get("slot"));
-  if (slot === null) return { ok: false, error: SLOT_ERROR };
+  if (slot === null) return { ok: false, error: t("badSlot") };
 
   const file = formData.get("image");
-  if (!(file instanceof File)) return { ok: false, error: UPLOAD_ERRORS.empty };
+  if (!(file instanceof File)) {
+    return { ok: false, error: await uploadErrorMessage("empty") };
+  }
 
   try {
     const saved = await saveImage(file);
     if (!saved.ok) {
-      return { ok: false, error: UPLOAD_ERRORS[saved.error] ?? "Błąd zapisu." };
+      return { ok: false, error: await uploadErrorMessage(saved.error) };
     }
 
     const before = await getSetting("hero");
@@ -260,10 +272,10 @@ export async function updateHeroImage(
     });
     revalidatePublic();
     revalidateSettings();
-    return { ok: true, message: `Zdjęcie ${slot + 1} zapisane.` };
+    return { ok: true, message: t("photoSaved", { n: slot + 1 }) };
   } catch (err) {
     adminActionFailed("updateHeroImage", err);
-    return GENERIC_ERROR;
+    return genericError();
   }
 }
 
@@ -279,19 +291,20 @@ export async function setActiveHeroImage(
   slotRaw: number,
 ): Promise<SaveResult> {
   const admin = await requirePermission("ustawienia.zmien");
+  const t = await getTranslations("Admin.settings.actions");
 
   const variant = heroVariant(variantRaw);
-  if (!variant) return { ok: false, error: "Nieprawidłowe dane." };
+  if (!variant) return { ok: false, error: t("badData") };
   const slot = heroSlot(slotRaw);
-  if (slot === null) return { ok: false, error: SLOT_ERROR };
+  if (slot === null) return { ok: false, error: t("badSlot") };
 
   try {
     const before = await getSetting("hero");
     if (before[variant].images[slot] == null) {
-      return { ok: false, error: "W tym miejscu nie ma zdjęcia." };
+      return { ok: false, error: t("emptySlot") };
     }
     if (before[variant].active === slot) {
-      return { ok: true, message: `Zdjęcie ${slot + 1} jest już aktywne.` };
+      return { ok: true, message: t("alreadyActive", { n: slot + 1 }) };
     }
 
     const after = await saveHeroSet(
@@ -311,10 +324,10 @@ export async function setActiveHeroImage(
     });
     revalidatePublic();
     revalidateSettings();
-    return { ok: true, message: `Zdjęcie ${slot + 1} jest teraz na stronie.` };
+    return { ok: true, message: t("nowOnSite", { n: slot + 1 }) };
   } catch (err) {
     adminActionFailed("setActiveHeroImage", err);
-    return GENERIC_ERROR;
+    return genericError();
   }
 }
 
@@ -334,17 +347,18 @@ export async function deleteHeroImage(
   slotRaw: number,
 ): Promise<SaveResult> {
   const admin = await requirePermission("ustawienia.zmien");
+  const t = await getTranslations("Admin.settings.actions");
 
   const variant = heroVariant(variantRaw);
-  if (!variant) return { ok: false, error: "Nieprawidłowe dane." };
+  if (!variant) return { ok: false, error: t("badData") };
   const slot = heroSlot(slotRaw);
-  if (slot === null) return { ok: false, error: SLOT_ERROR };
+  if (slot === null) return { ok: false, error: t("badSlot") };
 
   try {
     const before = await getSetting("hero");
     const removed = before[variant].images[slot];
     if (removed == null) {
-      return { ok: false, error: "W tym miejscu nie ma zdjęcia." };
+      return { ok: false, error: t("emptySlot") };
     }
 
     const images = [...before[variant].images];
@@ -385,14 +399,14 @@ export async function deleteHeroImage(
     return {
       ok: true,
       message: left
-        ? `Zdjęcie ${slot + 1} usunięte.`
+        ? t("photoRemoved", { n: slot + 1 })
         : variant === "dark"
-          ? "Zdjęcie usunięte — motyw ciemny wraca do domyślnego."
-          : "Zdjęcie usunięte — jasny motyw bez zdjęcia.",
+          ? t("removedDark")
+          : t("removedLight"),
     };
   } catch (err) {
     adminActionFailed("deleteHeroImage", err);
-    return GENERIC_ERROR;
+    return genericError();
   }
 }
 
@@ -403,12 +417,13 @@ export async function updateLegalDocument(
   formData: FormData,
 ): Promise<SaveResult> {
   const admin = await requirePermission("ustawienia.zmien");
+  const t = await getTranslations("Admin.settings.actions");
 
   const docRaw = String(formData.get("doc") ?? "");
   const localeRaw = String(formData.get("locale") ?? "");
   const doc = docRaw === "terms" || docRaw === "privacy" ? docRaw : null;
   const locale = localeRaw === "pl" || localeRaw === "en" ? localeRaw : null;
-  if (!doc || !locale) return { ok: false, error: "Nieprawidłowe dane." };
+  if (!doc || !locale) return { ok: false, error: t("badData") };
 
   // Sanitised before storage as well as before render — see lib/legal/sanitize.
   const html = sanitizeLegalHtml(String(formData.get("html") ?? ""));
@@ -431,10 +446,10 @@ export async function updateLegalDocument(
     });
     revalidatePublic();
     revalidatePath("/admin/settings/legal");
-    return { ok: true, message: "Dokument zapisany." };
+    return { ok: true, message: t("documentSaved") };
   } catch (err) {
     adminActionFailed("updateLegalDocument", err);
-    return GENERIC_ERROR;
+    return genericError();
   }
 }
 
@@ -445,6 +460,7 @@ export async function updateCompanyInfo(
   formData: FormData,
 ): Promise<SaveResult> {
   const admin = await requirePermission("ustawienia.zmien");
+  const t = await getTranslations("Admin.settings.actions");
 
   const field = (name: string) => String(formData.get(name) ?? "").trim();
   const before = await getSetting("company");
@@ -512,17 +528,13 @@ export async function updateCompanyInfo(
     });
     revalidatePublic();
     revalidateSettings();
-    return { ok: true, message: "Dane firmy zapisane." };
+    return { ok: true, message: t("companySaved") };
   } catch (err) {
     if (err instanceof Error && err.name === "ZodError") {
-      return {
-        ok: false,
-        error:
-          "Sprawdź dane — adres e-mail musi być poprawny, link do mapy zaczynać się od http:// lub https://, a godziny mieć format GG:MM.",
-      };
+      return { ok: false, error: t("companyInvalid") };
     }
     adminActionFailed("updateCompanyInfo", err);
-    return GENERIC_ERROR;
+    return genericError();
   }
 }
 
@@ -545,10 +557,11 @@ export async function updateHeroText(
   formData: FormData,
 ): Promise<SaveResult> {
   const admin = await requirePermission("ustawienia.zmien");
+  const t = await getTranslations("Admin.settings.actions");
 
   const localeRaw = String(formData.get("locale") ?? "");
   const locale = localeRaw === "pl" || localeRaw === "en" ? localeRaw : null;
-  if (!locale) return { ok: false, error: "Nieprawidłowe dane." };
+  if (!locale) return { ok: false, error: t("badData") };
 
   const fields = Object.fromEntries(
     HERO_TEXT_FIELD_NAMES.map((name) => [
@@ -575,10 +588,10 @@ export async function updateHeroText(
     });
     revalidatePublic();
     revalidateSettings();
-    return { ok: true, message: "Treść hero zapisana." };
+    return { ok: true, message: t("heroTextSaved") };
   } catch (err) {
     adminActionFailed("updateHeroText", err);
-    return GENERIC_ERROR;
+    return genericError();
   }
 }
 
@@ -597,6 +610,7 @@ export async function updateChatbot(
   formData: FormData,
 ): Promise<SaveResult> {
   const admin = await requirePermission("ustawienia.zmien");
+  const t = await getTranslations("Admin.settings.actions");
 
   const pick = <T extends string>(
     key: string,
@@ -670,16 +684,13 @@ export async function updateChatbot(
     });
     revalidatePublic();
     revalidatePath("/admin/settings/chatbot");
-    return { ok: true, message: "Ustawienia asystenta zapisane." };
+    return { ok: true, message: t("chatbotSaved") };
   } catch (err) {
     if (err instanceof Error && err.name === "ZodError") {
-      return {
-        ok: false,
-        error: "Sprawdź adres e-mail do przekazywania rozmów.",
-      };
+      return { ok: false, error: t("chatbotEmailInvalid") };
     }
     adminActionFailed("updateChatbot", err);
-    return GENERIC_ERROR;
+    return genericError();
   }
 }
 
@@ -705,6 +716,7 @@ export async function updateGoogleMaps(
   formData: FormData,
 ): Promise<SaveResult> {
   const admin = await requirePermission("ustawienia.zmien");
+  const t = await getTranslations("Admin.settings.actions");
 
   const field = (name: string) => String(formData.get(name) ?? "").trim();
 
@@ -781,16 +793,12 @@ export async function updateGoogleMaps(
 
     revalidatePublic();
     revalidateSettings();
-    return { ok: true, message: "Ustawienia Google zapisane." };
+    return { ok: true, message: t("googleSaved") };
   } catch (err) {
     if (err instanceof Error && err.name === "ZodError") {
-      return {
-        ok: false,
-        error:
-          "Sprawdź pola: linki muszą zaczynać się od https://, współrzędne muszą być liczbami, ocena mieści się między 1,0 a 5,0, liczba opinii jest liczbą całkowitą, Place ID zawiera tylko litery, cyfry, - i _",
-      };
+      return { ok: false, error: t("googleInvalid") };
     }
     adminActionFailed("updateGoogleMaps", err);
-    return GENERIC_ERROR;
+    return genericError();
   }
 }

@@ -8,6 +8,7 @@ import {
   totalsOf,
 } from "@/lib/admin/economics";
 import { listCarExpenses } from "@/lib/admin/expenses";
+import { pick, pickFrom } from "@/lib/i18n-pick";
 import {
   EXPENSE_LABEL,
   EXPENSE_GROUP_LABEL,
@@ -187,8 +188,9 @@ export async function GET(request: Request) {
           ],
           rows: expenses.map((x) => [
             x.incurredOn,
-            EXPENSE_GROUP_LABEL[EXPENSE_GROUP_OF[x.category]],
-            EXPENSE_LABEL[x.category],
+            // The whole report is Polish (headers, sheet names), so the cell text is pinned to "pl".
+            pickFrom(EXPENSE_GROUP_LABEL, EXPENSE_GROUP_OF[x.category], "pl"),
+            pick(EXPENSE_LABEL[x.category], "pl"),
             zl(x.amountGrosze),
             x.periodStart,
             x.periodEnd,

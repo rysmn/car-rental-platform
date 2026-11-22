@@ -1,6 +1,7 @@
 "use client";
 
 import { useActionState, useRef, useState, useTransition } from "react";
+import { useLocale, useTranslations } from "next-intl";
 import {
   createAvailabilityBlock,
   deleteAvailabilityBlock,
@@ -17,9 +18,13 @@ function todayIso(): string {
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
 }
 
-function formatPl(iso: string): string {
-  const [y, m, d] = iso.split("-");
-  return `${d}.${m}.${y}`;
+function formatDate(iso: string, locale: string): string {
+  const [y, m, d] = iso.split("-").map(Number);
+  return new Date(y, m - 1, d).toLocaleDateString(locale, {
+    day: "2-digit",
+    month: "2-digit",
+    year: "numeric",
+  });
 }
 
 /**
@@ -43,6 +48,8 @@ export function BlockManager({
   units: { id: string; plate: string }[];
   blocks: AdminBlock[];
 }) {
+  const t = useTranslations("Admin.fleet");
+  const locale = useLocale();
   const formRef = useRef<HTMLFormElement>(null);
   const [state, submit, saving] = useActionState<FormResult | null, FormData>(
     async (prev, formData) => {
@@ -65,23 +72,19 @@ export function BlockManager({
   return (
     <section className="mt-14">
       <div className="mb-4">
-        <h2 className="label text-xs text-ink">Blokady dostępności</h2>
-        <p className="text-ink-faint text-xs">
-          Dni, w których auto nie jest do wynajęcia — serwis, rezerwacja
-          telefoniczna, użytek własny. Na stronie auta pokazują się na czerwono,
-          tak samo jak potwierdzone rezerwacje.
-        </p>
+        <h2 className="label text-xs text-ink">{t("blocksHeading")}</h2>
+        <p className="text-ink-faint text-xs">{t("blocksIntro")}</p>
       </div>
 
       {units.length === 0 ? (
         <p className="border-line bg-graphite/40 text-silver border px-5 py-6 text-center text-sm">
-          Najpierw dodaj egzemplarz — blokada dotyczy konkretnego auta.
+          {t("addUnitFirst")}
         </p>
       ) : (
         <>
           {upcoming.length === 0 ? (
             <p className="border-line bg-graphite/40 text-silver border px-5 py-6 text-center text-sm">
-              Brak blokad. Auto jest wolne we wszystkie dni bez rezerwacji.
+              {t("noBlocks")}
             </p>
           ) : (
             <ul className="border-line divide-line divide-y border">
@@ -91,7 +94,8 @@ export function BlockManager({
                   className="flex flex-wrap items-center justify-between gap-3 px-5 py-3"
                 >
                   <span className="text-sm text-ink">
-                    {formatPl(b.startDate)} – {formatPl(b.endDate)}
+                    {formatDate(b.startDate, locale)} –{" "}
+                    {formatDate(b.endDate, locale)}
                     <span className="text-ink-faint ml-3 text-xs">
                       {b.plate ?? "—"}
                       {b.reason ? ` · ${b.reason}` : ""}
@@ -101,7 +105,7 @@ export function BlockManager({
                     type="button"
                     disabled={busy}
                     onClick={() => {
-                      if (!confirm("Usunąć tę blokadę?")) return;
+                      if (!confirm(t("deleteBlockConfirm"))) return;
                       setRowError(null);
                       startTransition(async () => {
                         const res = await deleteAvailabilityBlock(
@@ -113,7 +117,7 @@ export function BlockManager({
                     }}
                     className="label-tight text-red text-[10px] transition-opacity hover:opacity-70 disabled:opacity-30"
                   >
-                    Usuń
+                    {t("remove")}
                   </button>
                 </li>
               ))}
@@ -122,7 +126,7 @@ export function BlockManager({
 
           {past > 0 && (
             <p className="text-ink-faint mt-2 text-xs">
-              Blokady zakończone: {past} (ukryte).
+              {t("pastBlocks", { count: past })}
             </p>
           )}
 
@@ -136,9 +140,9 @@ export function BlockManager({
             <input type="hidden" name="modelId" value={modelId} />
 
             <label className="flex flex-col gap-1">
-              <span className={labelCls}>Auto</span>
+              <span className={labelCls}>{t("car")}</span>
               <select name="carId" defaultValue="all" className={inputCls}>
-                <option value="all">Wszystkie ({units.length})</option>
+                <option value="all">{t("allUnits", { count: units.length })}</option>
                 {units.map((u) => (
                   <option key={u.id} value={u.id}>
                     {u.plate}
@@ -148,7 +152,7 @@ export function BlockManager({
             </label>
 
             <label className="flex flex-col gap-1">
-              <span className={labelCls}>Od</span>
+              <span className={labelCls}>{t("from")}</span>
               <input
                 type="date"
                 name="startDate"
@@ -159,7 +163,7 @@ export function BlockManager({
             </label>
 
             <label className="flex flex-col gap-1">
-              <span className={labelCls}>Do</span>
+              <span className={labelCls}>{t("to")}</span>
               <input
                 type="date"
                 name="endDate"
@@ -170,11 +174,11 @@ export function BlockManager({
             </label>
 
             <label className="flex flex-col gap-1">
-              <span className={labelCls}>Powód (opcjonalnie)</span>
+              <span className={labelCls}>{t("reasonOptional")}</span>
               <input
                 name="reason"
                 maxLength={200}
-                placeholder="serwis"
+                placeholder={t("reasonPlaceholder")}
                 className={inputCls}
               />
             </label>
@@ -185,7 +189,7 @@ export function BlockManager({
                 disabled={busy}
                 className="label bg-red hover:bg-red-hover inline-flex h-10 items-center px-6 text-xs text-white transition-colors disabled:opacity-50"
               >
-                {saving ? "Zapisywanie…" : "Zablokuj terminy"}
+                {saving ? t("saving") : t("blockDates")}
               </button>
             </div>
           </form>

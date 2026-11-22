@@ -15,6 +15,8 @@
  * deposit on booking, the balance at handover.
  */
 
+import { type Bilingual } from "@/lib/i18n-pick";
+
 export type PaymentStatus = "paid" | "partial" | "unpaid" | "overdue";
 
 export type PaymentSummary = {
@@ -56,11 +58,11 @@ export function summarise(
   };
 }
 
-export const PAYMENT_STATUS_LABEL: Record<PaymentStatus, string> = {
-  paid: "Zapłacone",
-  partial: "Częściowo",
-  unpaid: "Nieopłacone",
-  overdue: "Po terminie",
+export const PAYMENT_STATUS_LABEL: Record<PaymentStatus, Bilingual> = {
+  paid: { pl: "Zapłacone", en: "Paid" },
+  partial: { pl: "Częściowo", en: "Partly paid" },
+  unpaid: { pl: "Nieopłacone", en: "Unpaid" },
+  overdue: { pl: "Po terminie", en: "Overdue" },
 };
 
 /** Green settled, amber part-paid, red owed on a rental already running. */
@@ -71,9 +73,9 @@ export const PAYMENT_STATUS_TONE: Record<PaymentStatus, string> = {
   overdue: "bg-red text-white",
 };
 
-export const PAYMENT_METHOD_LABEL: Record<string, string> = {
-  cash: "Gotówka",
-  card: "Karta",
-  transfer: "Przelew",
-  online: "Online",
+export const PAYMENT_METHOD_LABEL: Record<string, Bilingual> = {
+  cash: { pl: "Gotówka", en: "Cash" },
+  card: { pl: "Karta", en: "Card" },
+  transfer: { pl: "Przelew", en: "Bank transfer" },
+  online: { pl: "Online", en: "Online" },
 };

@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import { useTranslations } from "next-intl";
 
 /**
  * Podpis palcem, na telefonie, przy aucie.
@@ -29,6 +30,7 @@ export function SignaturePad({
   /** Data URL po każdym pociągnięciu; pusty łańcuch, gdy pole wyczyszczono. */
   onChange: (dataUrl: string) => void;
 }) {
+  const t = useTranslations("Admin.reservations.signature");
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const drawing = useRef(false);
   const [drawn, setDrawn] = useState(false);
@@ -105,12 +107,12 @@ export function SignaturePad({
 
       <label className="flex flex-col gap-1">
         <span className="label-tight text-ink-faint text-[10px]">
-          Kto podpisuje
+          {t("signedBy")}
         </span>
         <input
           name="signedByName"
           defaultValue=""
-          placeholder="Imię i nazwisko"
+          placeholder={t("namePlaceholder")}
           className="border-line-strong bg-surface-1 text-ink h-12 w-full border px-3 text-base"
         />
       </label>
@@ -122,7 +124,7 @@ export function SignaturePad({
           {/* eslint-disable-next-line @next/next/no-img-element */}
           <img
             src={existingUrl}
-            alt="Podpis"
+            alt={t("alt")}
             className="border-line max-h-32 border bg-white"
           />
           <button
@@ -130,7 +132,7 @@ export function SignaturePad({
             onClick={() => setReplacing(true)}
             className="label-tight border-line-strong text-ink hover:border-ink tap mt-3 inline-flex h-11 items-center border px-4 text-[10px] transition-colors"
           >
-            Podpisz ponownie
+            {t("signAgain")}
           </button>
         </div>
       ) : (
@@ -150,10 +152,10 @@ export function SignaturePad({
               onClick={clear}
               className="label-tight border-line-strong text-ink-faint hover:border-ink hover:text-ink tap inline-flex h-11 items-center border px-4 text-[10px] transition-colors"
             >
-              Wyczyść
+              {t("clear")}
             </button>
             <span className="text-ink-faint text-[11px]">
-              {drawn ? "Podpis zostanie zapisany razem z protokołem." : "Podpisz palcem w polu powyżej."}
+              {drawn ? t("willSave") : t("signHint")}
             </span>
           </div>
         </div>

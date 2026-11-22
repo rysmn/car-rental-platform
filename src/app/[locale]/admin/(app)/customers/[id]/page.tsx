@@ -1,5 +1,5 @@
 import { notFound } from "next/navigation";
-import { setRequestLocale } from "next-intl/server";
+import { getTranslations, setRequestLocale } from "next-intl/server";
 import { guardPage } from "@/lib/auth/guard";
 import { Link } from "@/i18n/navigation";
 import { getCustomerCard } from "@/lib/admin/customer-card";
@@ -8,12 +8,31 @@ import {
   CUSTOMER_FLAG_TONE,
 } from "@/lib/admin/customer-flags";
 import { listDamages, DAMAGE_STATUS_LABEL, ourCostGrosze } from "@/lib/admin/damages";
+import { pickFrom } from "@/lib/i18n-pick";
 import { StatusBadge } from "@/components/admin/StatusBadge";
 import { type ReservationStatus } from "@/lib/admin/reservation-status";
 import { FlagForm } from "../FlagForm";
+import { ContactForm } from "../ContactForm";
+import { domainToUnicode } from "node:url";
+
+/** Punycode-Domain für Anzeige zurück in Unicode: müller.de statt xn--mller-kva.de. */
+function showEmail(email: string | null): string | null {
+  if (!email) return null;
+  const at = email.lastIndexOf("@");
+  if (at < 0) return email;
+  return `${email.slice(0, at + 1)}${domainToUnicode(email.slice(at + 1))}`;
+}
 import { formatDatePl, formatPln, formatPlnPrecise } from "@/lib/format";
 
-export const metadata = { title: "Klient" };
+export async function generateMetadata({
+  params,
+}: {
+  params: Promise<{ locale: string }>;
+}) {
+  const { locale } = await params;
+  const t = await getTranslations({ locale, namespace: "Admin.customers" });
+  return { title: t("metaCustomerTitle") };
+}
 
 const UUID_RE =
   /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
@@ -37,6 +56,7 @@ export default async function CustomerCardPage({
   const { locale, id } = await params;
   setRequestLocale(locale);
   await guardPage("klienci.podglad");
+  const t = await getTranslations("Admin.customers");
 
   if (!UUID_RE.test(id)) notFound();
   const [card, damages] = await Promise.all([
@@ -51,7 +71,7 @@ export default async function CustomerCardPage({
         href="/admin/customers"
         className="label-tight text-ink-faint hover:text-ink -my-2 inline-flex min-h-11 items-center text-[10px] transition-colors"
       >
-        ← Klienci
+        {t("back")}
       </Link>
 
       <header className="mt-4 mb-6 flex flex-wrap items-start justify-between gap-4">
@@ -85,63 +105,84 @@ export default async function CustomerCardPage({
           <span
             className={`label-tight border px-2 py-1 text-[10px] ${CUSTOMER_FLAG_TONE[card.flag]}`}
           >
-            {CUSTOMER_FLAG_LABEL[card.flag]}
+            {pickFrom(CUSTOMER_FLAG_LABEL, card.flag, locale)}
           </span>
         )}
       </header>
 
       <section className="mb-6 grid gap-4 sm:grid-cols-3">
-        <Figure label="Najmy" value={String(card.rentals.length)} />
-        <Figure label="Wydane" value={formatPlnPrecise(card.spentGrosze, "pl")} hint="suma wpłat, nie wycen" />
+        <Figure label={t("figRentals")} value={String(card.rentals.length)} />
         <Figure
-          label="Nierozliczone"
-          value={formatPlnPrecise(card.outstandingGrosze, "pl")}
-          tone={card.outstandingGrosze > 0 ? "text-red" : undefined}
-          hint="na najmach potwierdzonych i zakończonych"
+          label={t("figSpent")}
+          value={formatPlnPrecise(card.spentGrosze, locale)}
+          hint={t("figSpentHint")}
         />
         <Figure
-          label="Szkody"
-          value={`${card.damagesTotal}${card.damagesOpen ? ` (${card.damagesOpen} w toku)` : ""}`}
+          label={t("figOutstanding")}
+          value={formatPlnPrecise(card.outstandingGrosze, locale)}
+          tone={card.outstandingGrosze > 0 ? "text-red" : undefined}
+          hint={t("figOutstandingHint")}
+        />
+        <Figure
+          label={t("figDamages")}
+          value={
+            card.damagesOpen
+              ? t("damagesWithOpen", {
+                  total: card.damagesTotal,
+                  open: card.damagesOpen,
+                })
+              : String(card.damagesTotal)
+          }
           tone={card.damagesOpen > 0 ? "text-red" : undefined}
           hint={
             card.damagesOursGrosze > 0
-              ? `nasz koszt ${formatPlnPrecise(card.damagesOursGrosze, "pl")}`
+              ? t("figDamagesOurCost", {
+                  amount: formatPlnPrecise(card.damagesOursGrosze, locale),
+                })
               : undefined
           }
         />
         <Figure
-          label="Kaucje"
-          value={formatPlnPrecise(card.depositSecuredGrosze, "pl")}
+          label={t("figDeposits")}
+          value={formatPlnPrecise(card.depositSecuredGrosze, locale)}
           tone={card.depositToReturnCount > 0 ? "text-amber-400" : undefined}
           hint={
             card.depositToReturnCount > 0
-              ? `${card.depositToReturnCount} do zwrotu`
-              : "zabezpieczone teraz"
+              ? t("figDepositsToReturn", { count: card.depositToReturnCount })
+              : t("figDepositsSecured")
           }
         />
         <Figure
-          label="Spóźnione zwroty"
+          label={t("figLateReturns")}
           value={String(card.lateReturns)}
           tone={card.lateReturns > 0 ? "text-amber-400" : undefined}
-          hint="wg protokołów zwrotu"
+          hint={t("figLateReturnsHint")}
         />
       </section>
 
       <section className="border-line bg-graphite/40 mb-6 border p-6">
         <h2 className="label-tight text-ink-faint mb-4 text-[10px]">
-          Flaga wewnętrzna
+          {t("contactSection")}
+        </h2>
+        <ContactForm customerId={card.id} name={card.name} phone={card.phoneDisplay} email={card.email} emailShown={showEmail(card.email)} />
+      </section>
+
+      <section className="border-line bg-graphite/40 mb-6 border p-6">
+        <h2 className="label-tight text-ink-faint mb-4 text-[10px]">
+          {t("flagInternal")}
         </h2>
         <FlagForm customerId={card.id} flag={card.flag} notes={card.notes} />
         <p className="text-ink-faint mt-4 text-[11px]">
-          Flaga i notatka są widoczne wyłącznie w panelu — nie trafiają do
-          e-maili, faktur ani na stronę.
+          {t("flagInternalNote")}
         </p>
       </section>
 
       <section className="border-line bg-graphite/40 mb-6 border p-6">
-        <h2 className="label-tight text-ink-faint mb-4 text-[10px]">Najmy</h2>
+        <h2 className="label-tight text-ink-faint mb-4 text-[10px]">
+          {t("sectionRentals")}
+        </h2>
         {card.rentals.length === 0 ? (
-          <p className="text-ink-faint text-sm">Jeszcze nic nie wynajmował.</p>
+          <p className="text-ink-faint text-sm">{t("noRentals")}</p>
         ) : (
           <div className="overflow-x-auto">
             <table className="w-full min-w-[640px] border-collapse text-sm">
@@ -163,14 +204,17 @@ export default async function CustomerCardPage({
                     <td className="text-silver py-3 pr-4 whitespace-nowrap">
                       {formatDatePl(r.startDate)} – {formatDatePl(r.endDate)}
                       {r.lateReturn && (
-                        <span className="ml-2 text-amber-400">zwrot po terminie</span>
+                        <span className="ml-2 text-amber-400">
+                          {t("lateReturn")}
+                        </span>
                       )}
                     </td>
                     <td className="text-silver py-3 pr-4 text-right whitespace-nowrap tabular-nums">
-                      {formatPln(r.paidGrosze, locale)} / {formatPln(r.totalGrosze, locale)}
+                      {formatPln(r.paidGrosze, locale)} /{" "}
+                      {formatPln(r.totalGrosze, locale)}
                     </td>
                     <td className="py-3">
-                      <StatusBadge status={r.status as ReservationStatus} />
+                      <StatusBadge status={r.status as ReservationStatus} locale={locale} />
                     </td>
                   </tr>
                 ))}
@@ -181,9 +225,11 @@ export default async function CustomerCardPage({
       </section>
 
       <section className="border-line bg-graphite/40 border p-6">
-        <h2 className="label-tight text-ink-faint mb-4 text-[10px]">Szkody</h2>
+        <h2 className="label-tight text-ink-faint mb-4 text-[10px]">
+          {t("sectionDamages")}
+        </h2>
         {damages.length === 0 ? (
-          <p className="text-ink-faint text-sm">Żadnej szkody na koncie.</p>
+          <p className="text-ink-faint text-sm">{t("noDamages")}</p>
         ) : (
           <ul className="divide-line divide-y">
             {damages.map((d) => (
@@ -202,7 +248,7 @@ export default async function CustomerCardPage({
                     {formatPln(ourCostGrosze(d), locale)}
                   </span>
                   <span className="text-ink-faint text-xs">
-                    {DAMAGE_STATUS_LABEL[d.status]}
+                    {pickFrom(DAMAGE_STATUS_LABEL, d.status, locale)}
                   </span>
                 </span>
               </li>

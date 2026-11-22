@@ -1,6 +1,7 @@
 import "server-only";
 import { sql } from "drizzle-orm";
 import { getDb, schema } from "@/lib/db";
+import type { Bilingual } from "@/lib/i18n-pick";
 
 /**
  * What the security page knows, and how it knows it.
@@ -23,9 +24,9 @@ export type HealthState = "ok" | "warn" | "fail" | "stale" | "unknown";
 
 export type HealthCheck = {
   key: string;
-  label: string;
+  label: Bilingual;
   /** What this check answers, in the operator's language. */
-  description: string;
+  description: Bilingual;
   state: HealthState;
   /** The reporting script's own sentence, when there is one. */
   detail: string | null;
@@ -47,95 +48,134 @@ export type HealthCheck = {
  */
 const CHECKS: {
   key: string;
-  label: string;
-  description: string;
+  label: Bilingual;
+  description: Bilingual;
   everyMinutes: number;
 }[] = [
   {
     key: "backup",
-    label: "Kopia bazy",
-    description: "Nocna kopia z weryfikacją, 14 dni wstecz + niedziele",
+    label: { pl: "Kopia bazy", en: "Database backup" },
+    description: {
+      pl: "Nocna kopia z weryfikacją, 14 dni wstecz + niedziele",
+      en: "Nightly backup with verification, kept 14 days back + Sundays",
+    },
     everyMinutes: 24 * 60,
   },
   {
     key: "backup_offsite",
-    label: "Kopia poza serwerem",
-    description:
-      "Ta sama kopia wysyłana mailem, żeby przetrwała utratę serwera",
+    label: { pl: "Kopia poza serwerem", en: "Off-server backup" },
+    description: {
+      pl: "Ta sama kopia wysyłana mailem, żeby przetrwała utratę serwera",
+      en: "The same backup sent by e-mail, so it survives loss of the server",
+    },
     everyMinutes: 24 * 60,
   },
   {
     key: "monitor",
-    label: "Monitoring",
-    description: "Sprawdza dostępność, błędy i logowania co 15 minut",
+    label: { pl: "Monitoring", en: "Monitoring" },
+    description: {
+      pl: "Sprawdza dostępność, błędy i logowania co 15 minut",
+      en: "Checks availability, errors and logins every 15 minutes",
+    },
     everyMinutes: 15,
   },
   {
     key: "app",
-    label: "Strona",
-    description: "Czy witryna odpowiada poprawnie",
+    label: { pl: "Strona", en: "Site" },
+    description: {
+      pl: "Czy witryna odpowiada poprawnie",
+      en: "Whether the website responds correctly",
+    },
     everyMinutes: 15,
   },
   {
     key: "api",
-    label: "API",
-    description: "Warstwa tras /api — sprawdzana osobno od renderowania stron",
+    label: { pl: "API", en: "API" },
+    description: {
+      pl: "Warstwa tras /api — sprawdzana osobno od renderowania stron",
+      en: "The /api route layer — checked separately from page rendering",
+    },
     everyMinutes: 15,
   },
   {
     key: "db",
-    label: "Baza danych",
-    description: "Połączenia, długie zapytania, oczekujące blokady, rozmiar",
+    label: { pl: "Baza danych", en: "Database" },
+    description: {
+      pl: "Połączenia, długie zapytania, oczekujące blokady, rozmiar",
+      en: "Connections, long queries, waiting locks, size",
+    },
     everyMinutes: 15,
   },
   {
     key: "reservations",
-    label: "Rezerwacje",
-    description:
-      "Flota się otwiera, tabela rezerwacji czytelna, blokada terminu wolna",
+    label: { pl: "Rezerwacje", en: "Reservations" },
+    description: {
+      pl: "Flota się otwiera, tabela rezerwacji czytelna, blokada terminu wolna",
+      en: "The fleet opens, the reservations table is readable, the date lock is free",
+    },
     everyMinutes: 15,
   },
   {
     key: "email",
-    label: "E-mail",
-    description: "Czy potwierdzenia rezerwacji mają czym wyjść",
+    label: { pl: "E-mail", en: "E-mail" },
+    description: {
+      pl: "Czy potwierdzenia rezerwacji mają czym wyjść",
+      en: "Whether booking confirmations have a way out",
+    },
     everyMinutes: 15,
   },
   {
     key: "cpu",
-    label: "CPU",
-    description: "Obciążenie procesora względem liczby rdzeni",
+    label: { pl: "CPU", en: "CPU" },
+    description: {
+      pl: "Obciążenie procesora względem liczby rdzeni",
+      en: "Processor load relative to the number of cores",
+    },
     everyMinutes: 15,
   },
   {
     key: "ram",
-    label: "RAM",
-    description: "Pamięć dostępna dla aplikacji oraz zużycie swapa",
+    label: { pl: "RAM", en: "RAM" },
+    description: {
+      pl: "Pamięć dostępna dla aplikacji oraz zużycie swapa",
+      en: "Memory available to the application and swap use",
+    },
     everyMinutes: 15,
   },
   {
     key: "disk",
-    label: "Dysk",
-    description: "Pełny dysk zatrzymuje bazę i kopie w tej samej chwili",
+    label: { pl: "Dysk", en: "Disk" },
+    description: {
+      pl: "Pełny dysk zatrzymuje bazę i kopie w tej samej chwili",
+      en: "A full disk stops the database and the backups at the same time",
+    },
     everyMinutes: 15,
   },
   {
     key: "docker",
-    label: "Docker",
-    description: "Trzy kontenery produkcyjne: stan, restarty, zdrowie bazy",
+    label: { pl: "Docker", en: "Docker" },
+    description: {
+      pl: "Trzy kontenery produkcyjne: stan, restarty, zdrowie bazy",
+      en: "Three production containers: state, restarts, database health",
+    },
     everyMinutes: 15,
   },
   {
     key: "docker_cache",
-    label: "Docker build cache",
-    description:
-      "Pilnuje, żeby cache budowania nie zapełnił dysku — szczegóły niżej",
+    label: { pl: "Docker build cache", en: "Docker build cache" },
+    description: {
+      pl: "Pilnuje, żeby cache budowania nie zapełnił dysku — szczegóły niżej",
+      en: "Makes sure the build cache does not fill the disk — details below",
+    },
     everyMinutes: 15,
   },
   {
     key: "cert",
-    label: "Certyfikat HTTPS",
-    description: "Odnawiany automatycznie — ta linia pilnuje, że nadal działa",
+    label: { pl: "Certyfikat HTTPS", en: "HTTPS certificate" },
+    description: {
+      pl: "Odnawiany automatycznie — ta linia pilnuje, że nadal działa",
+      en: "Renewed automatically — this line checks that it still works",
+    },
     everyMinutes: 15,
   },
 ];

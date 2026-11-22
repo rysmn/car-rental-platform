@@ -98,19 +98,21 @@ export async function upsertCustomer(input: {
 }): Promise<string | null> {
   const phone = normalisePhone(input.phone);
   if (phone.length < 7 || input.name.trim().length < 2) return null;
+  const db = getDb();
 
-  const [row] = await getDb()
-    .insert(schema.customers)
-    .values({
-      phone,
-      phoneDisplay: input.phone.trim(),
-      name: input.name.trim(),
-      email: input.email?.trim() || null,
-      notes: input.notes?.trim() || null,
-    })
-    .onConflictDoUpdate({
-      target: schema.customers.phone,
-      set: {
+  // The phone number finds a returning customer; the oldest record wins if
+  // duplicates exist from earlier entries. Identity is the row id.
+  const [existing] = await db
+    .select({ id: schema.customers.id })
+    .from(schema.customers)
+    .where(eq(schema.customers.phone, phone))
+    .orderBy(schema.customers.createdAt)
+    .limit(1);
+
+  if (existing) {
+    await db
+      .update(schema.customers)
+      .set({
         name: input.name.trim(),
         phoneDisplay: input.phone.trim(),
         // COALESCE so a booking taken without an email does not erase the
@@ -118,7 +120,19 @@ export async function upsertCustomer(input: {
         email: sql`COALESCE(NULLIF(${input.email?.trim() ?? ""}, ''), ${schema.customers.email})`,
         notes: sql`COALESCE(NULLIF(${input.notes?.trim() ?? ""}, ''), ${schema.customers.notes})`,
         updatedAt: new Date(),
-      },
+      })
+      .where(eq(schema.customers.id, existing.id));
+    return existing.id;
+  }
+
+  const [row] = await db
+    .insert(schema.customers)
+    .values({
+      phone,
+      phoneDisplay: input.phone.trim(),
+      name: input.name.trim(),
+      email: input.email?.trim() || null,
+      notes: input.notes?.trim() || null,
     })
     .returning({ id: schema.customers.id });
 

@@ -1,8 +1,9 @@
+import { SHOP_CURRENCY } from "@/lib/currency/shop";
 /** Format integer grosze (1/100 PLN) as a localized currency string, no decimals. */
 export function formatPln(grosze: number, locale: string): string {
   return new Intl.NumberFormat(locale === "en" ? "en-GB" : "pl-PL", {
     style: "currency",
-    currency: "PLN",
+    currency: SHOP_CURRENCY,
     maximumFractionDigits: 0,
   }).format(grosze / 100);
 }
@@ -27,7 +28,7 @@ export function formatPln(grosze: number, locale: string): string {
 export function formatPlnDokladnie(grosze: number, locale: string): string {
   return new Intl.NumberFormat(locale === "en" ? "en-GB" : "pl-PL", {
     style: "currency",
-    currency: "PLN",
+    currency: SHOP_CURRENCY,
     minimumFractionDigits: 2,
     maximumFractionDigits: 2,
   }).format(grosze / 100);
@@ -48,7 +49,7 @@ export function formatPlnRange(
 ): string {
   const nf = new Intl.NumberFormat(locale === "en" ? "en-GB" : "pl-PL", {
     style: "currency",
-    currency: "PLN",
+    currency: SHOP_CURRENCY,
     maximumFractionDigits: 0,
   });
   try {
@@ -116,14 +117,14 @@ export function formatPlnOrAsk(grosze: number, locale: string): string {
 export function formatPlnPrecise(grosze: number, locale: string): string {
   return new Intl.NumberFormat(locale === "en" ? "en-GB" : "pl-PL", {
     style: "currency",
-    currency: "PLN",
+    currency: SHOP_CURRENCY,
     minimumFractionDigits: 2,
     maximumFractionDigits: 2,
   }).format(grosze / 100);
 }
 
 /**
- * Polish plural agreement: `pluralPl(4, "wynajem", "wynajmy", "wynajmów")`.
+ * Polish plural agreement: `pluralPl(4, "rental", "rentals", "rentals")`.
  *
  * Polish has three forms, not two, and the third is not simply "five or more":
  * 12–14 take the genitive plural even though 2–4 do not, which is why 22 is
@@ -136,12 +137,9 @@ export function pluralPl(
   few: string,
   many: string,
 ): string {
-  const abs = Math.abs(n);
-  if (abs === 1) return one;
-  const last = abs % 10;
-  const lastTwo = abs % 100;
-  if (last >= 2 && last <= 4 && (lastTwo < 12 || lastTwo > 14)) return few;
-  return many;
+  // English plural: exactly one, otherwise the plural form.
+  void few;
+  return Math.abs(n) === 1 ? one : many;
 }
 
 /** Format an ISO date (YYYY-MM-DD) as dd.mm.yyyy (no timezone math). */

@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { useTranslations } from "next-intl";
 import Image from "next/image";
 import { CalendarCheck, Mail, TriangleAlert } from "lucide-react";
 import { Link, usePathname } from "@/i18n/navigation";
@@ -55,6 +56,7 @@ export function MobileNav({
   themeToggle: React.ReactNode;
 }) {
   const [open, setOpen] = useState(false);
+  const t = useTranslations("Admin.components");
   const pathname = usePathname();
   const [renderedPathname, setRenderedPathname] = useState(pathname);
 
@@ -95,7 +97,7 @@ export function MobileNav({
               zamówił, kto pyta, co jest zepsute. */}
           <Link
             href="/admin/reservations"
-            aria-label={`Rezerwacje do potwierdzenia: ${reservations}`}
+            aria-label={t("mobile.reservationsAria", { count: reservations })}
             className="text-ink relative flex h-11 w-11 items-center justify-center"
           >
             <CalendarCheck
@@ -113,7 +115,7 @@ export function MobileNav({
           </Link>
           <Link
             href="/admin/inbox"
-            aria-label={`Skrzynka: ${inbox}`}
+            aria-label={t("mobile.inboxAria", { count: inbox })}
             className="text-ink relative flex h-11 w-11 items-center justify-center"
           >
             <Mail
@@ -131,7 +133,7 @@ export function MobileNav({
           </Link>
           <Link
             href="/admin/alerty"
-            aria-label={`Alerty: ${alerts}`}
+            aria-label={t("mobile.alertsAria", { count: alerts })}
             className="text-ink relative flex h-11 w-11 items-center justify-center"
           >
             <TriangleAlert
@@ -154,7 +156,7 @@ export function MobileNav({
           type="button"
           onClick={() => setOpen((v) => !v)}
           aria-expanded={open}
-          aria-label={open ? "Zamknij menu" : "Otwórz menu"}
+          aria-label={open ? t("mobile.closeMenu") : t("mobile.openMenu")}
           className="text-ink flex h-10 w-10 items-center justify-center"
         >
           {open ? (
@@ -205,7 +207,7 @@ export function MobileNav({
             <p className="text-ink-faint truncate text-[10px]">{admin.email}</p>
             <form action={onSignOut}>
               <button className="label-tight text-red mt-3 text-[10px]">
-                Wyloguj
+                {t("mobile.signOut")}
               </button>
             </form>
           </div>

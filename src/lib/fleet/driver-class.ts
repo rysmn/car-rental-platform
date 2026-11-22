@@ -1,3 +1,5 @@
+import type { Bilingual } from "@/lib/i18n-pick";
+
 /**
  * Which set of driver requirements a car falls under.
  *
@@ -20,10 +22,10 @@ export const DRIVER_CLASSES = ["standard", "premium", "van_bus"] as const;
 
 export type DriverClass = (typeof DRIVER_CLASSES)[number];
 
-export const DRIVER_CLASS_LABEL: Record<DriverClass, string> = {
-  standard: "Standard",
-  premium: "Premium",
-  van_bus: "Van / Bus",
+export const DRIVER_CLASS_LABEL: Record<DriverClass, Bilingual> = {
+  standard: { pl: "Standard", en: "Standard" },
+  premium: { pl: "Premium", en: "Premium" },
+  van_bus: { pl: "Van / Bus", en: "Van / Bus" },
 };
 
 /** Wording for the public side, where "van_bus" would read as a database key. */

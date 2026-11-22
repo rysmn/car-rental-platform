@@ -22,6 +22,13 @@ export function createLocalStorage(): StorageDriver {
       // driver's presigned URLs in production.
       return `/api/dev-storage/${encodeURIComponent(key)}`;
     },
+    async get(key: string) {
+      try {
+        return await fs.readFile(path.join(ROOT, key));
+      } catch {
+        return null;
+      }
+    },
     async delete(key: string) {
       await fs.rm(path.join(ROOT, key), { force: true });
     },

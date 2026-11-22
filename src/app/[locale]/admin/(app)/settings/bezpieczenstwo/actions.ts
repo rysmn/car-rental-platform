@@ -1,6 +1,7 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
+import { getTranslations } from "next-intl/server";
 import { bramaKrytyczna } from "@/lib/auth/critical";
 import { sql } from "drizzle-orm";
 import { getDb } from "@/lib/db";
@@ -41,6 +42,7 @@ export async function requestCacheCleanup(): Promise<CacheActionResult> {
   const brama = await bramaKrytyczna("bezpieczenstwo.zmien");
   if (!brama.ok) return { ok: false, error: brama.error };
   const admin = brama.admin;
+  const t = await getTranslations("Admin.settings.cacheActions");
 
   try {
     // Rate limit and double-click guard in a single statement, on purpose. Two
@@ -61,11 +63,7 @@ export async function requestCacheCleanup(): Promise<CacheActionResult> {
 
     const claimed = (Array.isArray(rows) ? rows : []).length > 0;
     if (!claimed) {
-      return {
-        ok: false,
-        error:
-          "Czyszczenie już zostało zlecone albo właśnie trwa. Odśwież stronę za chwilę.",
-      };
+      return { ok: false, error: t("alreadyQueued") };
     }
 
     await recordAudit({
@@ -78,13 +76,9 @@ export async function requestCacheCleanup(): Promise<CacheActionResult> {
     });
 
     revalidatePath("/admin/settings/bezpieczenstwo");
-    return {
-      ok: true,
-      message:
-        "Zlecono czyszczenie build cache. Serwer wykona je w ciągu minuty — odśwież stronę.",
-    };
+    return { ok: true, message: t("queued") };
   } catch (err) {
     adminActionFailed("requestCacheCleanup", err);
-    return { ok: false, error: "Nie udało się zlecić czyszczenia." };
+    return { ok: false, error: t("failed") };
   }
 }

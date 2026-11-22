@@ -1,6 +1,7 @@
 "use client";
 
 import { useActionState } from "react";
+import { useLocale, useTranslations } from "next-intl";
 import { updateOdometer, type OdometerResult } from "./actions";
 import {
   nadprzebiegKm,
@@ -31,6 +32,8 @@ export function OdometerForm({
   /** Stawka za kilometr ponad limit — również z migawki. `null` = nie zapisano. */
   stawkaGroszeZaKm: number | null;
 }) {
+  const t = useTranslations("Admin.reservations.odometer");
+  const locale = useLocale();
   const [state, action, pending] = useActionState<
     OdometerResult | null,
     FormData
@@ -59,7 +62,7 @@ export function OdometerForm({
       <div className="grid gap-3 sm:grid-cols-2">
         <label className="flex flex-col gap-1">
           <span className="label-tight text-ink-faint text-[10px]">
-            Licznik przy wydaniu (km)
+            {t("startLabel")}
           </span>
           <input
             name="startOdometerKm"
@@ -72,7 +75,7 @@ export function OdometerForm({
         </label>
         <label className="flex flex-col gap-1">
           <span className="label-tight text-ink-faint text-[10px]">
-            Licznik przy zwrocie (km)
+            {t("endLabel")}
           </span>
           <input
             name="endOdometerKm"
@@ -88,46 +91,42 @@ export function OdometerForm({
       {driven != null && (
         <div className="text-xs tabular-nums">
           <p className="text-silver">
-            Przejechano {driven.toLocaleString("pl-PL")} km
+            {t("driven", { km: driven.toLocaleString(locale) })}
             {limitKm != null && (
               <span className="text-ink-faint">
-                {" · limit "}
-                {limitKm.toLocaleString("pl-PL")} km
+                {t("limit", { km: limitKm.toLocaleString(locale) })}
               </span>
             )}
           </p>
           {limitKm != null && ponadLimit != null && ponadLimit > 0 && (
             <div className="border-line-strong mt-2 border-l-2 pl-3">
               <p className="text-ink">
-                Przebieg ponad limit: {ponadLimit.toLocaleString("pl-PL")} km
+                {t("overLimit", { km: ponadLimit.toLocaleString(locale) })}
               </p>
               {oplata != null && stawkaGroszeZaKm != null ? (
                 <>
                   <p className="text-silver">
-                    Stawka: {formatPlnDokladnie(stawkaGroszeZaKm, "pl")}/km
+                    {t("rate", {
+                      rate: formatPlnDokladnie(stawkaGroszeZaKm, locale),
+                    })}
                     <span className="text-ink-faint">
-                      {" (ze stawki zapisanej w rezerwacji)"}
+                      {t("rateFromBooking")}
                     </span>
                   </p>
                   <p className="text-ink font-bold">
-                    Opłata za nadprzebieg: {formatPln(oplata, "pl")}
+                    {t("fee", { fee: formatPln(oplata, locale) })}
                   </p>
                 </>
               ) : (
                 /* Brak stawki w migawce — rezerwacja sprzed 01.09.2026.
                    Mówimy o tym wprost; podstawienie dzisiejszej stawki
                    zmieniłoby warunki zamkniętej umowy. */
-                <p className="text-ink-faint">
-                  Stawka nadprzebiegu nie była zapisana przy tej rezerwacji —
-                  rozlicz ją ręcznie według umowy.
-                </p>
+                <p className="text-ink-faint">{t("noRate")}</p>
               )}
             </div>
           )}
           {limitKm != null && ponadLimit === 0 && (
-            <p className="text-ink-faint mt-1">
-              Limit nieprzekroczony — brak opłaty za nadprzebieg.
-            </p>
+            <p className="text-ink-faint mt-1">{t("noOverLimit")}</p>
           )}
         </div>
       )}
@@ -138,19 +137,16 @@ export function OdometerForm({
           disabled={pending}
           className="label border-line-strong inline-flex h-9 items-center border px-4 text-xs text-ink transition-colors hover:border-ink hover:bg-ink/5 disabled:opacity-50"
         >
-          {pending ? "Zapisywanie…" : "Zapisz licznik"}
+          {pending ? t("saving") : t("save")}
         </button>
         {state?.ok && (
-          <span className="text-xs text-emerald-400">Zapisano ✓</span>
+          <span className="text-xs text-emerald-400">{t("saved")}</span>
         )}
         {state && !state.ok && (
           <span className="text-red text-xs">{state.error}</span>
         )}
       </div>
-      <p className="text-ink-faint text-xs">
-        Zapisanie stanu przy zwrocie aktualizuje też przebieg egzemplarza we
-        flocie.
-      </p>
+      <p className="text-ink-faint text-xs">{t("hint")}</p>
     </form>
   );
 }

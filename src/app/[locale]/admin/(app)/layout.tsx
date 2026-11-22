@@ -1,6 +1,6 @@
 import Image from "next/image";
 import { redirect } from "next/navigation";
-import { setRequestLocale } from "next-intl/server";
+import { getTranslations, setRequestLocale } from "next-intl/server";
 import { Link } from "@/i18n/navigation";
 import { signOut } from "@/lib/auth/config";
 import { currentAdmin } from "@/lib/auth/guard";
@@ -86,28 +86,28 @@ const RESERVATION_COLOR = "#2EC4B6";
 const NAV = [
   {
     href: "/admin",
-    label: "Pulpit",
+    labelKey: "nav.dashboard",
     icon: <Gauge {...ICON} />,
     color: "#4DA3FF",
   },
   {
     href: "/admin/reservations",
     perm: "rezerwacje.podglad" as Permission,
-    label: "Rezerwacje",
+    labelKey: "nav.reservations",
     icon: <CalendarCheck {...ICON} />,
     color: "#2EC4B6",
   },
   {
     href: "/admin/customers",
     perm: "klienci.podglad" as Permission,
-    label: "Klienci",
+    labelKey: "nav.customers",
     icon: <Users {...ICON} />,
     color: "#6CC2FF",
   },
   {
     href: "/admin/fleet",
     perm: "flota.podglad" as Permission,
-    label: "Flota",
+    labelKey: "nav.fleet",
     icon: <CarFront {...ICON} />,
     color: "#60A5FA",
   },
@@ -119,14 +119,14 @@ const NAV = [
   {
     href: "/admin/szkody",
     perm: "wydania.prowadz" as Permission,
-    label: "Szkody",
+    labelKey: "nav.damages",
     icon: <ShieldAlert {...ICON} />,
     color: "#F87171",
   },
   {
     href: "/admin/analytics",
     perm: "analityka.podglad" as Permission,
-    label: "Analityka",
+    labelKey: "nav.analytics",
     icon: <ChartNoAxesCombined {...ICON} />,
     color: "#4ADE80",
   },
@@ -135,7 +135,7 @@ const NAV = [
   {
     href: "/admin/finanse",
     perm: "finanse.podglad" as Permission,
-    label: "Finanse",
+    labelKey: "nav.finance",
     icon: <Wallet {...ICON} />,
     color: "#34D399",
   },
@@ -147,21 +147,21 @@ const NAV = [
   {
     href: "/admin/kaucje",
     perm: "kaucje.prowadz" as Permission,
-    label: "Kaucje",
+    labelKey: "nav.deposits",
     icon: <HandCoins {...ICON} />,
     color: "#F472B6",
   },
   {
     href: "/admin/chatbot",
     perm: "czat.podglad" as Permission,
-    label: "Chatbot",
+    labelKey: "nav.chatbot",
     icon: <MessageCircleMore {...ICON} />,
     color: "#C084FC",
   },
   {
     href: "/admin/pricing",
     perm: "ceny.zmien" as Permission,
-    label: "Cennik",
+    labelKey: "nav.pricing",
     icon: <Tag {...ICON} />,
     color: "#FBBF24",
   },
@@ -173,7 +173,7 @@ const NAV = [
   {
     href: "/admin/zasady",
     perm: "zasady.zmien" as Permission,
-    label: "Zasady wynajmu",
+    labelKey: "nav.rentalTerms",
     icon: <ScrollText {...ICON} />,
     color: "#B388FF",
   },
@@ -188,28 +188,28 @@ const NAV = [
   {
     href: "/admin/dokumenty",
     perm: "dokumenty.podglad" as Permission,
-    label: "Umowy i dokumenty",
+    labelKey: "nav.documents",
     icon: <FileText {...ICON} />,
     color: "#4DD0E1",
   },
   {
     href: "/admin/settings",
     perm: "ustawienia.zmien" as Permission,
-    label: "Ustawienia",
+    labelKey: "nav.settings",
     icon: <Settings {...ICON} />,
     color: "#94A3B8",
   },
   {
     href: "/admin/users",
     perm: "konta.zarzadzaj" as Permission,
-    label: "Użytkownicy",
+    labelKey: "nav.users",
     icon: <UserCog {...ICON} />,
     color: "#2DD4BF",
   },
   {
     href: "/admin/audit",
     perm: "audyt.podglad" as Permission,
-    label: "Dziennik zdarzeń",
+    labelKey: "nav.auditLog",
     icon: <FileClock {...ICON} />,
     color: "#FB923C",
   },
@@ -235,6 +235,7 @@ export default async function AdminLayout({
 }) {
   const { locale } = await params;
   setRequestLocale(locale);
+  const t = await getTranslations("Admin.shell");
 
   // Authoritative access check (defense in depth with the middleware guard).
   // `currentAdmin` re-reads the account, so deleting or deactivating someone
@@ -274,7 +275,7 @@ export default async function AdminLayout({
   */
   const nav = NAV.filter(
     (item) => !("perm" in item) || can(admin.role, item.perm),
-  );
+  ).map((item) => ({ ...item, label: t(item.labelKey) }));
 
   // Counted here rather than per page so the badge is the same number
   // wherever the operator happens to be standing.
@@ -308,7 +309,7 @@ export default async function AdminLayout({
 
   const themeToggle = (
     <ThemeToggle
-      labels={{ light: "Włącz tryb jasny", dark: "Włącz tryb ciemny" }}
+      labels={{ light: t("switchToLight"), dark: t("switchToDark") }}
     />
   );
 
@@ -340,9 +341,7 @@ export default async function AdminLayout({
               that is where somebody looks when the screen is unreadable —
               not at the bottom of a sidebar they have to scroll. */}
           <div className="mt-3 flex items-center justify-between gap-2">
-            <p className="label-tight text-ink-faint text-[10px]">
-              Panel administracyjny
-            </p>
+            <p className="label-tight text-ink-faint text-[10px]">{t("adminPanel")}</p>
             {themeToggle}
           </div>
 
@@ -368,7 +367,7 @@ export default async function AdminLayout({
                 style={{ color: RESERVATION_COLOR }}
                 className="admin-nav-icon shrink-0"
               />{" "}
-              Rezerwacje
+              {t("nav.reservations")}
             </span>
             <span
               className={`label-tight rounded-pill px-2 py-0.5 text-[10px] ${
@@ -393,7 +392,7 @@ export default async function AdminLayout({
                 style={{ color: INBOX_COLOR }}
                 className="admin-nav-icon shrink-0"
               />{" "}
-              Skrzynka
+              {t("inbox")}
             </span>
             <span
               className={`label-tight rounded-pill px-2 py-0.5 text-[10px] ${
@@ -421,7 +420,7 @@ export default async function AdminLayout({
                 style={{ color: ALERT_COLOR }}
                 className="admin-nav-icon shrink-0"
               />{" "}
-              Alerty
+              {t("alerts")}
             </span>
             <span
               className={`label-tight rounded-pill px-2 py-0.5 text-[10px] ${
@@ -443,10 +442,10 @@ export default async function AdminLayout({
         <div className="border-line border-t p-4">
           <div className="mb-3 flex items-center justify-between">
             <span className="label-tight text-ink-faint text-[10px]">
-              Wygląd
+              {t("appearance")}
             </span>
             <ThemeToggle
-              labels={{ light: "Włącz tryb jasny", dark: "Włącz tryb ciemny" }}
+              labels={{ light: t("switchToLight"), dark: t("switchToDark") }}
             />
           </div>
           <p className="text-ink truncate text-xs">{admin.name}</p>
@@ -461,7 +460,7 @@ export default async function AdminLayout({
           />
           <form action={doSignOut}>
             <button className="label-tight text-red hover:text-ink tap mt-3 text-[10px] transition-colors">
-              Wyloguj
+              {t("signOut")}
             </button>
           </form>
         </div>

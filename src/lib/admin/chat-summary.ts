@@ -1,6 +1,7 @@
 import "server-only";
 import { sql } from "drizzle-orm";
 import { getDb } from "@/lib/db";
+import type { Bilingual } from "@/lib/i18n-pick";
 
 /**
  * One conversation, summarised — what was wanted, what happened, and where it
@@ -55,19 +56,46 @@ export type ConversationSummary = {
   aiUsed: boolean;
   aiFallback: boolean;
   unansweredCount: number;
-  noBookingReason: string;
+  noBookingReason: Bilingual;
 };
 
-const REASON: Record<string, string> = {
-  brak_auta: "Brak odpowiedniego auta we flocie",
-  brak_dostepnosci: "Brak dostępności w terminie",
-  pracownik: "Przekazano do pracownika",
-  lead: "Zostawił kontakt zamiast rezerwować",
-  nie_rozpoznano: "Nie rozpoznano pytania",
-  tylko_sprawdzal: "Klient tylko sprawdzał",
-  zamknieto: "Zamknięto rozmowę po pierwszej wiadomości",
-  brak_danych: "Brak danych — za mało śladów, żeby orzec",
-  rezerwacja: "Doszło do przejścia na formularz rezerwacji",
+const REASON: Record<string, Bilingual> = {
+  brak_auta: {
+    pl: "Brak odpowiedniego auta we flocie",
+    en: "No suitable car in the fleet",
+  },
+  brak_dostepnosci: {
+    pl: "Brak dostępności w terminie",
+    en: "Not available on the dates",
+  },
+  pracownik: {
+    pl: "Przekazano do pracownika",
+    en: "Handed over to a member of staff",
+  },
+  lead: {
+    pl: "Zostawił kontakt zamiast rezerwować",
+    en: "Left contact details instead of booking",
+  },
+  nie_rozpoznano: {
+    pl: "Nie rozpoznano pytania",
+    en: "Question not recognised",
+  },
+  tylko_sprawdzal: {
+    pl: "Klient tylko sprawdzał",
+    en: "Customer was only checking",
+  },
+  zamknieto: {
+    pl: "Zamknięto rozmowę po pierwszej wiadomości",
+    en: "Conversation closed after the first message",
+  },
+  brak_danych: {
+    pl: "Brak danych — za mało śladów, żeby orzec",
+    en: "No data — too few traces to decide",
+  },
+  rezerwacja: {
+    pl: "Doszło do przejścia na formularz rezerwacji",
+    en: "Moved on to the booking form",
+  },
 };
 
 export async function getConversationSummary(
@@ -168,6 +196,6 @@ export async function getConversationSummary(
     aiUsed: b(h.ai_used),
     aiFallback: b(h.ai_fallback),
     unansweredCount: Number(h.unanswered_count) || 0,
-    noBookingReason: REASON[reasonKey] ?? reasonKey,
+    noBookingReason: REASON[reasonKey] ?? { pl: reasonKey, en: reasonKey },
   };
 }

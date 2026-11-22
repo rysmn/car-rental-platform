@@ -1,4 +1,5 @@
 import type { LeadStatus, RequestSource } from "@/lib/db/schema";
+import type { Bilingual } from "@/lib/i18n-pick";
 
 /**
  * Napisy skrzynki — w module BEZ `"use client"`, i to jest cała sztuczka.
@@ -16,12 +17,12 @@ import type { LeadStatus, RequestSource } from "@/lib/db/schema";
  * a nie w żadnym z dwóch komponentów.
  */
 
-export const SOURCE_LABEL: Record<RequestSource, string> = {
-  chat: "Asystent",
-  b2b: "Firma",
-  car: "Samochód",
-  contact: "Formularz",
-  reservation: "Rezerwacja",
+export const SOURCE_LABEL: Record<RequestSource, Bilingual> = {
+  chat: { pl: "Asystent", en: "Assistant" },
+  b2b: { pl: "Firma", en: "Company" },
+  car: { pl: "Samochód", en: "Car" },
+  contact: { pl: "Formularz", en: "Form" },
+  reservation: { pl: "Rezerwacja", en: "Reservation" },
 };
 
 /**
@@ -40,19 +41,19 @@ export const SOURCE_LABEL: Record<RequestSource, string> = {
  *                        był klient" to dwie różne rzeczy i tylko drugiej
  *                        z nich nie wolno wliczać do statystyk zapytań.
  */
-export const STATUS_LABEL: Record<LeadStatus, string> = {
-  new: "Nowa",
-  contact: "W kontakcie",
-  waiting_customer: "Czeka na klienta",
-  offer: "Oferta wysłana",
-  reservation: "Rezerwacja",
-  closed: "Zamknięta",
-  spam: "Spam",
+export const STATUS_LABEL: Record<LeadStatus, Bilingual> = {
+  new: { pl: "Nowa", en: "New" },
+  contact: { pl: "W kontakcie", en: "In contact" },
+  waiting_customer: { pl: "Czeka na klienta", en: "Waiting for customer" },
+  offer: { pl: "Oferta wysłana", en: "Offer sent" },
+  reservation: { pl: "Rezerwacja", en: "Reservation" },
+  closed: { pl: "Zamknięta", en: "Closed" },
+  spam: { pl: "Spam", en: "Spam" },
 };
 
 /** Ten sam słownik w formie listy — do pól wyboru, gdzie liczy się kolejność. */
 export const STATUS_OPTIONS = (
-  Object.entries(STATUS_LABEL) as [LeadStatus, string][]
+  Object.entries(STATUS_LABEL) as [LeadStatus, Bilingual][]
 ).map(([value, label]) => ({ value, label }));
 
 /**

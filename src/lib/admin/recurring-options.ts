@@ -1,4 +1,5 @@
 import type { ExpenseCategory } from "@/lib/admin/expense-options";
+import type { Bilingual } from "@/lib/i18n-pick";
 
 // Client-safe half of the recurring-cost module: the interval vocabulary, the
 // labels, and the pure period maths. Split out of `lib/admin/recurring`, which
@@ -16,10 +17,10 @@ import type { ExpenseCategory } from "@/lib/admin/expense-options";
 export const RECURRING_INTERVALS = ["monthly", "quarterly", "yearly"] as const;
 export type RecurringInterval = (typeof RECURRING_INTERVALS)[number];
 
-export const INTERVAL_LABEL: Record<RecurringInterval, string> = {
-  monthly: "Co miesiąc",
-  quarterly: "Co kwartał",
-  yearly: "Co rok",
+export const INTERVAL_LABEL: Record<RecurringInterval, Bilingual> = {
+  monthly: { pl: "Co miesiąc", en: "Monthly" },
+  quarterly: { pl: "Co kwartał", en: "Quarterly" },
+  yearly: { pl: "Co rok", en: "Yearly" },
 };
 
 const MONTHS_PER: Record<RecurringInterval, number> = {

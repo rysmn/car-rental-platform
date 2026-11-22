@@ -1,3 +1,4 @@
+import type { Bilingual } from "@/lib/i18n-pick";
 import "server-only";
 import { sql } from "drizzle-orm";
 import { getDb } from "@/lib/db";
@@ -40,10 +41,10 @@ export type DocumentAlert = {
  */
 export type DocumentKind = "insurance" | "inspection" | "service";
 
-export const DOCUMENT_KIND_LABEL: Record<DocumentKind, string> = {
-  insurance: "OC/AC",
-  inspection: "Przegląd",
-  service: "Serwis",
+export const DOCUMENT_KIND_LABEL: Record<DocumentKind, Bilingual> = {
+  insurance: { pl: "OC/AC", en: "Liability/comprehensive insurance" },
+  inspection: { pl: "Przegląd", en: "Technical inspection" },
+  service: { pl: "Serwis", en: "Service" },
 };
 
 export type ModelPerformance = {

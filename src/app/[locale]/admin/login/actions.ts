@@ -2,6 +2,7 @@
 
 import { AuthError } from "next-auth";
 import { clientIp } from "@/lib/security/client-ip";
+import { limit, REGULY } from "@/lib/security/rate-limit";
 import { headers } from "next/headers";
 import { POTRZEBNY_KOD, signIn, ZLY_KOD } from "@/lib/auth/config";
 
@@ -39,6 +40,12 @@ export async function loginAction(
   // logowania, więc podrobiony kasował jedno i drugie.
   const adres = clientIp(h);
   const ip = adres === "unknown" ? null : adres;
+  // Limit częstotliwości PRZED sprawdzeniem hasła: zlicza każdą próbę, także
+  // tę z dobrym hasłem. Odpowiedź taka sama jak przy złych danych, żeby nie
+  // zdradzać, czy konto istnieje lub czy limit już zadziałał.
+  const email = String(formData.get("email") ?? "").trim().toLowerCase();
+  const prog = limit(REGULY.logowanie, [ip, email || null]);
+  if (prog.przekroczony) return { error: true };
   try {
     await signIn("credentials", {
       email: String(formData.get("email") ?? ""),

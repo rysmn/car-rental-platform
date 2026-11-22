@@ -5,7 +5,7 @@ import { defineRouting } from "next-intl/routing";
 // Accept-Language; English is reached explicitly via the switcher (`/en`).
 export const routing = defineRouting({
   locales: ["pl", "en"],
-  defaultLocale: "pl",
+  defaultLocale: "en", // LOKALER TEST: Englisch als Standard
   localePrefix: "as-needed",
   localeDetection: false,
   pathnames: {

@@ -1,9 +1,8 @@
-import { setRequestLocale } from "next-intl/server";
+import { getTranslations, setRequestLocale } from "next-intl/server";
 import { guardPage } from "@/lib/auth/guard";
 import { Link } from "@/i18n/navigation";
 import {
   DAMAGE_STATUSES,
-  DAMAGE_STATUS_LABEL,
   DAMAGE_STATUS_TONE,
   listCarChoices,
   listDamages,
@@ -12,9 +11,18 @@ import {
   type DamageStatus,
 } from "@/lib/admin/damages";
 import { DamageForm } from "./DamageForm";
-import { formatDatePl, formatPln, formatPlnPrecise } from "@/lib/format";
+import { formatPln, formatPlnPrecise } from "@/lib/format";
+import { formatIsoDate } from "../finanse/date-format";
 
-export const metadata = { title: "Szkody" };
+export async function generateMetadata({
+  params,
+}: {
+  params: Promise<{ locale: string }>;
+}) {
+  const { locale } = await params;
+  const t = await getTranslations({ locale, namespace: "Admin.damages" });
+  return { title: t("title") };
+}
 
 function asStatus(v: unknown): DamageStatus | undefined {
   return typeof v === "string" && DAMAGE_STATUSES.includes(v as DamageStatus)
@@ -39,6 +47,7 @@ export default async function DamagesPage({
   const { locale } = await params;
   setRequestLocale(locale);
   await guardPage("wydania.prowadz");
+  const t = await getTranslations("Admin.damages");
 
   const sp = await searchParams;
   const status = asStatus(sp.status);
@@ -57,9 +66,12 @@ export default async function DamagesPage({
     <div>
       <header className="mb-8 flex flex-wrap items-end justify-between gap-4">
         <div>
-          <h1 className="font-heading text-ink text-2xl">Szkody</h1>
+          <h1 className="font-heading text-ink text-2xl">{t("title")}</h1>
           <p className="text-silver mt-1 text-sm">
-            {open.length} spraw w toku · nasz koszt {formatPlnPrecise(openOurs, "pl")}
+            {t("subtitle", {
+              count: open.length,
+              amount: formatPlnPrecise(openOurs, locale),
+            })}
           </p>
         </div>
         <Link
@@ -70,14 +82,14 @@ export default async function DamagesPage({
           }
           className="label bg-red hover:bg-red-hover tap inline-flex h-12 items-center px-6 text-xs text-white transition-colors"
         >
-          {nowa ? "Zamknij formularz" : "+ Nowa szkoda"}
+          {nowa ? t("newForm.close") : t("newForm.open")}
         </Link>
       </header>
 
       {nowa && (
         <section className="border-line bg-graphite/40 mb-8 border p-6">
           <h2 className="label-tight text-ink-faint mb-4 text-[10px]">
-            Nowa szkoda
+            {t("newForm.title")}
           </h2>
           <DamageForm cars={cars} reservations={reservations} existing={null} />
         </section>
@@ -92,7 +104,7 @@ export default async function DamagesPage({
               : "border-ink text-ink"
           }`}
         >
-          Wszystkie ({all.length})
+          {t("filter.all", { count: all.length })}
         </Link>
         {DAMAGE_STATUSES.map((s) => (
           <Link
@@ -104,27 +116,27 @@ export default async function DamagesPage({
                 : "border-line-strong text-ink-faint hover:border-ink hover:text-ink"
             }`}
           >
-            {DAMAGE_STATUS_LABEL[s]} ({all.filter((d) => d.status === s).length})
+            {t(`status.${s}`)} ({all.filter((d) => d.status === s).length})
           </Link>
         ))}
       </div>
 
       {rows.length === 0 ? (
         <p className="border-line bg-graphite/40 text-silver border p-10 text-center text-sm">
-          {status ? "Żadna szkoda nie jest w tym stanie." : "Nie ma żadnej szkody."}
+          {status ? t("empty.filtered") : t("empty.none")}
         </p>
       ) : (
         <div className="border-line overflow-x-auto border">
           <table className="w-full min-w-3xl border-collapse text-sm">
             <thead>
               <tr className="border-line bg-graphite/60 border-b text-left">
-                <Th>Data</Th>
-                <Th>Auto</Th>
-                <Th>Co się stało</Th>
-                <Th>Klient</Th>
-                <Th className="text-right">Naprawa</Th>
-                <Th className="text-right">Nasz koszt</Th>
-                <Th>Status</Th>
+                <Th>{t("columns.date")}</Th>
+                <Th>{t("columns.car")}</Th>
+                <Th>{t("columns.what")}</Th>
+                <Th>{t("columns.customer")}</Th>
+                <Th className="text-right">{t("columns.repair")}</Th>
+                <Th className="text-right">{t("columns.ours")}</Th>
+                <Th>{t("columns.status")}</Th>
               </tr>
             </thead>
             <tbody>
@@ -134,7 +146,7 @@ export default async function DamagesPage({
                   className="border-line/60 hover:bg-ink/5 border-b transition-colors last:border-0"
                 >
                   <Td className="text-silver whitespace-nowrap">
-                    {formatDatePl(d.occurredOn)}
+                    {formatIsoDate(d.occurredOn, locale)}
                   </Td>
                   <Td>
                     <span className="text-ink">{d.car}</span>
@@ -151,7 +163,7 @@ export default async function DamagesPage({
                     </Link>
                     {d.photos.length > 0 && (
                       <span className="text-ink-faint ml-2 text-xs">
-                        {d.photos.length} zdj.
+                        {t("photoCount", { count: d.photos.length })}
                       </span>
                     )}
                   </Td>
@@ -173,7 +185,7 @@ export default async function DamagesPage({
                     <span
                       className={`label-tight border px-2 py-1 text-[10px] ${DAMAGE_STATUS_TONE[d.status]}`}
                     >
-                      {DAMAGE_STATUS_LABEL[d.status]}
+                      {t(`status.${d.status}`)}
                     </span>
                   </Td>
                 </tr>

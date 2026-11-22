@@ -1,13 +1,6 @@
+import { getTranslations } from "next-intl/server";
 import { Link } from "@/i18n/navigation";
 import type { DocumentAlert } from "@/lib/admin/stats";
-
-// Spelled out here rather than reusing the email's shorter "OC/AC": the panel
-// has the width, and this list is read by whoever has to act on it.
-const KIND_LABEL: Record<DocumentAlert["kind"], string> = {
-  insurance: "Ubezpieczenie OC/AC",
-  inspection: "Przegląd",
-  service: "Serwis",
-};
 
 function formatPl(iso: string): string {
   const [y, m, d] = iso.split("-");
@@ -22,18 +15,26 @@ function formatPl(iso: string): string {
  * list says so explicitly, because a blank space reads as "not loaded yet"
  * rather than "nothing to do".
  */
-export function DocumentAlerts({
+// Spelled out here rather than reusing the email's shorter "OC/AC": the panel
+// has the width, and this list is read by whoever has to act on it.
+export async function DocumentAlerts({
   alerts,
   limit,
 }: {
   alerts: DocumentAlert[];
   limit?: number;
 }) {
+  const t = await getTranslations("Admin.components");
+  const KIND_LABEL: Record<DocumentAlert["kind"], string> = {
+    insurance: t("documents.insurance"),
+    inspection: t("documents.inspection"),
+    service: t("documents.service"),
+  };
+
   if (alerts.length === 0) {
     return (
       <p className="border-line text-silver border px-5 py-6 text-center text-sm">
-        Brak terminów w ciągu najbliższych 30 dni — dokumenty ważne, serwisy
-        zaplanowane dalej.
+        {t("documents.none")}
       </p>
     );
   }
@@ -62,10 +63,10 @@ export function DocumentAlerts({
               }
             >
               {a.level === "overdue"
-                ? `Po terminie ${Math.abs(a.daysLeft)} dni`
+                ? t("documents.overdue", { count: Math.abs(a.daysLeft) })
                 : a.daysLeft === 0
-                  ? "Wygasa dziś"
-                  : `Zostało ${a.daysLeft} dni`}
+                  ? t("documents.expiresToday")
+                  : t("documents.daysLeft", { count: a.daysLeft })}
             </span>
           </li>
         ))}
@@ -75,7 +76,7 @@ export function DocumentAlerts({
           href="/admin/analytics"
           className="label-tight text-silver mt-3 inline-block text-[10px] transition-colors hover:text-ink"
         >
-          Wszystkie przypomnienia ({alerts.length}) →
+          {t("documents.allReminders", { count: alerts.length })}
         </Link>
       )}
     </>

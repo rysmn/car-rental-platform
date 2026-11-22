@@ -2,6 +2,7 @@
 
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
+import { useLocale, useTranslations } from "next-intl";
 import { moveReservation } from "./actions";
 import { formatPln } from "@/lib/format";
 
@@ -36,6 +37,8 @@ export function MoveCar({
   units: Unit[];
   currentDailyGrosze: number;
 }) {
+  const t = useTranslations("Admin.reservations.moveCar");
+  const locale = useLocale();
   const router = useRouter();
   const [open, setOpen] = useState(false);
   const [pending, startTransition] = useTransition();
@@ -46,22 +49,20 @@ export function MoveCar({
   return (
     <div className="border-line bg-graphite/40 mt-6 border p-6">
       <div className="flex flex-wrap items-center justify-between gap-3">
-        <h2 className="label-tight text-ink-faint text-[10px]">Zmiana auta</h2>
+        <h2 className="label-tight text-ink-faint text-[10px]">{t("heading")}</h2>
         <button
           type="button"
           onClick={() => setOpen((v) => !v)}
           className="label-tight border-line-strong text-ink hover:border-ink hover:bg-ink/5 tap inline-flex h-11 items-center border px-4 text-[10px] transition-colors"
         >
-          {open ? "Zwiń" : `Pokaż wolne auta (${others.length})`}
+          {open ? t("collapse") : t("showFree", { count: others.length })}
         </button>
       </div>
 
       {open && (
         <>
           {others.length === 0 ? (
-            <p className="text-ink-faint mt-4 text-sm">
-              W tym terminie nie ma innego wolnego auta.
-            </p>
+            <p className="text-ink-faint mt-4 text-sm">{t("none")}</p>
           ) : (
             <ul className="divide-line mt-4 divide-y">
               {others.map((u) => (
@@ -75,11 +76,13 @@ export function MoveCar({
                       <span className="text-ink-faint ml-2">{u.plate}</span>
                     )}
                     <span className="text-ink-faint ml-3 text-xs tabular-nums">
-                      {formatPln(u.dailyPriceGrosze, "pl")}/doba
+                      {t("perDay", {
+                        price: formatPln(u.dailyPriceGrosze, locale),
+                      })}
                       {u.dailyPriceGrosze > currentDailyGrosze
-                        ? " · wyższa klasa"
+                        ? t("higherClass")
                         : u.dailyPriceGrosze < currentDailyGrosze
-                          ? " · niższa klasa"
+                          ? t("lowerClass")
                           : ""}
                     </span>
                   </span>
@@ -101,17 +104,14 @@ export function MoveCar({
                     }}
                     className="label-tight bg-red hover:bg-red-hover tap inline-flex h-11 items-center px-4 text-[10px] whitespace-nowrap text-white transition-colors disabled:opacity-60"
                   >
-                    {pending ? "…" : "Przenieś tutaj"}
+                    {pending ? "…" : t("moveHere")}
                   </button>
                 </li>
               ))}
             </ul>
           )}
           {error && <p className="text-red mt-3 text-sm">{error}</p>}
-          <p className="text-ink-faint mt-4 text-[11px]">
-            Cena najmu nie zmienia się przy przesiadce — przeniesienie jest
-            decyzją firmy, nie nową ofertą dla klienta.
-          </p>
+          <p className="text-ink-faint mt-4 text-[11px]">{t("note")}</p>
         </>
       )}
     </div>

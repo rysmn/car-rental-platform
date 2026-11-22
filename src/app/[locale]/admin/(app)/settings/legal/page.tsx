@@ -1,4 +1,4 @@
-import { setRequestLocale } from "next-intl/server";
+import { setRequestLocale, getTranslations } from "next-intl/server";
 import { Link, type AppHref } from "@/i18n/navigation";
 import { getSetting } from "@/lib/admin/settings";
 import { getLegalDoc, legalDocToHtml } from "@/lib/legal/content";
@@ -8,13 +8,9 @@ import { LegalEditor } from "./LegalEditor";
 type Doc = "terms" | "privacy";
 type Loc = "pl" | "en";
 
-const DOCS: { key: Doc; label: string; path: string }[] = [
-  { key: "terms", label: "Regulamin", path: "/regulamin" },
-  {
-    key: "privacy",
-    label: "Polityka prywatności",
-    path: "/polityka-prywatnosci",
-  },
+const DOC_PATHS: { key: Doc; path: string }[] = [
+  { key: "terms", path: "/regulamin" },
+  { key: "privacy", path: "/polityka-prywatnosci" },
 ];
 const LOCALES: { key: Loc; label: string }[] = [
   { key: "pl", label: "Polski" },
@@ -54,6 +50,8 @@ export default async function LegalSettingsPage({
   const { locale } = await params;
   setRequestLocale(locale);
   const sp = await searchParams;
+  const t = await getTranslations("Admin.settings.legal");
+  const tc = await getTranslations("Admin.settings.common");
 
   const doc: Doc = sp.doc === "privacy" ? "privacy" : "terms";
   const lang: Loc = sp.lang === "en" ? "en" : "pl";
@@ -68,7 +66,11 @@ export default async function LegalSettingsPage({
     ? stored
     : legalDocToHtml(getLegalDoc(doc, lang));
 
-  const current = DOCS.find((d) => d.key === doc)!;
+  const docs = DOC_PATHS.map((d) => ({
+    ...d,
+    label: t(`docs.${d.key}`),
+  }));
+  const current = docs.find((d) => d.key === doc)!;
 
   return (
     <div className="max-w-4xl">
@@ -77,20 +79,21 @@ export default async function LegalSettingsPage({
           href="/admin/settings"
           className="-my-2 inline-flex min-h-11 items-center label-tight text-silver text-[11px] transition-colors hover:text-ink"
         >
-          ← Ustawienia
+          {tc("back")}
         </Link>
         <h1 className="font-heading mt-4 text-2xl font-bold text-ink">
-          Dokumenty prawne
+          {t("title")}
         </h1>
         <p className="text-silver mt-1 text-sm">
-          Zapisana wersja zastępuje treść wbudowaną i jest publikowana pod{" "}
-          <span className="text-ink">{current.path}</span>. Treść jest
-          filtrowana pod kątem bezpieczeństwa przy zapisie.
+          {t.rich("intro", {
+            path: current.path,
+            b: (chunks) => <span className="text-ink">{chunks}</span>,
+          })}
         </p>
       </header>
 
       <div className="mb-4 flex flex-wrap gap-2">
-        {DOCS.map((d) => (
+        {docs.map((d) => (
           <Tab
             key={d.key}
             active={d.key === doc}
@@ -120,9 +123,7 @@ export default async function LegalSettingsPage({
       </div>
 
       <p className="text-ink-faint mb-4 text-xs">
-        {isOverride
-          ? "Publikowana jest wersja własna (edytowana w panelu)."
-          : "Publikowana jest wersja wbudowana."}
+        {isOverride ? t("status.custom") : t("status.builtIn")}
       </p>
 
       {/* Remount the editor when the document or language changes — Tiptap keeps

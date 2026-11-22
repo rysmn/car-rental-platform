@@ -1,5 +1,5 @@
 import { redirect } from "next/navigation";
-import { setRequestLocale } from "next-intl/server";
+import { getTranslations, setRequestLocale } from "next-intl/server";
 import { currentAdmin } from "@/lib/auth/guard";
 import { listAdmins } from "@/lib/admin/admins";
 import { formatDateTimePl } from "@/lib/format";
@@ -24,6 +24,16 @@ function Section({
   );
 }
 
+export async function generateMetadata({
+  params,
+}: {
+  params: Promise<{ locale: string }>;
+}) {
+  const { locale } = await params;
+  const t = await getTranslations({ locale, namespace: "Admin.users" });
+  return { title: t("metaTitle") };
+}
+
 export default async function UsersPage({
   params,
 }: {
@@ -31,6 +41,7 @@ export default async function UsersPage({
 }) {
   const { locale } = await params;
   setRequestLocale(locale);
+  const t = await getTranslations("Admin.users");
 
   // The layout already gates the whole panel; this re-check gives the page the
   // live role it needs to decide what to render.
@@ -48,7 +59,7 @@ export default async function UsersPage({
         locked: a.locked,
         lastLoginLabel: a.lastLoginAt
           ? formatDateTimePl(a.lastLoginAt)
-          : "nigdy",
+          : t("neverLoggedIn"),
         createdLabel: formatDateTimePl(a.createdAt),
       }))
     : [];
@@ -57,17 +68,14 @@ export default async function UsersPage({
     <div className="max-w-4xl">
       <header className="mb-8">
         <h1 className="font-heading text-2xl font-bold text-ink">
-          Użytkownicy
+          {t("title")}
         </h1>
-        <p className="text-silver mt-1 text-sm">
-          Konta z dostępem do panelu administracyjnego. Rejestracja publiczna
-          nie istnieje — konta zakłada się wyłącznie tutaj.
-        </p>
+        <p className="text-silver mt-1 text-sm">{t("intro")}</p>
       </header>
 
       <Section
-        title="Moje hasło"
-        subtitle="Zmiana hasła własnego konta — wymaga podania aktualnego hasła"
+        title={t("ownPasswordTitle")}
+        subtitle={t("ownPasswordSubtitle")}
       >
         <OwnPasswordForm />
       </Section>
@@ -75,29 +83,28 @@ export default async function UsersPage({
       {isSuperadmin ? (
         <>
           <Section
-            title="Nowy użytkownik"
-            subtitle="Utworzone konto może zalogować się od razu"
+            title={t("newUserTitle")}
+            subtitle={t("newUserSubtitle")}
           >
             <CreateAdminForm />
           </Section>
 
           <Section
-            title={`Konta (${admins.length})`}
-            subtitle="Edycja danych, roli i hasła, dezaktywacja oraz usuwanie kont"
+            title={t("accountsTitle", { count: admins.length })}
+            subtitle={t("accountsSubtitle")}
           >
             <AdminList admins={admins} currentAdminId={admin.id} />
             <p className="text-ink-faint mt-4 text-xs">
-              Rola <span className="text-silver">Superadmin</span> daje dostęp
-              do tej strony i zarządzania kontami. Rola{" "}
-              <span className="text-silver">Administrator</span> daje pełen
-              dostęp do reszty panelu, ale nie do kont.
+              {t.rich("rolesNote", {
+                b: (chunks) => <span className="text-silver">{chunks}</span>,
+              })}
             </p>
           </Section>
         </>
       ) : (
-        <Section title="Zarządzanie kontami">
+        <Section title={t("accountManagement")}>
           <p className="border-line bg-graphite/40 text-silver border p-6 text-sm">
-            Dodawanie, edycja i usuwanie kont wymaga roli Superadmin.
+            {t("cannotManage")}
           </p>
         </Section>
       )}

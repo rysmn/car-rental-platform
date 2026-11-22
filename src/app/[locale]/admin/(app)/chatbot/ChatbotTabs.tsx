@@ -1,4 +1,5 @@
 import { Link } from "@/i18n/navigation";
+import { useTranslations } from "next-intl";
 
 /**
  * Section navigation for the chatbot area.
@@ -8,15 +9,16 @@ import { Link } from "@/i18n/navigation";
  * thing that builds locally and fails in CI.
  */
 const TABS = [
-  { href: "/admin/chatbot", label: "Pulpit" },
-  { href: "/admin/chatbot/rozmowy", label: "Rozmowy" },
-  { href: "/admin/chatbot/leady", label: "Leady" },
-  { href: "/admin/chatbot/analityka", label: "Analityka" },
-  { href: "/admin/chatbot/pytania", label: "Pytania bez odpowiedzi" },
-  { href: "/admin/settings/chatbot", label: "Ustawienia" },
+  { href: "/admin/chatbot", label: "tabs.dashboard" },
+  { href: "/admin/chatbot/rozmowy", label: "tabs.conversations" },
+  { href: "/admin/chatbot/leady", label: "tabs.leads" },
+  { href: "/admin/chatbot/analityka", label: "tabs.analytics" },
+  { href: "/admin/chatbot/pytania", label: "tabs.questions" },
+  { href: "/admin/settings/chatbot", label: "tabs.settings" },
 ] as const;
 
 export function ChatbotTabs({ active }: { active: string }) {
+  const t = useTranslations("Admin.chatbot");
   return (
     // `.tap` zamiast `min-h-11 sm:min-h-0`: etykieta ma 10 px, więc sam wiersz
     // tekstu ma 16 px wysokości — za mało dla palca. O wysokości decyduje
@@ -31,7 +33,7 @@ export function ChatbotTabs({ active }: { active: string }) {
             tab.href === active ? "text-ink" : "text-ink-faint hover:text-ink"
           }`}
         >
-          {tab.label}
+          {t(tab.label)}
         </Link>
       ))}
     </nav>

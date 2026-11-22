@@ -5,6 +5,7 @@ import { bramaKrytyczna } from "@/lib/auth/critical";
 import { redirect } from "next/navigation";
 import { and, count, eq } from "drizzle-orm";
 import { z } from "zod";
+import { getTranslations } from "next-intl/server";
 import { getDb, schema } from "@/lib/db";
 import { requirePermission } from "@/lib/auth/guard";
 import { DEADLINE_KINDS } from "@/lib/admin/deadline-options";
@@ -261,37 +262,43 @@ const ExpenseSchema = z
     { path: ["periodEnd"] },
   );
 
+/** Message-catalogue keys for field names (see Admin.fleet.fieldLabels). */
 const FIELD_LABEL: Record<string, string> = {
-  slug: "identyfikator (slug)",
-  brand: "marka",
-  model: "model",
-  year: "rok",
-  seats: "liczba miejsc",
-  daily: "cena za dobę",
-  monthly: "cena miesięczna",
-  plate: "rejestracja",
-  vin: "VIN",
-  mileageKm: "przebieg",
-  purchasePrice: "cena zakupu",
-  purchasedOn: "data zakupu",
-  residualValue: "wartość po amortyzacji",
-  depreciationMonths: "okres amortyzacji",
-  periodStart: "okres od",
-  periodEnd: "okres do (musi być podany razem z „od” i nie wcześniejszy)",
-  amount: "kwota",
-  incurredOn: "data wydatku",
-  category: "rodzaj wydatku",
-  odometerKm: "przebieg przy wydatku",
-  driverClass: "klasa wymogów kierowcy (Standard / Premium / Van-Bus)",
+  slug: "fieldSlug",
+  brand: "fieldBrand",
+  model: "fieldModel",
+  year: "fieldYear",
+  seats: "fieldSeats",
+  daily: "fieldDaily",
+  monthly: "fieldMonthly",
+  plate: "fieldPlate",
+  vin: "fieldVin",
+  mileageKm: "fieldMileage",
+  purchasePrice: "fieldPurchasePrice",
+  purchasedOn: "fieldPurchasedOn",
+  residualValue: "fieldResidualValue",
+  depreciationMonths: "fieldDepreciationMonths",
+  periodStart: "fieldPeriodStart",
+  periodEnd: "fieldPeriodEnd",
+  amount: "fieldAmount",
+  incurredOn: "fieldIncurredOn",
+  category: "fieldCategory",
+  odometerKm: "fieldOdometerKm",
+  driverClass: "fieldDriverClass",
 };
 
-function zodError(e: z.ZodError): FormResult {
+type Translator = Awaited<ReturnType<typeof getTranslations>>;
+
+function zodError(e: z.ZodError, t: Translator): FormResult {
   const first = e.issues[0];
   const key = first?.path[0];
-  const label = typeof key === "string" ? (FIELD_LABEL[key] ?? key) : "";
+  const label =
+    typeof key === "string" ? (FIELD_LABEL[key] ? t(FIELD_LABEL[key]) : key) : "";
   return {
     ok: false,
-    error: label ? `Sprawdź pole: ${label}.` : "Nieprawidłowe dane formularza.",
+    error: label
+      ? t("errCheckField", { field: label })
+      : t("errInvalidForm"),
   };
 }
 
@@ -350,9 +357,10 @@ export async function createModel(
   _prev: FormResult | null,
   formData: FormData,
 ): Promise<FormResult> {
+  const t = await getTranslations("Admin.fleet");
   const admin = await requirePermission("flota.edytuj");
   const parsed = ModelSchema.safeParse(modelFields(formData));
-  if (!parsed.success) return zodError(parsed.error);
+  if (!parsed.success) return zodError(parsed.error, t);
   const values = modelRow(parsed.data);
 
   const db = getDb();
@@ -365,9 +373,9 @@ export async function createModel(
     newId = row.id;
   } catch (err) {
     if (isUnique(err))
-      return { ok: false, error: "Model z tym identyfikatorem już istnieje." };
+      return { ok: false, error: t("errSlugTaken") };
     adminActionFailed("createModel", err);
-    return { ok: false, error: "Wystąpił błąd. Spróbuj ponownie." };
+    return { ok: false, error: t("errGeneric") };
   }
 
   await recordAudit({
@@ -385,11 +393,12 @@ export async function updateModel(
   _prev: FormResult | null,
   formData: FormData,
 ): Promise<FormResult> {
+  const t = await getTranslations("Admin.fleet");
   const admin = await requirePermission("flota.edytuj");
   const id = String(formData.get("id") ?? "");
-  if (!UUID_RE.test(id)) return { ok: false, error: "Nieprawidłowe dane." };
+  if (!UUID_RE.test(id)) return { ok: false, error: t("errInvalidData") };
   const parsed = ModelSchema.safeParse(modelFields(formData));
-  if (!parsed.success) return zodError(parsed.error);
+  if (!parsed.success) return zodError(parsed.error, t);
   const values = modelRow(parsed.data);
 
   const db = getDb();
@@ -399,7 +408,7 @@ export async function updateModel(
       .from(schema.carModels)
       .where(eq(schema.carModels.id, id))
       .limit(1);
-    if (!before) return { ok: false, error: "Nie znaleziono modelu." };
+    if (!before) return { ok: false, error: t("errModelNotFound") };
 
     /*
      * Values this form no longer offers are kept, not silently dropped.
@@ -435,17 +444,18 @@ export async function updateModel(
     return { ok: true };
   } catch (err) {
     if (isUnique(err))
-      return { ok: false, error: "Model z tym identyfikatorem już istnieje." };
+      return { ok: false, error: t("errSlugTaken") };
     adminActionFailed("updateModel", err);
-    return { ok: false, error: "Wystąpił błąd. Spróbuj ponownie." };
+    return { ok: false, error: t("errGeneric") };
   }
 }
 
 export async function deleteModel(id: string): Promise<FormResult> {
+  const t = await getTranslations("Admin.fleet");
   const brama = await bramaKrytyczna("flota.usun");
   if (!brama.ok) return { ok: false, error: brama.error };
   const admin = brama.admin;
-  if (!UUID_RE.test(id)) return { ok: false, error: "Nieprawidłowe dane." };
+  if (!UUID_RE.test(id)) return { ok: false, error: t("errInvalidData") };
   const db = getDb();
 
   const [[{ cars: carN }], [{ res: resN }]] = await Promise.all([
@@ -461,13 +471,13 @@ export async function deleteModel(id: string): Promise<FormResult> {
   if (carN > 0)
     return {
       ok: false,
-      error: "Usuń najpierw egzemplarze tego modelu.",
+      error: t("errModelHasUnits"),
     };
   if (resN > 0)
     return {
       ok: false,
       error:
-        "Model ma powiązane rezerwacje — ukryj go (odznacz „Opublikowany”) zamiast usuwać.",
+        t("errModelHasBookings"),
     };
 
   try {
@@ -476,10 +486,10 @@ export async function deleteModel(id: string): Promise<FormResult> {
     if (isFkInUse(err))
       return {
         ok: false,
-        error: "Model jest w użyciu i nie może zostać usunięty.",
+        error: t("errModelInUse"),
       };
     adminActionFailed("deleteModel", err);
-    return { ok: false, error: "Wystąpił błąd. Spróbuj ponownie." };
+    return { ok: false, error: t("errGeneric") };
   }
 
   await recordAudit({
@@ -498,9 +508,10 @@ export async function createCar(
   _prev: FormResult | null,
   formData: FormData,
 ): Promise<FormResult> {
+  const t = await getTranslations("Admin.fleet");
   const admin = await requirePermission("flota.edytuj");
   const parsed = CarSchema.safeParse(Object.fromEntries(formData));
-  if (!parsed.success) return zodError(parsed.error);
+  if (!parsed.success) return zodError(parsed.error, t);
   const d = parsed.data;
 
   const db = getDb();
@@ -546,10 +557,10 @@ export async function createCar(
     return { ok: true };
   } catch (err) {
     if (isUnique(err))
-      return { ok: false, error: "Rejestracja lub numer VIN już istnieje." };
-    if (isFkInUse(err)) return { ok: false, error: "Nieznany model." };
+      return { ok: false, error: t("errPlateVinTaken") };
+    if (isFkInUse(err)) return { ok: false, error: t("errUnknownModel") };
     adminActionFailed("createCar", err);
-    return { ok: false, error: "Wystąpił błąd. Spróbuj ponownie." };
+    return { ok: false, error: t("errGeneric") };
   }
 }
 
@@ -557,11 +568,12 @@ export async function updateCar(
   _prev: FormResult | null,
   formData: FormData,
 ): Promise<FormResult> {
+  const t = await getTranslations("Admin.fleet");
   const admin = await requirePermission("flota.edytuj");
   const id = String(formData.get("id") ?? "");
-  if (!UUID_RE.test(id)) return { ok: false, error: "Nieprawidłowe dane." };
+  if (!UUID_RE.test(id)) return { ok: false, error: t("errInvalidData") };
   const parsed = CarSchema.safeParse(Object.fromEntries(formData));
-  if (!parsed.success) return zodError(parsed.error);
+  if (!parsed.success) return zodError(parsed.error, t);
   const d = parsed.data;
 
   const db = getDb();
@@ -571,7 +583,7 @@ export async function updateCar(
       .from(schema.cars)
       .where(eq(schema.cars.id, id))
       .limit(1);
-    if (!before) return { ok: false, error: "Nie znaleziono egzemplarza." };
+    if (!before) return { ok: false, error: t("errCarNotFound") };
 
     await db
       .update(schema.cars)
@@ -623,17 +635,18 @@ export async function updateCar(
     return { ok: true };
   } catch (err) {
     if (isUnique(err))
-      return { ok: false, error: "Rejestracja lub numer VIN już istnieje." };
+      return { ok: false, error: t("errPlateVinTaken") };
     adminActionFailed("updateCar", err);
-    return { ok: false, error: "Wystąpił błąd. Spróbuj ponownie." };
+    return { ok: false, error: t("errGeneric") };
   }
 }
 
 export async function deleteCar(id: string): Promise<FormResult> {
+  const t = await getTranslations("Admin.fleet");
   const brama = await bramaKrytyczna("flota.usun");
   if (!brama.ok) return { ok: false, error: brama.error };
   const admin = brama.admin;
-  if (!UUID_RE.test(id)) return { ok: false, error: "Nieprawidłowe dane." };
+  if (!UUID_RE.test(id)) return { ok: false, error: t("errInvalidData") };
   const db = getDb();
 
   const [before] = await db
@@ -641,7 +654,7 @@ export async function deleteCar(id: string): Promise<FormResult> {
     .from(schema.cars)
     .where(eq(schema.cars.id, id))
     .limit(1);
-  if (!before) return { ok: false, error: "Nie znaleziono egzemplarza." };
+  if (!before) return { ok: false, error: t("errCarNotFound") };
 
   const [{ res: resN }] = await db
     .select({ res: count() })
@@ -651,7 +664,7 @@ export async function deleteCar(id: string): Promise<FormResult> {
     return {
       ok: false,
       error:
-        "Egzemplarz ma powiązane rezerwacje — ustaw status „Serwis” zamiast usuwać.",
+        t("errUnitHasBookings"),
     };
 
   try {
@@ -660,10 +673,10 @@ export async function deleteCar(id: string): Promise<FormResult> {
     if (isFkInUse(err))
       return {
         ok: false,
-        error: "Egzemplarz jest w użyciu i nie może zostać usunięty.",
+        error: t("errUnitInUse"),
       };
     adminActionFailed("deleteCar", err);
-    return { ok: false, error: "Wystąpił błąd. Spróbuj ponownie." };
+    return { ok: false, error: t("errGeneric") };
   }
 
   await recordAudit({
@@ -691,10 +704,11 @@ export async function deleteCar(id: string): Promise<FormResult> {
  * handover, and that is a reservation, not a turnaround step.
  */
 export async function advancePrep(id: string): Promise<FormResult> {
+  const t = await getTranslations("Admin.fleet");
   const brama = await bramaKrytyczna("flota.status");
   if (!brama.ok) return { ok: false, error: brama.error };
   const admin = brama.admin;
-  if (!UUID_RE.test(id)) return { ok: false, error: "Nieprawidłowe dane." };
+  if (!UUID_RE.test(id)) return { ok: false, error: t("errInvalidData") };
 
   const db = getDb();
   const [before] = await db
@@ -706,13 +720,13 @@ export async function advancePrep(id: string): Promise<FormResult> {
     .from(schema.cars)
     .where(eq(schema.cars.id, id))
     .limit(1);
-  if (!before) return { ok: false, error: "Nie znaleziono egzemplarza." };
+  if (!before) return { ok: false, error: t("errCarNotFound") };
 
   const next = before.prepStatus
     ? nextPrepStatus(before.prepStatus)
     : PREP_STATUSES[0];
   if (!next)
-    return { ok: false, error: "Egzemplarz jest już gotowy do wydania." };
+    return { ok: false, error: t("errUnitReady") };
 
   try {
     await db
@@ -721,7 +735,7 @@ export async function advancePrep(id: string): Promise<FormResult> {
       .where(eq(schema.cars.id, id));
   } catch (err) {
     adminActionFailed("advancePrep", err);
-    return { ok: false, error: "Wystąpił błąd. Spróbuj ponownie." };
+    return { ok: false, error: t("errGeneric") };
   }
 
   await recordAudit({
@@ -741,10 +755,10 @@ export async function advancePrep(id: string): Promise<FormResult> {
 const MAX_IMAGES = 20;
 
 const UPLOAD_ERRORS: Record<string, string> = {
-  empty: "Nie wybrano pliku.",
-  too_large: "Plik jest za duży — maksymalnie 8 MB.",
-  unsupported_type: "Nieobsługiwany format. Dozwolone: JPG, PNG, WEBP.",
-  write_failed: "Nie udało się zapisać pliku.",
+  empty: "errUploadEmpty",
+  too_large: "errUploadTooLarge",
+  unsupported_type: "errUploadType",
+  write_failed: "errUploadWrite",
 };
 
 /**
@@ -756,13 +770,14 @@ const UPLOAD_ERRORS: Record<string, string> = {
 async function readImages(
   id: string,
 ): Promise<{ ok: true; images: string[] } | { ok: false; error: string }> {
+  const t = await getTranslations("Admin.fleet");
   const db = getDb();
   const [row] = await db
     .select({ images: schema.carModels.images })
     .from(schema.carModels)
     .where(eq(schema.carModels.id, id))
     .limit(1);
-  if (!row) return { ok: false, error: "Nie znaleziono modelu." };
+  if (!row) return { ok: false, error: t("errModelNotFound") };
   return { ok: true, images: row.images ?? [] };
 }
 
@@ -800,15 +815,16 @@ export async function uploadModelImages(
   _prev: FormResult | null,
   formData: FormData,
 ): Promise<FormResult> {
+  const t = await getTranslations("Admin.fleet");
   const admin = await requirePermission("flota.edytuj");
 
   const id = String(formData.get("modelId") ?? "");
-  if (!UUID_RE.test(id)) return { ok: false, error: "Nieprawidłowe dane." };
+  if (!UUID_RE.test(id)) return { ok: false, error: t("errInvalidData") };
 
   const files = formData
     .getAll("images")
     .filter((f): f is File => f instanceof File && f.size > 0);
-  if (files.length === 0) return { ok: false, error: UPLOAD_ERRORS.empty };
+  if (files.length === 0) return { ok: false, error: t(UPLOAD_ERRORS.empty) };
 
   const current = await readImages(id);
   if (!current.ok) return current;
@@ -816,7 +832,7 @@ export async function uploadModelImages(
   if (current.images.length + files.length > MAX_IMAGES) {
     return {
       ok: false,
-      error: `Maksymalnie ${MAX_IMAGES} zdjęć na model — usuń któreś, aby dodać nowe.`,
+      error: t("errMaxImages", { max: MAX_IMAGES }),
     };
   }
 
@@ -827,7 +843,10 @@ export async function uploadModelImages(
       // Roll back this batch: a half-uploaded set would leave the admin
       // guessing which of the files they picked actually landed.
       await Promise.all(stored.map((url) => deleteImage(url).catch(() => {})));
-      return { ok: false, error: UPLOAD_ERRORS[saved.error] ?? "Błąd zapisu." };
+      return {
+        ok: false,
+        error: t(UPLOAD_ERRORS[saved.error] ?? "errSaveFailed"),
+      };
     }
     stored.push(saved.url);
   }
@@ -844,7 +863,7 @@ export async function uploadModelImages(
   } catch (err) {
     await Promise.all(stored.map((url) => deleteImage(url).catch(() => {})));
     adminActionFailed("uploadModelImages", err);
-    return { ok: false, error: "Wystąpił błąd. Spróbuj ponownie." };
+    return { ok: false, error: t("errGeneric") };
   }
   return { ok: true };
 }
@@ -854,8 +873,9 @@ export async function removeModelImage(
   id: string,
   url: string,
 ): Promise<FormResult> {
+  const t = await getTranslations("Admin.fleet");
   const admin = await requirePermission("flota.edytuj");
-  if (!UUID_RE.test(id)) return { ok: false, error: "Nieprawidłowe dane." };
+  if (!UUID_RE.test(id)) return { ok: false, error: t("errInvalidData") };
 
   const current = await readImages(id);
   if (!current.ok) return current;
@@ -872,7 +892,7 @@ export async function removeModelImage(
     );
   } catch (err) {
     adminActionFailed("removeModelImage", err);
-    return { ok: false, error: "Wystąpił błąd. Spróbuj ponownie." };
+    return { ok: false, error: t("errGeneric") };
   }
 
   // Only after the row no longer points at it. `deleteImage` ignores anything
@@ -901,14 +921,15 @@ export async function moveModelImage(
   url: string,
   direction: "up" | "down" | "cover",
 ): Promise<FormResult> {
+  const t = await getTranslations("Admin.fleet");
   const admin = await requirePermission("flota.edytuj");
-  if (!UUID_RE.test(id)) return { ok: false, error: "Nieprawidłowe dane." };
+  if (!UUID_RE.test(id)) return { ok: false, error: t("errInvalidData") };
 
   const current = await readImages(id);
   if (!current.ok) return current;
 
   const from = current.images.indexOf(url);
-  if (from === -1) return { ok: false, error: "Nie znaleziono zdjęcia." };
+  if (from === -1) return { ok: false, error: t("errPhotoNotFound") };
   const after = [...current.images];
   if (direction === "cover") {
     if (from === 0) return { ok: true };
@@ -934,7 +955,7 @@ export async function moveModelImage(
     );
   } catch (err) {
     adminActionFailed("moveModelImage", err);
-    return { ok: false, error: "Wystąpił błąd. Spróbuj ponownie." };
+    return { ok: false, error: t("errGeneric") };
   }
   return { ok: true };
 }
@@ -973,12 +994,13 @@ export async function createAvailabilityBlock(
   _prev: FormResult | null,
   formData: FormData,
 ): Promise<FormResult> {
+  const t = await getTranslations("Admin.fleet");
   const brama = await bramaKrytyczna("flota.status");
   if (!brama.ok) return { ok: false, error: brama.error };
   const admin = brama.admin;
 
   const parsed = BlockSchema.safeParse(Object.fromEntries(formData));
-  if (!parsed.success) return zodError(parsed.error);
+  if (!parsed.success) return zodError(parsed.error, t);
   const d = parsed.data;
 
   const db = getDb();
@@ -1031,7 +1053,7 @@ export async function createAvailabilityBlock(
     return { ok: true };
   } catch (err) {
     adminActionFailed("createAvailabilityBlock", err);
-    return { ok: false, error: "Wystąpił błąd. Spróbuj ponownie." };
+    return { ok: false, error: t("errGeneric") };
   }
 }
 
@@ -1039,11 +1061,12 @@ export async function deleteAvailabilityBlock(
   id: string,
   modelId: string,
 ): Promise<FormResult> {
+  const t = await getTranslations("Admin.fleet");
   const brama = await bramaKrytyczna("flota.status");
   if (!brama.ok) return { ok: false, error: brama.error };
   const admin = brama.admin;
   if (!UUID_RE.test(id) || !UUID_RE.test(modelId)) {
-    return { ok: false, error: "Nieprawidłowe dane." };
+    return { ok: false, error: t("errInvalidData") };
   }
 
   const db = getDb();
@@ -1069,7 +1092,7 @@ export async function deleteAvailabilityBlock(
         ),
       )
       .limit(1);
-    if (!block) return { ok: false, error: "Nie znaleziono blokady." };
+    if (!block) return { ok: false, error: t("errBlockNotFound") };
 
     await db
       .delete(schema.availabilityBlocks)
@@ -1088,7 +1111,7 @@ export async function deleteAvailabilityBlock(
     return { ok: true };
   } catch (err) {
     adminActionFailed("deleteAvailabilityBlock", err);
-    return { ok: false, error: "Wystąpił błąd. Spróbuj ponownie." };
+    return { ok: false, error: t("errGeneric") };
   }
 }
 
@@ -1105,13 +1128,14 @@ const FEATURE_MAX_LEN = 60;
 async function readFeatures(
   id: string,
 ): Promise<{ ok: true; features: string[] } | { ok: false; error: string }> {
+  const t = await getTranslations("Admin.fleet");
   const db = getDb();
   const [row] = await db
     .select({ features: schema.carModels.features })
     .from(schema.carModels)
     .where(eq(schema.carModels.id, id))
     .limit(1);
-  if (!row) return { ok: false, error: "Nie znaleziono modelu." };
+  if (!row) return { ok: false, error: t("errModelNotFound") };
   return { ok: true, features: row.features ?? [] };
 }
 
@@ -1145,15 +1169,16 @@ export async function addModelFeature(
   _prev: FormResult | null,
   formData: FormData,
 ): Promise<FormResult> {
+  const t = await getTranslations("Admin.fleet");
   const admin = await requirePermission("flota.edytuj");
 
   const id = String(formData.get("modelId") ?? "");
-  if (!UUID_RE.test(id)) return { ok: false, error: "Nieprawidłowe dane." };
+  if (!UUID_RE.test(id)) return { ok: false, error: t("errInvalidData") };
 
   const label = String(formData.get("feature") ?? "")
     .trim()
     .slice(0, FEATURE_MAX_LEN);
-  if (!label) return { ok: false, error: "Wpisz nazwę wyposażenia." };
+  if (!label) return { ok: false, error: t("errFeatureEmpty") };
 
   const current = await readFeatures(id);
   if (!current.ok) return current;
@@ -1161,10 +1186,10 @@ export async function addModelFeature(
   // Case-insensitive duplicate check: "CarPlay" and "carplay" on the same card
   // reads as a mistake, and it is.
   if (current.features.some((f) => f.toLowerCase() === label.toLowerCase())) {
-    return { ok: false, error: "To wyposażenie jest już na liście." };
+    return { ok: false, error: t("errFeatureDuplicate") };
   }
   if (current.features.length >= MAX_FEATURES) {
-    return { ok: false, error: `Maksymalnie ${MAX_FEATURES} pozycji.` };
+    return { ok: false, error: t("errMaxFeatures", { max: MAX_FEATURES }) };
   }
 
   try {
@@ -1177,7 +1202,7 @@ export async function addModelFeature(
     );
   } catch (err) {
     adminActionFailed("addModelFeature", err);
-    return { ok: false, error: "Wystąpił błąd. Spróbuj ponownie." };
+    return { ok: false, error: t("errGeneric") };
   }
   return { ok: true };
 }
@@ -1186,8 +1211,9 @@ export async function removeModelFeature(
   id: string,
   label: string,
 ): Promise<FormResult> {
+  const t = await getTranslations("Admin.fleet");
   const admin = await requirePermission("flota.edytuj");
-  if (!UUID_RE.test(id)) return { ok: false, error: "Nieprawidłowe dane." };
+  if (!UUID_RE.test(id)) return { ok: false, error: t("errInvalidData") };
 
   const current = await readFeatures(id);
   if (!current.ok) return current;
@@ -1204,7 +1230,7 @@ export async function removeModelFeature(
     );
   } catch (err) {
     adminActionFailed("removeModelFeature", err);
-    return { ok: false, error: "Wystąpił błąd. Spróbuj ponownie." };
+    return { ok: false, error: t("errGeneric") };
   }
   return { ok: true };
 }
@@ -1212,10 +1238,10 @@ export async function removeModelFeature(
 /* ── Car expenses ─────────────────────────────────────────────────────────── */
 
 const INVOICE_ERRORS: Record<string, string> = {
-  empty: "Nie wybrano pliku.",
-  too_large: "Plik jest za duży — maksymalnie 8 MB.",
-  unsupported_type: "Nieobsługiwany format. Dozwolone: PDF, JPG, PNG, WEBP.",
-  write_failed: "Nie udało się zapisać pliku.",
+  empty: "errUploadEmpty",
+  too_large: "errUploadTooLarge",
+  unsupported_type: "errUploadTypeInvoice",
+  write_failed: "errUploadWrite",
 };
 
 /**
@@ -1229,11 +1255,15 @@ const INVOICE_ERRORS: Record<string, string> = {
 async function readInvoice(
   formData: FormData,
 ): Promise<{ ok: true; url?: string } | { ok: false; error: string }> {
+  const t = await getTranslations("Admin.fleet");
   const file = formData.get("invoice");
   if (!(file instanceof File) || file.size === 0) return { ok: true };
   const saved = await saveInvoice(file);
   if (!saved.ok) {
-    return { ok: false, error: INVOICE_ERRORS[saved.error] ?? "Błąd zapisu." };
+    return {
+      ok: false,
+      error: t(INVOICE_ERRORS[saved.error] ?? "errSaveFailed"),
+    };
   }
   return { ok: true, url: saved.url };
 }
@@ -1265,13 +1295,14 @@ export async function createExpense(
   _prev: FormResult | null,
   formData: FormData,
 ): Promise<FormResult> {
+  const t = await getTranslations("Admin.fleet");
   const admin = await requirePermission("finanse.edytuj");
   const parsed = ExpenseSchema.safeParse(Object.fromEntries(formData));
-  if (!parsed.success) return zodError(parsed.error);
+  if (!parsed.success) return zodError(parsed.error, t);
   const d = parsed.data;
 
   const modelId = await modelIdOfCar(d.carId);
-  if (!modelId) return { ok: false, error: "Nie znaleziono egzemplarza." };
+  if (!modelId) return { ok: false, error: t("errCarNotFound") };
 
   const invoice = await readInvoice(formData);
   if (!invoice.ok) return { ok: false, error: invoice.error };
@@ -1309,7 +1340,7 @@ export async function createExpense(
     return { ok: true };
   } catch (err) {
     adminActionFailed("createExpense", err);
-    return { ok: false, error: "Wystąpił błąd. Spróbuj ponownie." };
+    return { ok: false, error: t("errGeneric") };
   }
 }
 
@@ -1317,11 +1348,12 @@ export async function updateExpense(
   _prev: FormResult | null,
   formData: FormData,
 ): Promise<FormResult> {
+  const t = await getTranslations("Admin.fleet");
   const admin = await requirePermission("finanse.edytuj");
   const id = String(formData.get("id") ?? "");
-  if (!UUID_RE.test(id)) return { ok: false, error: "Nieprawidłowe dane." };
+  if (!UUID_RE.test(id)) return { ok: false, error: t("errInvalidData") };
   const parsed = ExpenseSchema.safeParse(Object.fromEntries(formData));
-  if (!parsed.success) return zodError(parsed.error);
+  if (!parsed.success) return zodError(parsed.error, t);
   const d = parsed.data;
 
   const db = getDb();
@@ -1331,13 +1363,13 @@ export async function updateExpense(
       .from(schema.carExpenses)
       .where(eq(schema.carExpenses.id, id))
       .limit(1);
-    if (!before) return { ok: false, error: "Nie znaleziono wydatku." };
+    if (!before) return { ok: false, error: t("errExpenseNotFound") };
 
     // The car is taken from the stored row, never from the form: letting a
     // submitted carId move an expense between cars would silently rewrite two
     // cars' P&L from one edit box.
     const modelId = await modelIdOfCar(before.carId);
-    if (!modelId) return { ok: false, error: "Nie znaleziono egzemplarza." };
+    if (!modelId) return { ok: false, error: t("errCarNotFound") };
 
     const invoice = await readInvoice(formData);
     if (!invoice.ok) return { ok: false, error: invoice.error };
@@ -1385,13 +1417,14 @@ export async function updateExpense(
     return { ok: true };
   } catch (err) {
     adminActionFailed("updateExpense", err);
-    return { ok: false, error: "Wystąpił błąd. Spróbuj ponownie." };
+    return { ok: false, error: t("errGeneric") };
   }
 }
 
 export async function deleteExpense(id: string): Promise<FormResult> {
+  const t = await getTranslations("Admin.fleet");
   const admin = await requirePermission("finanse.edytuj");
-  if (!UUID_RE.test(id)) return { ok: false, error: "Nieprawidłowe dane." };
+  if (!UUID_RE.test(id)) return { ok: false, error: t("errInvalidData") };
 
   const db = getDb();
   const [before] = await db
@@ -1399,7 +1432,7 @@ export async function deleteExpense(id: string): Promise<FormResult> {
     .from(schema.carExpenses)
     .where(eq(schema.carExpenses.id, id))
     .limit(1);
-  if (!before) return { ok: false, error: "Nie znaleziono wydatku." };
+  if (!before) return { ok: false, error: t("errExpenseNotFound") };
 
   const modelId = await modelIdOfCar(before.carId);
 
@@ -1422,7 +1455,7 @@ export async function deleteExpense(id: string): Promise<FormResult> {
     return { ok: true };
   } catch (err) {
     adminActionFailed("deleteExpense", err);
-    return { ok: false, error: "Wystąpił błąd. Spróbuj ponownie." };
+    return { ok: false, error: t("errGeneric") };
   }
 }
 
@@ -1451,13 +1484,14 @@ export async function createRecurring(
   _prev: FormResult | null,
   formData: FormData,
 ): Promise<FormResult> {
+  const t = await getTranslations("Admin.fleet");
   const admin = await requirePermission("finanse.edytuj");
   const parsed = RecurringSchema.safeParse(Object.fromEntries(formData));
-  if (!parsed.success) return zodError(parsed.error);
+  if (!parsed.success) return zodError(parsed.error, t);
   const d = parsed.data;
 
   const modelId = await modelIdOfCar(d.carId);
-  if (!modelId) return { ok: false, error: "Nie znaleziono egzemplarza." };
+  if (!modelId) return { ok: false, error: t("errCarNotFound") };
 
   try {
     const [row] = await getDb()
@@ -1492,13 +1526,14 @@ export async function createRecurring(
     return { ok: true };
   } catch (err) {
     adminActionFailed("createRecurring", err);
-    return { ok: false, error: "Wystąpił błąd. Spróbuj ponownie." };
+    return { ok: false, error: t("errGeneric") };
   }
 }
 
 export async function deleteRecurring(id: string): Promise<FormResult> {
+  const t = await getTranslations("Admin.fleet");
   const admin = await requirePermission("finanse.edytuj");
-  if (!UUID_RE.test(id)) return { ok: false, error: "Nieprawidłowe dane." };
+  if (!UUID_RE.test(id)) return { ok: false, error: t("errInvalidData") };
 
   const db = getDb();
   const [before] = await db
@@ -1506,7 +1541,7 @@ export async function deleteRecurring(id: string): Promise<FormResult> {
     .from(schema.recurringCosts)
     .where(eq(schema.recurringCosts.id, id))
     .limit(1);
-  if (!before) return { ok: false, error: "Nie znaleziono definicji." };
+  if (!before) return { ok: false, error: t("errRecurringNotFound") };
 
   const modelId = await modelIdOfCar(before.carId);
 
@@ -1535,7 +1570,7 @@ export async function deleteRecurring(id: string): Promise<FormResult> {
     return { ok: true };
   } catch (err) {
     adminActionFailed("deleteRecurring", err);
-    return { ok: false, error: "Wystąpił błąd. Spróbuj ponownie." };
+    return { ok: false, error: t("errGeneric") };
   }
 }
 
@@ -1551,8 +1586,9 @@ export async function deleteRecurring(id: string): Promise<FormResult> {
 export async function generateRecurring(
   id: string,
 ): Promise<FormResult & { created?: number }> {
+  const t = await getTranslations("Admin.fleet");
   const admin = await requirePermission("finanse.edytuj");
-  if (!UUID_RE.test(id)) return { ok: false, error: "Nieprawidłowe dane." };
+  if (!UUID_RE.test(id)) return { ok: false, error: t("errInvalidData") };
 
   const db = getDb();
   const [def] = await db
@@ -1560,15 +1596,15 @@ export async function generateRecurring(
     .from(schema.recurringCosts)
     .where(eq(schema.recurringCosts.id, id))
     .limit(1);
-  if (!def) return { ok: false, error: "Nie znaleziono definicji." };
+  if (!def) return { ok: false, error: t("errRecurringNotFound") };
   if (!def.active)
     return {
       ok: false,
-      error: "Definicja jest wyłączona — włącz ją najpierw.",
+      error: t("errRecurringDisabled"),
     };
 
   const modelId = await modelIdOfCar(def.carId);
-  if (!modelId) return { ok: false, error: "Nie znaleziono egzemplarza." };
+  if (!modelId) return { ok: false, error: t("errCarNotFound") };
 
   const today = new Date().toISOString().slice(0, 10);
   const periods = occurrencesUpTo(
@@ -1615,7 +1651,7 @@ export async function generateRecurring(
     return { ok: true, created: inserted.length };
   } catch (err) {
     adminActionFailed("generateRecurring", err);
-    return { ok: false, error: "Wystąpił błąd. Spróbuj ponownie." };
+    return { ok: false, error: t("errGeneric") };
   }
 }
 
@@ -1624,8 +1660,8 @@ export async function generateRecurring(
 const deadlineInput = z.object({
   carId: z.string().uuid(),
   kind: z.enum(DEADLINE_KINDS),
-  title: z.string().trim().min(2, "Podaj nazwę").max(160),
-  dueOn: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "Podaj termin"),
+  title: z.string().trim().min(2).max(160),
+  dueOn: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
   amount: z.preprocess(
     (v) => (String(v ?? "").trim() === "" ? null : String(v).replace(",", ".")),
     z.coerce.number().nullable(),
@@ -1644,6 +1680,7 @@ export async function addDeadline(
   _prev: DeadlineResult | null,
   formData: FormData,
 ): Promise<DeadlineResult> {
+  const t = await getTranslations("Admin.fleet");
   const admin = await requirePermission("flota.edytuj");
   const parsed = deadlineInput.safeParse({
     carId: formData.get("carId") ?? "",
@@ -1654,9 +1691,15 @@ export async function addDeadline(
     note: formData.get("note") ?? "",
   });
   if (!parsed.success) {
+    const field = parsed.error.issues[0]?.path[0];
     return {
       ok: false,
-      error: parsed.error.issues[0]?.message ?? "Popraw dane terminu",
+      error:
+        field === "title"
+          ? t("errDeadlineName")
+          : field === "dueOn"
+            ? t("errDeadlineDate")
+            : t("errDeadlineCheck"),
     };
   }
   const d = parsed.data;
@@ -1683,7 +1726,7 @@ export async function addDeadline(
     return { ok: true };
   } catch (err) {
     adminActionFailed("deadlineSave", err);
-    return { ok: false, error: "Nie udało się zapisać terminu" };
+    return { ok: false, error: t("errDeadlineSave") };
   }
 }
 
@@ -1692,11 +1735,12 @@ export async function completeDeadline(
   _prev: DeadlineResult | null,
   formData: FormData,
 ): Promise<DeadlineResult> {
+  const t = await getTranslations("Admin.fleet");
   const admin = await requirePermission("flota.edytuj");
   const id = String(formData.get("id") ?? "");
   const carId = String(formData.get("carId") ?? "");
   if (!UUID_RE.test(id) || !UUID_RE.test(carId)) {
-    return { ok: false, error: "Nieprawidłowe dane" };
+    return { ok: false, error: t("errInvalidDataShort") };
   }
   try {
     await markDone(id, carId);
@@ -1713,6 +1757,6 @@ export async function completeDeadline(
     return { ok: true };
   } catch (err) {
     adminActionFailed("deadlineComplete", err);
-    return { ok: false, error: "Nie udało się odhaczyć" };
+    return { ok: false, error: t("errDeadlineDone") };
   }
 }

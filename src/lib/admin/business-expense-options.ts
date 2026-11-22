@@ -1,3 +1,5 @@
+import type { Bilingual } from "@/lib/i18n-pick";
+
 // Client-safe company-cost vocabulary + Polish labels. No server imports, so
 // the entry form, the Finanse charts and the server actions all read one list.
 
@@ -24,7 +26,7 @@
 export const BUSINESS_EXPENSE_GROUPS = [
   {
     key: "marketing",
-    label: "Marketing i reklama",
+    label: { pl: "Marketing i reklama", en: "Marketing and advertising" },
     categories: [
       "ads_google",
       "ads_facebook",
@@ -35,12 +37,12 @@ export const BUSINESS_EXPENSE_GROUPS = [
   },
   {
     key: "premises",
-    label: "Lokal i parking",
+    label: { pl: "Lokal i parking", en: "Premises and parking" },
     categories: ["parking", "rent", "utilities", "office"],
   },
   {
     key: "services",
-    label: "Usługi i technologia",
+    label: { pl: "Usługi i technologia", en: "Services and technology" },
     categories: [
       "accounting",
       "legal",
@@ -52,17 +54,17 @@ export const BUSINESS_EXPENSE_GROUPS = [
   },
   {
     key: "fleet",
-    label: "Flota — koszty wspólne",
+    label: { pl: "Flota — koszty wspólne", en: "Fleet — shared costs" },
     categories: ["cleaning", "fuel", "tools"],
   },
   {
     key: "people",
-    label: "Ludzie",
+    label: { pl: "Ludzie", en: "People" },
     categories: ["salary", "contractor", "training"],
   },
   {
     key: "finance",
-    label: "Finanse i urząd",
+    label: { pl: "Finanse i urząd", en: "Finance and tax office" },
     categories: ["bank", "insurance", "tax", "zus", "other"],
   },
 ] as const;
@@ -77,39 +79,39 @@ export const BUSINESS_EXPENSE_CATEGORIES = BUSINESS_EXPENSE_GROUPS.flatMap(
 export type BusinessExpenseCategory =
   (typeof BUSINESS_EXPENSE_GROUPS)[number]["categories"][number];
 
-export const BUSINESS_EXPENSE_LABEL: Record<BusinessExpenseCategory, string> = {
-  ads_google: "Google Ads",
-  ads_facebook: "Facebook",
-  ads_instagram: "Instagram",
-  ads_tiktok: "TikTok",
-  marketing_other: "Inny marketing",
-  parking: "Parking / garaż",
-  rent: "Czynsz biura",
-  utilities: "Media (prąd, woda)",
-  office: "Biuro — wyposażenie",
-  accounting: "Księgowość",
-  legal: "Obsługa prawna",
-  phone: "Telefony i internet",
-  software: "Oprogramowanie",
-  domain: "Domena i hosting",
-  website: "Strona www",
-  cleaning: "Myjnia i sprzątanie",
-  fuel: "Paliwo (wspólne)",
-  tools: "Narzędzia",
-  salary: "Wynagrodzenia",
-  contractor: "Zlecenia",
-  training: "Szkolenia",
-  bank: "Opłaty bankowe",
-  insurance: "Ubezpieczenie firmy",
-  tax: "Podatki i opłaty",
-  zus: "ZUS i składki",
-  other: "Inne",
+export const BUSINESS_EXPENSE_LABEL: Record<BusinessExpenseCategory, Bilingual> = {
+  ads_google: { pl: "Google Ads", en: "Google Ads" },
+  ads_facebook: { pl: "Facebook", en: "Facebook" },
+  ads_instagram: { pl: "Instagram", en: "Instagram" },
+  ads_tiktok: { pl: "TikTok", en: "TikTok" },
+  marketing_other: { pl: "Inny marketing", en: "Other marketing" },
+  parking: { pl: "Parking / garaż", en: "Parking / garage" },
+  rent: { pl: "Czynsz biura", en: "Office rent" },
+  utilities: { pl: "Media (prąd, woda)", en: "Utilities (power, water)" },
+  office: { pl: "Biuro — wyposażenie", en: "Office — equipment" },
+  accounting: { pl: "Księgowość", en: "Accounting" },
+  legal: { pl: "Obsługa prawna", en: "Legal services" },
+  phone: { pl: "Telefony i internet", en: "Phone and internet" },
+  software: { pl: "Oprogramowanie", en: "Software" },
+  domain: { pl: "Domena i hosting", en: "Domain and hosting" },
+  website: { pl: "Strona www", en: "Website" },
+  cleaning: { pl: "Myjnia i sprzątanie", en: "Car wash and cleaning" },
+  fuel: { pl: "Paliwo (wspólne)", en: "Fuel (shared)" },
+  tools: { pl: "Narzędzia", en: "Tools" },
+  salary: { pl: "Wynagrodzenia", en: "Salaries" },
+  contractor: { pl: "Zlecenia", en: "Contractors" },
+  training: { pl: "Szkolenia", en: "Training" },
+  bank: { pl: "Opłaty bankowe", en: "Bank fees" },
+  insurance: { pl: "Ubezpieczenie firmy", en: "Company insurance" },
+  tax: { pl: "Podatki i opłaty", en: "Taxes and fees" },
+  zus: { pl: "ZUS i składki", en: "ZUS and social contributions" },
+  other: { pl: "Inne", en: "Other" },
 };
 
-export const BUSINESS_GROUP_LABEL: Record<BusinessExpenseGroup, string> =
+export const BUSINESS_GROUP_LABEL: Record<BusinessExpenseGroup, Bilingual> =
   Object.fromEntries(
     BUSINESS_EXPENSE_GROUPS.map((g) => [g.key, g.label]),
-  ) as Record<BusinessExpenseGroup, string>;
+  ) as Record<BusinessExpenseGroup, Bilingual>;
 
 /** Which group a category belongs to — built once, read by every total. */
 export const BUSINESS_GROUP_OF = Object.fromEntries(

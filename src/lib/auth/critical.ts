@@ -1,6 +1,8 @@
 import "server-only";
 import { eq } from "drizzle-orm";
+import { getLocale } from "next-intl/server";
 import { getDb, schema } from "@/lib/db";
+import { pick, type Bilingual } from "@/lib/i18n-pick";
 import { requirePermission } from "./guard";
 import { verifyPassword } from "./password";
 import { verifyTotp } from "./totp";
@@ -71,7 +73,13 @@ export async function potwierdzTozsamosc(
     .from(schema.admins)
     .where(eq(schema.admins.id, admin.id))
     .limit(1);
-  if (!row) return { ok: false, error: "Nie znaleziono konta." };
+  const locale = await getLocale();
+  if (!row) {
+    return {
+      ok: false,
+      error: pick({ pl: "Nie znaleziono konta.", en: "Account not found." }, locale),
+    };
+  }
 
   if (!(await verifyPassword(row.passwordHash, haslo))) {
     void recordSecurityEvent({
@@ -80,7 +88,10 @@ export async function potwierdzTozsamosc(
       adminId: admin.id,
       detail: { powod: "hasło" },
     });
-    return { ok: false, error: "Hasło nie pasuje." };
+    return {
+      ok: false,
+      error: pick({ pl: "Hasło nie pasuje.", en: "Password does not match." }, locale),
+    };
   }
 
   if (row.totpConfirmedAt && row.totpSecret) {
@@ -90,7 +101,16 @@ export async function potwierdzTozsamosc(
         endpoint: "admin.confirm",
         adminId: admin.id,
       });
-      return { ok: false, error: "Podaj aktualny kod z aplikacji." };
+      return {
+        ok: false,
+        error: pick(
+          {
+            pl: "Podaj aktualny kod z aplikacji.",
+            en: "Enter the current code from the app.",
+          },
+          locale,
+        ),
+      };
     }
   }
 
@@ -147,9 +167,14 @@ export async function requireCritical(
 }
 
 /** Komunikat, który panel pokazuje zamiast surowego wyjątku. */
-export const KOMUNIKAT_POTWIERDZENIA =
-  "Ta operacja wymaga potwierdzenia tożsamości. Odblokuj operacje krytyczne " +
-  "w panelu bocznym (kłódka pod nazwą konta) i spróbuj ponownie.";
+export const KOMUNIKAT_POTWIERDZENIA: Bilingual = {
+  pl:
+    "Ta operacja wymaga potwierdzenia tożsamości. Odblokuj operacje krytyczne " +
+    "w panelu bocznym (kłódka pod nazwą konta) i spróbuj ponownie.",
+  en:
+    "This operation requires identity confirmation. Unlock critical operations " +
+    "in the side panel (the padlock under the account name) and try again.",
+};
 
 /**
  * Wariant `requireCritical`, który ZWRACA odmowę zamiast ją rzucać.
@@ -172,13 +197,20 @@ export async function bramaKrytyczna(permission: Permission): Promise<
     return { ok: true, admin: await requireCritical(permission) };
   } catch (err) {
     const wiadomosc = err instanceof Error ? err.message : "";
+    const locale = await getLocale();
     if (wiadomosc === "confirm_required") {
-      return { ok: false, error: KOMUNIKAT_POTWIERDZENIA };
+      return { ok: false, error: pick(KOMUNIKAT_POTWIERDZENIA, locale) };
     }
     if (wiadomosc === "forbidden") {
       return {
         ok: false,
-        error: "Twoja rola nie pozwala na tę operację.",
+        error: pick(
+          {
+            pl: "Twoja rola nie pozwala na tę operację.",
+            en: "Your role does not allow this operation.",
+          },
+          locale,
+        ),
       };
     }
     throw err;

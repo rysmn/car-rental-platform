@@ -3,6 +3,7 @@ import { sql } from "drizzle-orm";
 import { getDb } from "@/lib/db";
 import { depositTotals } from "./deposits";
 import { formatPlnPrecise } from "@/lib/format";
+import type { Bilingual } from "@/lib/i18n-pick";
 import { isoDay } from "@/lib/booking/availability";
 import { getMonthlySeries } from "@/lib/admin/economics";
 import { resolveFleetState, type FleetState } from "@/lib/fleet/status";
@@ -473,13 +474,266 @@ export type AttentionKind =
 export type AttentionItem = {
   kind: AttentionKind;
   /** What it is about: a car, or a reservation reference. */
-  subject: string;
-  detail: string;
+  subject: Bilingual;
+  detail: Bilingual;
   /** What the operator is supposed to DO about it. */
-  action: string;
+  action: Bilingual;
   urgent: boolean;
   href: string | null;
 };
+
+/**
+ * One row of the attention query. The SQL names WHAT happened (`code`) and
+ * carries the facts (`params`); the sentences are written in JS, in both
+ * languages, so no Polish is baked into the database query.
+ */
+type AttentionRow = {
+  kind: AttentionKind;
+  code: string;
+  params: Record<string, unknown> | null;
+  urgent: boolean;
+  id: string | null;
+  sort: number;
+};
+
+const both = (pl: string, en: string): Bilingual => ({ pl, en });
+
+/** Plural "dzień / dni" and "day / days" for a whole-number count. */
+const pluralDays = (n: number, one: Bilingual, many: Bilingual): Bilingual =>
+  n === 1 ? one : many;
+
+function attentionText(
+  code: string,
+  p: Record<string, unknown>,
+): { subject: Bilingual; detail: Bilingual; action: Bilingual } {
+  const s = (k: string) => (p[k] == null ? "" : String(p[k]));
+  const n = (k: string) => Number(p[k] ?? 0);
+  const car = s("car");
+  switch (code) {
+    case "overdue": {
+      const d = n("days");
+      const unit = pluralDays(d, both("dnia", "day"), both("dni", "days"));
+      return {
+        subject: both(car, car),
+        detail: both(
+          `Zwrot zaległy od ${d} ${unit.pl} · ${s("name")} · ${s("phone")}`,
+          `Return overdue by ${d} ${unit.en} · ${s("name")} · ${s("phone")}`,
+        ),
+        action: both("Zadzwoń i odbierz auto", "Call and collect the car"),
+      };
+    }
+    case "decision":
+      return {
+        subject: both(`Rezerwacja ${s("ref")}`, `Reservation ${s("ref")}`),
+        detail: both(
+          `Czeka na decyzję · ${s("car")} · od ${s("from")}`,
+          `Awaiting decision · ${s("car")} · from ${s("from")}`,
+        ),
+        action: both("Potwierdź albo odrzuć", "Confirm or reject"),
+      };
+    case "pickup": {
+      const t = s("time") ? ` ${s("time")}` : "";
+      return {
+        subject: both(car, car),
+        detail: both(
+          `Wydanie dzisiaj${t} · ${s("name")} · ${s("phone")}`,
+          `Handover today${t} · ${s("name")} · ${s("phone")}`,
+        ),
+        action: both(
+          "Przygotuj i wydaj auto",
+          "Prepare and hand over the car",
+        ),
+      };
+    }
+    case "return": {
+      const t = s("time") ? ` ${s("time")}` : "";
+      return {
+        subject: both(car, car),
+        detail: both(
+          `Zwrot dzisiaj${t} · ${s("name")}`,
+          `Return today${t} · ${s("name")}`,
+        ),
+        action: both(
+          "Odbierz auto i spisz licznik",
+          "Collect the car and note the mileage",
+        ),
+      };
+    }
+    case "payment": {
+      const ref = s("ref");
+      const detail = p.hasPaid
+        ? both(
+            `Zapłacono ${s("paid")} z ${s("total")} zł · zostało ${s("owed")} zł`,
+            `Paid ${s("paid")} of ${s("total")} PLN · ${s("owed")} PLN left`,
+          )
+        : both(`Brak wpłaty · ${s("total")} zł`, `No payment · ${s("total")} PLN`);
+      return {
+        subject: both(`Rezerwacja ${ref}`, `Reservation ${ref}`),
+        detail,
+        action: both("Pobierz należność", "Collect the amount due"),
+      };
+    }
+    case "tyres": {
+      const summer = s("fitted") === "summer";
+      const changed = s("changed");
+      const last = changed
+        ? both(` · ostatnia zmiana ${changed}`, ` · last change ${changed}`)
+        : both("", "");
+      return {
+        subject: both(car, car),
+        detail: both(
+          (summer
+            ? "Opony letnie, a trwa sezon zimowy"
+            : "Opony zimowe, a trwa sezon letni") + last.pl,
+          (summer
+            ? "Summer tyres, but it is winter season"
+            : "Winter tyres, but it is summer season") + last.en,
+        ),
+        action: summer
+          ? both(
+              "Załóż opony zimowe — nie wydawaj auta",
+              "Fit winter tyres — do not hand the car over",
+            )
+          : both("Załóż opony letnie", "Fit summer tyres"),
+      };
+    }
+    case "expiry": {
+      const diff = n("diff");
+      const kind = s("kind");
+      const label =
+        kind === "insurance"
+          ? both("OC", "Liability insurance (OC)")
+          : kind === "ac"
+            ? both("AC", "Comprehensive insurance (AC)")
+            : kind === "inspection"
+              ? both("Badanie techniczne", "Technical inspection")
+              : both("Serwis", "Service");
+      const timing =
+        diff < 0
+          ? both(
+              ` po terminie od ${-diff} ${-diff === 1 ? "dzień" : "dni"}`,
+              ` overdue by ${-diff} ${-diff === 1 ? "day" : "days"}`,
+            )
+          : diff === 0
+            ? both(" — dzisiaj", " — today")
+            : both(
+              ` za ${diff} ${diff === 1 ? "dzień" : "dni"}`,
+              ` in ${diff} ${diff === 1 ? "day" : "days"}`,
+            );
+      const action =
+        kind === "insurance"
+          ? both("Przedłuż OC", "Renew liability insurance")
+          : kind === "ac"
+            ? both("Przedłuż AC", "Renew comprehensive insurance")
+            : kind === "inspection"
+              ? both("Umów badanie techniczne", "Book the technical inspection")
+              : both("Umów serwis", "Book a service");
+      return {
+        subject: both(car, car),
+        detail: both(
+          label.pl + timing.pl,
+          label.en + timing.en,
+        ),
+        action,
+      };
+    }
+    case "serviceKm": {
+      const isService = s("kind") === "service";
+      const label = isService
+        ? both("Serwis", "Service")
+        : both("Wymiana oleju", "Oil change");
+      const over = p.over != null;
+      const timing = over
+        ? both(` przekroczony o ${s("over")} km`, ` overdue by ${s("over")} km`)
+        : both(` za ${s("left")} km`, ` in ${s("left")} km`);
+      return {
+        subject: both(car, car),
+        detail: both(label.pl + timing.pl, label.en + timing.en),
+        action: isService
+          ? both("Umów serwis", "Book a service")
+          : both("Umów wymianę oleju", "Book an oil change"),
+      };
+    }
+    case "cost": {
+      const cat = s("category");
+      const label =
+        cat === "leasing"
+          ? both("Rata leasingu", "Leasing instalment")
+          : cat === "insurance"
+            ? both("Rata ubezpieczenia", "Insurance instalment")
+            : cat === "tax"
+              ? both("Podatek", "Tax")
+              : cat === "parking"
+                ? both("Opłata za parking", "Parking fee")
+                : both("Koszt cykliczny", "Recurring cost");
+      const due = s("due");
+      const when =
+        s("rel") === "past"
+          ? both(`termin minął ${due}`, `due date passed ${due}`)
+          : s("rel") === "today"
+            ? both("termin dzisiaj", "due today")
+            : both(`termin ${due}`, `due ${due}`);
+      return {
+        subject: both(car, car),
+        detail: both(
+          `${label.pl} ${s("amount")} zł · ${when.pl}`,
+          `${label.en} ${s("amount")} PLN · ${when.en}`,
+        ),
+        action: both("Opłać i zapisz w kosztach", "Pay and record it in costs"),
+      };
+    }
+    case "deadline": {
+      const kind = s("kind");
+      const label =
+        kind === "fine"
+          ? both("Mandat", "Fine")
+          : kind === "damage"
+            ? both("Szkoda", "Damage")
+            : kind === "deposit_take"
+              ? both("Kaucja do pobrania", "Deposit to take")
+              : kind === "deposit_return"
+                ? both("Kaucja do zwrotu", "Deposit to return")
+                : kind === "prep"
+                  ? both("Przygotowanie auta", "Car preparation")
+                  : both("Termin", "Deadline");
+      const action =
+        kind === "fine"
+          ? both("Opłać mandat", "Pay the fine")
+          : kind === "damage"
+            ? both("Domknij szkodę", "Close the damage claim")
+            : kind === "deposit_take"
+              ? both("Pobierz kaucję", "Take the deposit")
+              : kind === "deposit_return"
+                ? both("Zwróć kaucję", "Return the deposit")
+                : kind === "prep"
+                  ? both("Przygotuj auto", "Prepare the car")
+                  : both("Zrób i odhacz", "Do it and tick it off");
+      const amount = p.amount == null ? "" : ` · ${s("amount")} zł`;
+      const amountEn = p.amount == null ? "" : ` · ${s("amount")} PLN`;
+      const due = s("due");
+      const when =
+        s("rel") === "past"
+          ? both(`termin minął ${due}`, `due date passed ${due}`)
+          : s("rel") === "today"
+            ? both("termin dzisiaj", "due today")
+            : both(`termin ${due}`, `due ${due}`);
+      return {
+        subject: both(car, car),
+        detail: both(
+          `${label.pl}: ${s("title")}${amount} · ${when.pl}`,
+          `${label.en}: ${s("title")}${amountEn} · ${when.en}`,
+        ),
+        action,
+      };
+    }
+    default:
+      return {
+        subject: both(car, car),
+        detail: both(code, code),
+        action: both("", ""),
+      };
+  }
+}
 
 /**
  * The short list of things that will cost money or a customer if ignored today.
@@ -503,30 +757,24 @@ export async function getAttentionItems(): Promise<AttentionItem[]> {
   const recurringAmount = money("rc.amount_grosze");
   const deadlineAmount = money("d.amount_grosze");
 
-  const rows = rowsOf<{
-    kind: AttentionKind;
-    subject: string;
-    detail: string;
-    action: string;
-    urgent: boolean;
-    id: string | null;
-    sort: number;
-  }>(
+  const rows = rowsOf<AttentionRow>(
     await getDb().execute(sql`
       -- Every branch below scans the WHOLE fleet and every reservation. The
       -- car names in any example are just what happens to be due; nothing here
       -- is keyed to a particular vehicle.
       --
-      -- Column order is fixed for the UNION: kind, subject, detail, action,
-      -- urgent, id, sort.
+      -- Column order is fixed for the UNION: kind, code, params, urgent,
+      -- id, sort. "code" names the sentence; "params" carries its facts; the
+      -- Polish and English wording is built in JS (attentionText).
 
       -- 1. A car that should have come back and has not.
       SELECT 'overdue'::text AS kind,
-             cm.brand || ' ' || cm.model || ' · ' || c.plate AS subject,
-             'Zwrot zaległy od ' || (CURRENT_DATE - r.end_date) ||
-               CASE WHEN CURRENT_DATE - r.end_date = 1 THEN ' dnia' ELSE ' dni' END ||
-               ' · ' || r.customer_name || ' · ' || r.customer_phone AS detail,
-             'Zadzwoń i odbierz auto' AS action,
+             'overdue'::text AS code,
+             jsonb_build_object(
+               'car', cm.brand || ' ' || cm.model || ' · ' || c.plate,
+               'days', CURRENT_DATE - r.end_date,
+               'name', r.customer_name,
+               'phone', r.customer_phone) AS params,
              true AS urgent,
              r.id::text AS id,
              0 AS sort
@@ -538,10 +786,11 @@ export async function getAttentionItems(): Promise<AttentionItem[]> {
       UNION ALL
 
       -- 2. Requests nobody has decided on.
-      SELECT 'decision', 'Rezerwacja ' || r.reference,
-             'Czeka na decyzję · ' || cm.brand || ' ' || cm.model ||
-               ' · od ' || to_char(r.start_date, 'DD.MM'),
-             'Potwierdź albo odrzuć',
+      SELECT 'decision', 'decision',
+             jsonb_build_object(
+               'ref', r.reference,
+               'car', cm.brand || ' ' || cm.model,
+               'from', to_char(r.start_date, 'DD.MM')),
              (r.start_date <= CURRENT_DATE + 2),
              r.id::text, 1
       FROM reservations r
@@ -551,11 +800,12 @@ export async function getAttentionItems(): Promise<AttentionItem[]> {
       UNION ALL
 
       -- 3. Handovers due today.
-      SELECT 'pickup', cm.brand || ' ' || cm.model || ' · ' || c.plate,
-             'Wydanie dzisiaj' ||
-               COALESCE(' ' || to_char(r.pickup_time, 'HH24:MI'), '') ||
-               ' · ' || r.customer_name || ' · ' || r.customer_phone,
-             'Przygotuj i wydaj auto',
+      SELECT 'pickup', 'pickup',
+             jsonb_build_object(
+               'car', cm.brand || ' ' || cm.model || ' · ' || c.plate,
+               'time', to_char(r.pickup_time, 'HH24:MI'),
+               'name', r.customer_name,
+               'phone', r.customer_phone),
              true, r.id::text, 2
       FROM reservations r
       JOIN cars c ON c.id = r.car_id
@@ -565,11 +815,11 @@ export async function getAttentionItems(): Promise<AttentionItem[]> {
       UNION ALL
 
       -- 4. Returns due today.
-      SELECT 'return', cm.brand || ' ' || cm.model || ' · ' || c.plate,
-             'Zwrot dzisiaj' ||
-               COALESCE(' ' || to_char(r.return_time, 'HH24:MI'), '') ||
-               ' · ' || r.customer_name,
-             'Odbierz auto i spisz licznik',
+      SELECT 'return', 'return',
+             jsonb_build_object(
+               'car', cm.brand || ' ' || cm.model || ' · ' || c.plate,
+               'time', to_char(r.return_time, 'HH24:MI'),
+               'name', r.customer_name),
              true, r.id::text, 3
       FROM reservations r
       JOIN cars c ON c.id = r.car_id
@@ -579,13 +829,13 @@ export async function getAttentionItems(): Promise<AttentionItem[]> {
       UNION ALL
 
       -- 5. Money owed on a rental that has started or starts within three days.
-      SELECT 'payment', 'Rezerwacja ' || r.reference,
-             CASE WHEN COALESCE(p.paid, 0) > 0
-                  THEN 'Zapłacono ' || ${paidSoFar} || ' z ' || ${totalDue} ||
-                       ' zł · zostało ' || ${stillOwed} || ' zł'
-                  ELSE 'Brak wpłaty · ' || ${totalDue} || ' zł'
-             END,
-             'Pobierz należność',
+      SELECT 'payment', 'payment',
+             jsonb_build_object(
+               'ref', r.reference,
+               'hasPaid', COALESCE(p.paid, 0) > 0,
+               'paid', CASE WHEN COALESCE(p.paid, 0) > 0 THEN ${paidSoFar} END,
+               'total', ${totalDue},
+               'owed', ${stillOwed}),
              (r.start_date <= CURRENT_DATE),
              r.id::text, 4
       FROM reservations r
@@ -605,16 +855,11 @@ export async function getAttentionItems(): Promise<AttentionItem[]> {
       -- December is not a reminder, it is a car that must not leave the yard,
       -- so it is urgent from the first day and the action says so. All-season
       -- tyres are never wrong and never alert.
-      SELECT 'tyres', cm.brand || ' ' || cm.model || ' · ' || c.plate,
-             CASE WHEN c.tyres_fitted = 'summer'
-                  THEN 'Opony letnie, a trwa sezon zimowy'
-                  ELSE 'Opony zimowe, a trwa sezon letni'
-             END ||
-             COALESCE(' · ostatnia zmiana ' || to_char(c.tyres_changed_on, 'DD.MM.YYYY'), ''),
-             CASE WHEN c.tyres_fitted = 'summer'
-                  THEN 'Załóż opony zimowe — nie wydawaj auta'
-                  ELSE 'Załóż opony letnie'
-             END,
+      SELECT 'tyres', 'tyres',
+             jsonb_build_object(
+               'car', cm.brand || ' ' || cm.model || ' · ' || c.plate,
+               'fitted', c.tyres_fitted,
+               'changed', to_char(c.tyres_changed_on, 'DD.MM.YYYY')),
              (c.tyres_fitted = 'summer'),
              NULL, 5
       FROM cars c
@@ -634,25 +879,11 @@ export async function getAttentionItems(): Promise<AttentionItem[]> {
 
       -- 7. Paperwork and the planned service date.
       SELECT CASE WHEN k.kind = 'service' THEN 'service' ELSE 'document' END,
-             cm.brand || ' ' || cm.model || ' · ' || c.plate,
-             CASE k.kind
-               WHEN 'insurance' THEN 'OC'
-               WHEN 'ac' THEN 'AC'
-               WHEN 'inspection' THEN 'Badanie techniczne'
-               ELSE 'Serwis'
-             END ||
-             CASE
-               WHEN k.date < CURRENT_DATE
-                 THEN ' po terminie od ' || (CURRENT_DATE - k.date) || ' dni'
-               WHEN k.date = CURRENT_DATE THEN ' — dzisiaj'
-               ELSE ' za ' || (k.date - CURRENT_DATE) || ' dni'
-             END,
-             CASE k.kind
-               WHEN 'insurance' THEN 'Przedłuż OC'
-               WHEN 'ac' THEN 'Przedłuż AC'
-               WHEN 'inspection' THEN 'Umów badanie techniczne'
-               ELSE 'Umów serwis'
-             END,
+             'expiry',
+             jsonb_build_object(
+               'car', cm.brand || ' ' || cm.model || ' · ' || c.plate,
+               'kind', k.kind,
+               'diff', k.date - CURRENT_DATE),
              (k.date <= CURRENT_DATE + 7),
              NULL, 6
       FROM cars c
@@ -670,23 +901,23 @@ export async function getAttentionItems(): Promise<AttentionItem[]> {
       -- 8. Service and oil by distance. Two intervals, same shape: without an
       -- interval AND a reading from the last one there is nothing to count
       -- down from, and a guessed countdown is worse than none.
-      SELECT 'service', cm.brand || ' ' || cm.model || ' · ' || c.plate,
-             j.label ||
-             CASE
-               WHEN c.mileage_km >= j.last + j.step
-                 THEN ' przekroczony o ' || (c.mileage_km - j.last - j.step) || ' km'
-               ELSE ' za ' || (j.last + j.step - c.mileage_km) || ' km'
-             END,
-             j.action,
+      SELECT 'service', 'serviceKm',
+             jsonb_build_object(
+               'car', cm.brand || ' ' || cm.model || ' · ' || c.plate,
+               'kind', j.kind,
+               'over', CASE WHEN c.mileage_km >= j.last + j.step
+                            THEN c.mileage_km - j.last - j.step END,
+               'left', CASE WHEN c.mileage_km < j.last + j.step
+                            THEN j.last + j.step - c.mileage_km END),
              (c.mileage_km >= j.last + j.step - 500),
              NULL, 6
       FROM cars c
       JOIN car_models cm ON cm.id = c.model_id
       CROSS JOIN LATERAL (
         VALUES
-          ('Serwis', c.service_interval_km, c.last_service_km, 'Umów serwis'),
-          ('Wymiana oleju', c.oil_interval_km, c.last_oil_km, 'Umów wymianę oleju')
-      ) AS j(label, step, last, action)
+          ('service', c.service_interval_km, c.last_service_km),
+          ('oil', c.oil_interval_km, c.last_oil_km)
+      ) AS j(kind, step, last)
       WHERE j.step IS NOT NULL AND j.last IS NOT NULL
         AND c.mileage_km >= j.last + j.step - 2000
 
@@ -696,21 +927,15 @@ export async function getAttentionItems(): Promise<AttentionItem[]> {
       -- parking. Read from the schedule the operator already set up, so a
       -- leasing instalment cannot be forgotten just because nobody looked at
       -- the car's expense tab this month.
-      SELECT 'cost', cm.brand || ' ' || cm.model || ' · ' || c.plate,
-             CASE rc.category
-               WHEN 'leasing' THEN 'Rata leasingu'
-               WHEN 'insurance' THEN 'Rata ubezpieczenia'
-               WHEN 'tax' THEN 'Podatek'
-               WHEN 'parking' THEN 'Opłata za parking'
-               ELSE 'Koszt cykliczny'
-             END || ' ' || ${recurringAmount} || ' zł · ' ||
-             CASE
-               WHEN nx.due < CURRENT_DATE
-                 THEN 'termin minął ' || to_char(nx.due, 'DD.MM')
-               WHEN nx.due = CURRENT_DATE THEN 'termin dzisiaj'
-               ELSE 'termin ' || to_char(nx.due, 'DD.MM')
-             END,
-             'Opłać i zapisz w kosztach',
+      SELECT 'cost', 'cost',
+             jsonb_build_object(
+               'car', cm.brand || ' ' || cm.model || ' · ' || c.plate,
+               'category', rc.category,
+               'amount', ${recurringAmount},
+               'due', to_char(nx.due, 'DD.MM'),
+               'rel', CASE WHEN nx.due < CURRENT_DATE THEN 'past'
+                           WHEN nx.due = CURRENT_DATE THEN 'today'
+                           ELSE 'future' END),
              (nx.due <= CURRENT_DATE),
              NULL, 7
       FROM recurring_costs rc
@@ -740,30 +965,16 @@ export async function getAttentionItems(): Promise<AttentionItem[]> {
       -- deposits to take or give back, prep jobs, one-off obligations. The
       -- operator sets the date; this reads it. Anything already dealt with
       -- (done_at set) is out.
-      SELECT 'deadline', cm.brand || ' ' || cm.model || ' · ' || c.plate,
-             CASE d.kind
-               WHEN 'fine' THEN 'Mandat'
-               WHEN 'damage' THEN 'Szkoda'
-               WHEN 'deposit_take' THEN 'Kaucja do pobrania'
-               WHEN 'deposit_return' THEN 'Kaucja do zwrotu'
-               WHEN 'prep' THEN 'Przygotowanie auta'
-               ELSE 'Termin'
-             END || ': ' || d.title ||
-             COALESCE(' · ' || ${deadlineAmount} || ' zł', '') || ' · ' ||
-             CASE
-               WHEN d.due_on < CURRENT_DATE
-                 THEN 'termin minął ' || to_char(d.due_on, 'DD.MM')
-               WHEN d.due_on = CURRENT_DATE THEN 'termin dzisiaj'
-               ELSE 'termin ' || to_char(d.due_on, 'DD.MM')
-             END,
-             CASE d.kind
-               WHEN 'fine' THEN 'Opłać mandat'
-               WHEN 'damage' THEN 'Domknij szkodę'
-               WHEN 'deposit_take' THEN 'Pobierz kaucję'
-               WHEN 'deposit_return' THEN 'Zwróć kaucję'
-               WHEN 'prep' THEN 'Przygotuj auto'
-               ELSE 'Zrób i odhacz'
-             END,
+      SELECT 'deadline', 'deadline',
+             jsonb_build_object(
+               'car', cm.brand || ' ' || cm.model || ' · ' || c.plate,
+               'kind', d.kind,
+               'title', d.title,
+               'amount', ${deadlineAmount},
+               'due', to_char(d.due_on, 'DD.MM'),
+               'rel', CASE WHEN d.due_on < CURRENT_DATE THEN 'past'
+                           WHEN d.due_on = CURRENT_DATE THEN 'today'
+                           ELSE 'future' END),
              (d.due_on <= CURRENT_DATE),
              NULL, 8
       FROM car_deadlines d
@@ -775,14 +986,17 @@ export async function getAttentionItems(): Promise<AttentionItem[]> {
     `),
   );
 
-  const items: AttentionItem[] = rows.map((r) => ({
-    kind: r.kind,
-    subject: r.subject,
-    detail: r.detail,
-    action: r.action,
-    urgent: Boolean(r.urgent),
-    href: r.id ? `/admin/reservations/${r.id}` : null,
-  }));
+  const items: AttentionItem[] = rows.map((r) => {
+    const text = attentionText(r.code, r.params ?? {});
+    return {
+      kind: r.kind,
+      subject: text.subject,
+      detail: text.detail,
+      action: text.action,
+      urgent: Boolean(r.urgent),
+      href: r.id ? `/admin/reservations/${r.id}` : null,
+    };
+  });
 
   // 11. Deposits owed back, as ONE row rather than one per rental.
   //
@@ -794,9 +1008,15 @@ export async function getAttentionItems(): Promise<AttentionItem[]> {
   if (deposits.toReturnCount > 0) {
     items.push({
       kind: "deposit",
-      subject: `Kaucje do zwrotu: ${deposits.toReturnCount}`,
-      detail: `${formatPlnPrecise(deposits.toReturnGrosze, "pl")} czeka na zwrot klientom`,
-      action: "Rozlicz i zwróć",
+      subject: both(
+        `Kaucje do zwrotu: ${deposits.toReturnCount}`,
+        `Deposits to return: ${deposits.toReturnCount}`,
+      ),
+      detail: both(
+        `${formatPlnPrecise(deposits.toReturnGrosze, "pl")} czeka na zwrot klientom`,
+        `${formatPlnPrecise(deposits.toReturnGrosze, "en")} awaiting return to customers`,
+      ),
+      action: both("Rozlicz i zwróć", "Settle and return"),
       urgent: true,
       href: "/admin/kaucje",
     });

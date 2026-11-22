@@ -1,3 +1,4 @@
+import type { Bilingual } from "@/lib/i18n-pick";
 import "server-only";
 import { sql, type SQL } from "drizzle-orm";
 import { getDb } from "@/lib/db";
@@ -26,11 +27,11 @@ const num = (v: unknown) => Number(v ?? 0) || 0;
 /* ── The window ───────────────────────────────────────────────────────────── */
 
 export const PERIODS = [
-  { key: "today", label: "Dziś", days: 1 },
-  { key: "7d", label: "7 dni", days: 7 },
-  { key: "month", label: "Miesiąc", days: 30 },
-  { key: "quarter", label: "Kwartał", days: 90 },
-  { key: "year", label: "Rok", days: 365 },
+  { key: "today", label: { pl: "Dziś", en: "Today" }, days: 1 },
+  { key: "7d", label: { pl: "7 dni", en: "7 days" }, days: 7 },
+  { key: "month", label: { pl: "Miesiąc", en: "Month" }, days: 30 },
+  { key: "quarter", label: { pl: "Kwartał", en: "Quarter" }, days: 90 },
+  { key: "year", label: { pl: "Rok", en: "Year" }, days: 365 },
 ] as const;
 
 export type PeriodKey = (typeof PERIODS)[number]["key"] | "custom";
@@ -355,16 +356,16 @@ export async function getCostStructure(
 
 /* ── Rhythm: weekdays and months ──────────────────────────────────────────── */
 
-export type WeekdayRow = { weekday: number; label: string; occupancy: number };
+export type WeekdayRow = { weekday: number; label: Bilingual; occupancy: number };
 
-const WEEKDAYS = [
-  "Poniedziałek",
-  "Wtorek",
-  "Środa",
-  "Czwartek",
-  "Piątek",
-  "Sobota",
-  "Niedziela",
+const WEEKDAYS: Bilingual[] = [
+  { pl: "Poniedziałek", en: "Monday" },
+  { pl: "Wtorek", en: "Tuesday" },
+  { pl: "Środa", en: "Wednesday" },
+  { pl: "Czwartek", en: "Thursday" },
+  { pl: "Piątek", en: "Friday" },
+  { pl: "Sobota", en: "Saturday" },
+  { pl: "Niedziela", en: "Sunday" },
 ];
 
 /** Which days of the week actually earn — the basis of a weekend price. */
@@ -408,7 +409,7 @@ export async function getWeekdayOccupancy(
     const capacity = num(r.car_days);
     return {
       weekday: num(r.dow),
-      label: WEEKDAYS[num(r.dow) - 1] ?? "",
+      label: WEEKDAYS[num(r.dow) - 1] ?? { pl: "", en: "" },
       occupancy: capacity > 0 ? num(r.days) / capacity : 0,
     };
   });
@@ -540,7 +541,7 @@ export async function getCustomerMix(
 
 /* ── Best and worst ───────────────────────────────────────────────────────── */
 
-export type Highlight = { label: string; subject: string; value: string };
+export type Highlight = { label: Bilingual; subject: string; value: Bilingual };
 
 /**
  * The five lines an owner reads first.
@@ -551,8 +552,14 @@ export type Highlight = { label: string; subject: string; value: string };
 export function highlightsOf(cars: CarOccupancy[]): Highlight[] {
   if (cars.length === 0) return [];
   const withRevenue = cars.filter((c) => c.revenueGrosze > 0);
-  const pct = (v: number) => `${Math.round(v * 100)}%`;
-  const zl = (g: number) => `${(g / 100).toLocaleString("pl-PL")} zł`;
+  const pct = (v: number): Bilingual => {
+    const text = `${Math.round(v * 100)}%`;
+    return { pl: text, en: text };
+  };
+  const zl = (g: number): Bilingual => ({
+    pl: `${(g / 100).toLocaleString("pl-PL")} zł`,
+    en: `${(g / 100).toLocaleString("en-GB")} PLN`,
+  });
 
   const best = [...cars].sort((a, b) => b.marginGrosze - a.marginGrosze)[0];
   const busiest = [...cars].sort((a, b) => b.occupancy - a.occupancy)[0];
@@ -568,24 +575,24 @@ export function highlightsOf(cars: CarOccupancy[]): Highlight[] {
 
   const out: Highlight[] = [
     {
-      label: "Najbardziej rentowne auto",
+      label: { pl: "Najbardziej rentowne auto", en: "Most profitable car" },
       subject: best.carName,
       value: zl(best.marginGrosze),
     },
     {
-      label: "Najwyższe obłożenie",
+      label: { pl: "Najwyższe obłożenie", en: "Highest occupancy" },
       subject: busiest.carName,
       value: pct(busiest.occupancy),
     },
     {
-      label: "Najniższe obłożenie",
+      label: { pl: "Najniższe obłożenie", en: "Lowest occupancy" },
       subject: idlest.carName,
       value: pct(idlest.occupancy),
     },
   ];
   if (priciest) {
     out.push({
-      label: "Najwyższa cena za dobę",
+      label: { pl: "Najwyższa cena za dobę", en: "Highest daily rate" },
       subject: priciest.carName,
       value: zl(
         Math.round(priciest.revenueGrosze / Math.max(priciest.daysRented, 1)),
@@ -594,7 +601,7 @@ export function highlightsOf(cars: CarOccupancy[]): Highlight[] {
   }
   if (costliest.expenseGrosze > 0) {
     out.push({
-      label: "Największy koszt",
+      label: { pl: "Największy koszt", en: "Biggest cost" },
       subject: costliest.carName,
       value: zl(costliest.expenseGrosze),
     });

@@ -1,0 +1,1 @@
+{"nodes": [{"id": "$graphify-root$_drizzle_0040_fee_cap_sql", "label": "0040_fee_cap.sql", "file_type": "code", "source_file": "drizzle/0040_fee_cap.sql", "source_location": null}, {"id": "fees", "label": "\"fees\"", "file_type": "code", "source_file": "", "source_location": "", "origin_file": "$graphify-root$/drizzle/0040_fee_cap.sql"}], "edges": []}

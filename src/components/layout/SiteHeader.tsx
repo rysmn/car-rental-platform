@@ -10,7 +10,6 @@ import { SavedNavLink } from "./SavedNavLink";
 import { SavedIconLink } from "./SavedIconLink";
 import { ReviewsLink } from "./ReviewsLink";
 import { ThemeToggle } from "./ThemeToggle";
-import { CurrencySwitcher } from "@/components/currency/CurrencySwitcher";
 import { MyReservationBadge } from "@/components/booking/MyReservationBadge";
 import { MyReservationsNavLink } from "@/components/booking/MyReservationsNavLink";
 import { ButtonLink } from "@/components/ui/Button";
@@ -258,16 +257,6 @@ export function SiteHeader({
             className="flex items-center gap-[var(--belka-ustawienia)]"
           >
             <LocaleSwitcher />
-            {/* Desktop: te same napisy „zł / €" co na telefonie — jedna
-                kontrolka nie może się nazywać dwoma sposobami zależnie od
-                szerokości okna. Ten sam komponent, ten sam kurs, ten sam
-                zapis wyboru; zmieniają się wyłącznie etykiety. */}
-            <CurrencySwitcher
-              note={t("currencyNote")}
-              groupLabel={t("changeCurrency")}
-              labelPln="zł"
-              labelEur="€"
-            />
             <ThemeToggle
               labels={{ light: t("themeLight"), dark: t("themeDark") }}
             />
@@ -352,20 +341,6 @@ export function SiteHeader({
             miejsca jest w bród, zostaje 32 px.
           */}
           <LocaleSwitcher className="[&_a]:min-w-7 min-[430px]:[&_a]:min-w-8" />
-          {/*
-            „zł / €" zamiast „PLN / EUR" — dwa znaki zamiast sześciu, ta sama
-            treść. To jest ten sam `CurrencySwitcher`, ten sam kurs i ten sam
-            zapis wyboru; zmieniają się WYŁĄCZNIE napisy na przyciskach.
-            Flag nie ma i mieć nie będzie: waluta to nie kraj, a € jest
-            wspólne dla dwudziestu z nich.
-          */}
-          <CurrencySwitcher
-            note={t("currencyNote")}
-            groupLabel={t("changeCurrency")}
-            labelPln="zł"
-            labelEur="€"
-            className="hidden min-[360px]:flex [&_button]:min-w-7 min-[430px]:[&_button]:min-w-8"
-          />
           {/*
             MOTYW WRACA DO BELKI (decyzja właściciela 02.09.2026).
 
@@ -463,18 +438,6 @@ export function SiteHeader({
               przycisk dalej niż jeden przycisk za mały. Zmierzone: 320 px to
               jedyna szerokość, na której to wchodzi w grę.
             */}
-            <div className="border-line flex items-center justify-between border-b py-4 min-[360px]:hidden">
-              <span className="label-tight text-silver text-sm">
-                {t("currency")}
-              </span>
-              <CurrencySwitcher
-                note={t("currencyNote")}
-                groupLabel={t("changeCurrency")}
-                labelPln="zł"
-                labelEur="€"
-                className="text-xs [&_button]:min-w-10"
-              />
-            </div>
 
             {/*
               Motyw wrócił do belki, więc tutaj zostaje wyłącznie poniżej

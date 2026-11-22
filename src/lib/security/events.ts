@@ -2,6 +2,7 @@ import "server-only";
 import { and, eq, gte, sql } from "drizzle-orm";
 import { createHash } from "node:crypto";
 import { getDb, schema } from "@/lib/db";
+import type { Bilingual } from "@/lib/i18n-pick";
 
 /**
  * Dziennik odrzuconych prób — rozdział 13.1 punkt 4.
@@ -248,29 +249,29 @@ export async function podsumujZdarzenia(
   }
 }
 
-/** Nazwy rodzajów po polsku — panel nie ma pokazywać identyfikatorów z kodu. */
-export const NAZWA_ZDARZENIA: Record<string, string> = {
-  honeypot: "Pułapka na roboty",
-  form_rate_limited: "Limit wysyłek formularza",
-  turnstile_missing: "Brak tokenu antybotowego",
-  turnstile_invalid: "Odrzucony token antybotowy",
-  form_too_fast: "Formularz wysłany zbyt szybko",
-  chat_session_limit: "Limit wiadomości w rozmowie",
-  chat_repeat: "Powtarzana wiadomość w czacie",
-  chat_flood: "Zbyt szybkie wiadomości w czacie",
-  scrape_rate_limited: "Limit ruchu publicznego",
-  suspicious_agent: "Podejrzany klient HTTP",
-  verification_bad_token: "Zły token potwierdzenia",
-  verification_expired: "Wygasłe potwierdzenie",
-  verification_reused: "Ponownie użyty link potwierdzenia",
-  verification_unavailable: "Termin zajęty przy potwierdzaniu",
-  lead_time_rejected: "Odbiór poniżej minimalnego wyprzedzenia",
-  login_failed: "Nieudane logowanie",
-  login_locked: "Konto zablokowane po próbach",
-  totp_failed: "Zły kod 2FA",
-  recovery_used: "Użyty kod zapasowy",
-  new_device: "Logowanie z nowego urządzenia",
-  sessions_revoked: "Unieważnienie wszystkich sesji",
-  critical_denied: "Odmowa operacji krytycznej",
-  permission_denied: "Brak uprawnień do operacji",
+/** Nazwy rodzajów — panel nie ma pokazywać identyfikatorów z kodu. */
+export const NAZWA_ZDARZENIA: Record<string, Bilingual> = {
+  honeypot: { pl: "Pułapka na roboty", en: "Bot trap" },
+  form_rate_limited: { pl: "Limit wysyłek formularza", en: "Form submission limit" },
+  turnstile_missing: { pl: "Brak tokenu antybotowego", en: "Missing anti-bot token" },
+  turnstile_invalid: { pl: "Odrzucony token antybotowy", en: "Rejected anti-bot token" },
+  form_too_fast: { pl: "Formularz wysłany zbyt szybko", en: "Form sent too quickly" },
+  chat_session_limit: { pl: "Limit wiadomości w rozmowie", en: "Message limit in a conversation" },
+  chat_repeat: { pl: "Powtarzana wiadomość w czacie", en: "Repeated message in chat" },
+  chat_flood: { pl: "Zbyt szybkie wiadomości w czacie", en: "Messages in chat too fast" },
+  scrape_rate_limited: { pl: "Limit ruchu publicznego", en: "Public traffic limit" },
+  suspicious_agent: { pl: "Podejrzany klient HTTP", en: "Suspicious HTTP client" },
+  verification_bad_token: { pl: "Zły token potwierdzenia", en: "Invalid confirmation token" },
+  verification_expired: { pl: "Wygasłe potwierdzenie", en: "Expired confirmation" },
+  verification_reused: { pl: "Ponownie użyty link potwierdzenia", en: "Confirmation link reused" },
+  verification_unavailable: { pl: "Termin zajęty przy potwierdzaniu", en: "Date taken during confirmation" },
+  lead_time_rejected: { pl: "Odbiór poniżej minimalnego wyprzedzenia", en: "Pickup below the minimum lead time" },
+  login_failed: { pl: "Nieudane logowanie", en: "Failed login" },
+  login_locked: { pl: "Konto zablokowane po próbach", en: "Account locked after attempts" },
+  totp_failed: { pl: "Zły kod 2FA", en: "Wrong 2FA code" },
+  recovery_used: { pl: "Użyty kod zapasowy", en: "Recovery code used" },
+  new_device: { pl: "Logowanie z nowego urządzenia", en: "Login from a new device" },
+  sessions_revoked: { pl: "Unieważnienie wszystkich sesji", en: "All sessions revoked" },
+  critical_denied: { pl: "Odmowa operacji krytycznej", en: "Critical operation denied" },
+  permission_denied: { pl: "Brak uprawnień do operacji", en: "No permission for the operation" },
 };

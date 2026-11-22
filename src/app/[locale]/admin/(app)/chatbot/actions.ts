@@ -7,6 +7,7 @@ import { getDb, schema } from "@/lib/db";
 import { requirePermission } from "@/lib/auth/guard";
 import { recordAudit } from "@/lib/auth/audit";
 import { adminActionFailed } from "@/lib/alerts/admin";
+import { getTranslations } from "next-intl/server";
 
 /**
  * The only writes the chatbot section performs.
@@ -45,12 +46,13 @@ export async function updateLead(
   formData: FormData,
 ): Promise<LeadResult> {
   const admin = await requirePermission("skrzynka.obsluz");
+  const t = await getTranslations("Admin.chatbot.errors");
   const parsed = schemaLead.safeParse({
     id: formData.get("id"),
     status: formData.get("status"),
     note: formData.get("note") ?? "",
   });
-  if (!parsed.success) return { ok: false, error: "Nieprawidłowe dane." };
+  if (!parsed.success) return { ok: false, error: t("invalidData") };
   const d = parsed.data;
 
   try {
@@ -60,7 +62,7 @@ export async function updateLead(
       .from(schema.chatLeads)
       .where(eq(schema.chatLeads.id, d.id))
       .limit(1);
-    if (!before) return { ok: false, error: "Nie znaleziono zgłoszenia." };
+    if (!before) return { ok: false, error: t("leadNotFound") };
 
     await db
       .update(schema.chatLeads)
@@ -80,7 +82,7 @@ export async function updateLead(
     return { ok: true };
   } catch (err) {
     adminActionFailed("updateLead", err);
-    return { ok: false, error: "Wystąpił błąd. Spróbuj ponownie." };
+    return { ok: false, error: t("generic") };
   }
 }
 
@@ -109,11 +111,12 @@ export async function createFaqDraft(
   formData: FormData,
 ): Promise<LeadResult> {
   const admin = await requirePermission("czat.ustawienia");
+  const t = await getTranslations("Admin.chatbot.errors");
   const parsed = faqDraftSchema.safeParse({
     question: formData.get("question"),
     locale: formData.get("locale"),
   });
-  if (!parsed.success) return { ok: false, error: "Nieprawidłowe pytanie." };
+  if (!parsed.success) return { ok: false, error: t("invalidQuestion") };
 
   try {
     const db = getDb();
@@ -142,7 +145,7 @@ export async function createFaqDraft(
     return { ok: true };
   } catch (err) {
     adminActionFailed("createFaqDraft", err);
-    return { ok: false, error: "Nie udało się utworzyć szkicu." };
+    return { ok: false, error: t("draftFailed") };
   }
 }
 
@@ -158,19 +161,20 @@ export async function saveFaqEntry(
   formData: FormData,
 ): Promise<LeadResult> {
   const admin = await requirePermission("czat.ustawienia");
+  const t = await getTranslations("Admin.chatbot.errors");
   const parsed = faqSaveSchema.safeParse({
     id: formData.get("id"),
     question: formData.get("question"),
     answer: formData.get("answer") ?? "",
     publish: formData.get("publish") === "1",
   });
-  if (!parsed.success) return { ok: false, error: "Nieprawidłowe dane." };
+  if (!parsed.success) return { ok: false, error: t("invalidData") };
   const d = parsed.data;
 
   // Publishing an empty answer would let the assistant reply with silence and
   // count it as having helped.
   if (d.publish && d.answer.length < 3) {
-    return { ok: false, error: "Nie można opublikować pustej odpowiedzi." };
+    return { ok: false, error: t("emptyPublish") };
   }
 
   try {
@@ -180,7 +184,7 @@ export async function saveFaqEntry(
       .from(schema.chatFaq)
       .where(eq(schema.chatFaq.id, d.id))
       .limit(1);
-    if (!before) return { ok: false, error: "Nie znaleziono wpisu." };
+    if (!before) return { ok: false, error: t("entryNotFound") };
 
     await db
       .update(schema.chatFaq)
@@ -214,7 +218,7 @@ export async function saveFaqEntry(
     return { ok: true };
   } catch (err) {
     adminActionFailed("saveFaqEntry", err);
-    return { ok: false, error: "Nie udało się zapisać." };
+    return { ok: false, error: t("saveFailed") };
   }
 }
 
@@ -223,8 +227,9 @@ export async function deleteFaqEntry(
   formData: FormData,
 ): Promise<LeadResult> {
   const admin = await requirePermission("czat.ustawienia");
+  const t = await getTranslations("Admin.chatbot.errors");
   const id = String(formData.get("id") ?? "");
-  if (!UUID_RE.test(id)) return { ok: false, error: "Nieprawidłowe dane." };
+  if (!UUID_RE.test(id)) return { ok: false, error: t("invalidData") };
 
   try {
     const db = getDb();
@@ -233,7 +238,7 @@ export async function deleteFaqEntry(
       .from(schema.chatFaq)
       .where(eq(schema.chatFaq.id, id))
       .limit(1);
-    if (!before) return { ok: false, error: "Nie znaleziono wpisu." };
+    if (!before) return { ok: false, error: t("entryNotFound") };
 
     await db.delete(schema.chatFaq).where(eq(schema.chatFaq.id, id));
     await recordAudit({
@@ -248,6 +253,6 @@ export async function deleteFaqEntry(
     return { ok: true };
   } catch (err) {
     adminActionFailed("deleteFaqEntry", err);
-    return { ok: false, error: "Nie udało się usunąć." };
+    return { ok: false, error: t("deleteFailed") };
   }
 }

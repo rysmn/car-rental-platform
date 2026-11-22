@@ -1,6 +1,7 @@
 "use client";
 
 import { useActionState, useState } from "react";
+import { useLocale, useTranslations } from "next-intl";
 import { formatPln } from "@/lib/format";
 import {
   oznaczNieodebranie,
@@ -18,25 +19,11 @@ import type { NaleznoscAnulowania } from "@/lib/booking/cancellation-repo";
  * a ekran, który po umorzeniu pokazuje samo „0 zł", gubi to, co się wydarzyło.
  */
 
-const ETYKIETA_STANU: Record<NaleznoscAnulowania["status"], string> = {
-  not_applicable: "BEZPŁATNE",
-  due: "DO ZAPŁATY",
-  paid: "ZAPŁACONE",
-  waived: "UMORZONE",
-};
-
 const STYL_STANU: Record<NaleznoscAnulowania["status"], string> = {
   not_applicable: "border-line text-ink-faint",
   due: "border-red text-red",
   paid: "border-line text-emerald-400",
   waived: "border-line text-silver",
-};
-
-const ETYKIETA_PROGU: Record<string, string> = {
-  free: "ponad próg bezpłatny",
-  tier1: "między progami",
-  tier2: "poniżej drugiego progu",
-  no_show: "nieodebranie auta",
 };
 
 const PRZYCISK =
@@ -56,6 +43,24 @@ export function CancellationFeePanel({
   /** Dlaczego nie — zdanie dla obsługi, gdy przycisku nie ma. */
   powodNieodebrania: string | null;
 }) {
+  const t = useTranslations("Admin.reservations.cancellation");
+  const locale = useLocale();
+  const intl = locale === "en" ? "en-GB" : "pl-PL";
+
+  const ETYKIETA_STANU: Record<NaleznoscAnulowania["status"], string> = {
+    not_applicable: t("stateNotApplicable"),
+    due: t("stateDue"),
+    paid: t("statePaid"),
+    waived: t("stateWaived"),
+  };
+
+  const ETYKIETA_PROGU: Record<string, string> = {
+    free: t("tierFree"),
+    tier1: t("tierBetween"),
+    tier2: t("tierBelowSecond"),
+    no_show: t("tierNoShow"),
+  };
+
   const [stanUmorzenia, umorz, umarzanie] = useActionState(
     umorzOplateAnulowania,
     null,
@@ -73,14 +78,14 @@ export function CancellationFeePanel({
   return (
     <div className="border-line bg-graphite/40 mt-6 border p-6">
       <h2 className="label-tight text-ink-faint mb-4 text-[10px]">
-        Anulowanie i nieodebranie
+        {t("heading")}
       </h2>
 
       {fee ? (
         <div className="space-y-3">
           <div className="flex flex-wrap items-center gap-3">
             <span className="font-heading text-ink text-lg font-bold tabular-nums">
-              {formatPln(fee.amountGrosze, "pl")}
+              {formatPln(fee.amountGrosze, locale)}
             </span>
             <span
               className={`label-tight border px-2 py-1 text-[10px] ${STYL_STANU[fee.status]}`}
@@ -89,7 +94,7 @@ export function CancellationFeePanel({
               {ETYKIETA_STANU[fee.status]}
             </span>
             <span className="text-ink-faint text-xs">
-              {fee.kind === "no_show" ? "nieodebranie" : "anulowanie"} ·{" "}
+              {fee.kind === "no_show" ? t("kindNoShow") : t("kindCancel")} ·{" "}
               {ETYKIETA_PROGU[fee.tier] ?? fee.tier}
             </span>
           </div>
@@ -100,30 +105,38 @@ export function CancellationFeePanel({
           */}
           {fee.policyGrosze > fee.amountGrosze && (
             <p className="text-ink-faint text-xs">
-              Cennik: {formatPln(fee.policyGrosze, "pl")} — ograniczone
-              wartością rezerwacji ({formatPln(fee.reservationTotalGrosze, "pl")}
-              ).
+              {t("policy", {
+                policy: formatPln(fee.policyGrosze, locale),
+                total: formatPln(fee.reservationTotalGrosze, locale),
+              })}
             </p>
           )}
 
           <p className="text-ink-faint text-xs">
-            Naliczono {fee.chargedAt.toLocaleString("pl-PL")}
+            {t("charged", {
+              date: fee.chargedAt.toLocaleString(intl),
+            })}
             {fee.hoursToPickup !== null &&
-              ` · ${fee.hoursToPickup.toFixed(1)} h do odbioru`}
+              t("hoursToPickup", {
+                hours: fee.hoursToPickup.toFixed(1),
+              })}
           </p>
 
           {fee.status === "waived" && (
             <div className="border-line-strong border-l-2 pl-3">
               <p className="text-silver text-xs">
-                Umorzone {fee.waivedAt?.toLocaleString("pl-PL")} · do zapłaty{" "}
-                {formatPln(0, "pl")}
+                {t("waivedAt", {
+                  date: fee.waivedAt?.toLocaleString(intl) ?? "",
+                  amount: formatPln(0, locale),
+                })}
               </p>
               <p className="text-ink-faint mt-1 text-xs">
-                Powód: {fee.waiveReason}
+                {t("reason", { reason: fee.waiveReason ?? "" })}
               </p>
               <p className="text-ink-faint mt-1 text-xs">
-                Pierwotnie naliczono {formatPln(fee.amountGrosze, "pl")} — kwota
-                zostaje w historii.
+                {t("originallyCharged", {
+                  amount: formatPln(fee.amountGrosze, locale),
+                })}
               </p>
             </div>
           )}
@@ -133,7 +146,7 @@ export function CancellationFeePanel({
               <form action={zaplac}>
                 <input type="hidden" name="id" value={reservationId} />
                 <button type="submit" disabled={wplacanie} className={PRZYCISK}>
-                  {wplacanie ? "Zapisywanie…" : "Oznacz jako zapłaconą"}
+                  {wplacanie ? t("saving") : t("markPaid")}
                 </button>
               </form>
               {!formularzUmorzenia && (
@@ -143,7 +156,7 @@ export function CancellationFeePanel({
                   onClick={() => setFormularzUmorzenia(true)}
                   data-fee-waive-open
                 >
-                  Umorz opłatę
+                  {t("waiveFee")}
                 </button>
               )}
             </div>
@@ -154,27 +167,27 @@ export function CancellationFeePanel({
               <input type="hidden" name="id" value={reservationId} />
               <label className="block">
                 <span className="label-tight text-ink-faint text-[10px]">
-                  Powód umorzenia (zostaje w historii)
+                  {t("waiveReasonLabel")}
                 </span>
                 <input
                   name="reason"
                   required
                   minLength={3}
                   maxLength={500}
-                  placeholder="np. awaria po naszej stronie, gest wobec stałego klienta"
+                  placeholder={t("waivePlaceholder")}
                   className="border-line-strong bg-surface-1 text-ink mt-1 h-10 w-full border px-3 text-sm"
                 />
               </label>
               <div className="flex flex-wrap items-center gap-3">
                 <button type="submit" disabled={umarzanie} className={PRZYCISK}>
-                  {umarzanie ? "Umarzanie…" : "Potwierdź umorzenie"}
+                  {umarzanie ? t("waiving") : t("confirmWaive")}
                 </button>
                 <button
                   type="button"
                   className={PRZYCISK}
                   onClick={() => setFormularzUmorzenia(false)}
                 >
-                  Anuluj
+                  {t("cancel")}
                 </button>
               </div>
             </form>
@@ -190,8 +203,7 @@ export function CancellationFeePanel({
       ) : (
         <div className="space-y-3">
           <p className="text-ink-faint text-xs leading-relaxed">
-            Nic nie naliczono. Opłata powstaje przy anulowaniu przez klienta
-            albo przy oznaczeniu rezerwacji jako nieodebranej.
+            {t("nothingCharged")}
           </p>
           {mozliwyNoShow ? (
             <form action={noShow}>
@@ -202,7 +214,7 @@ export function CancellationFeePanel({
                 className={PRZYCISK}
                 data-mark-no-show
               >
-                {noShowTrwa ? "Zapisywanie…" : "Klient się nie zjawił"}
+                {noShowTrwa ? t("saving") : t("noShowButton")}
               </button>
             </form>
           ) : (

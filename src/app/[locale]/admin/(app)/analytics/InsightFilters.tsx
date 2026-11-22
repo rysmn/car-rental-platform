@@ -1,4 +1,6 @@
+import { useLocale, useTranslations } from "next-intl";
 import { PERIODS, type PeriodKey, type Window } from "@/lib/admin/insights";
+import { pick } from "@/lib/i18n-pick";
 
 /**
  * The filter bar, as a plain GET form.
@@ -29,6 +31,8 @@ export function InsightFilters({
   segments: { key: string; label: string }[];
   locations: { id: string; name: string }[];
 }) {
+  const t = useTranslations("Admin.analytics");
+  const locale = useLocale();
   const field =
     "h-9 border border-line-strong bg-surface-1 px-2 text-xs text-ink";
 
@@ -38,21 +42,21 @@ export function InsightFilters({
       className="border-line bg-void flex flex-wrap items-end gap-3 border p-4"
     >
       <label className="flex flex-col gap-1">
-        <span className="label-tight text-ink-faint text-[10px]">Okres</span>
+        <span className="label-tight text-ink-faint text-[10px]">{t("filters.period")}</span>
         <select name="period" defaultValue={period} className={field}>
           {PERIODS.map((p) => (
             <option key={p.key} value={p.key}>
-              {p.label}
+              {pick(p.label, locale)}
             </option>
           ))}
-          <option value="custom">Własny zakres</option>
+          <option value="custom">{t("filters.periodCustom")}</option>
         </select>
       </label>
 
       {/* Always visible, not hidden behind the "custom" choice: they double as
           a readout of what the chosen preset actually resolved to. */}
       <label className="flex flex-col gap-1">
-        <span className="label-tight text-ink-faint text-[10px]">Od</span>
+        <span className="label-tight text-ink-faint text-[10px]">{t("filters.from")}</span>
         <input
           type="date"
           name="from"
@@ -61,7 +65,7 @@ export function InsightFilters({
         />
       </label>
       <label className="flex flex-col gap-1">
-        <span className="label-tight text-ink-faint text-[10px]">Do</span>
+        <span className="label-tight text-ink-faint text-[10px]">{t("filters.to")}</span>
         <input
           type="date"
           name="to"
@@ -71,9 +75,9 @@ export function InsightFilters({
       </label>
 
       <label className="flex flex-col gap-1">
-        <span className="label-tight text-ink-faint text-[10px]">Samochód</span>
+        <span className="label-tight text-ink-faint text-[10px]">{t("filters.car")}</span>
         <select name="car" defaultValue={carId ?? ""} className={field}>
-          <option value="">Cała flota</option>
+          <option value="">{t("filters.allFleet")}</option>
           {cars.map((c) => (
             <option key={c.id} value={c.id}>
               {c.label}
@@ -83,9 +87,9 @@ export function InsightFilters({
       </label>
 
       <label className="flex flex-col gap-1">
-        <span className="label-tight text-ink-faint text-[10px]">Klasa</span>
+        <span className="label-tight text-ink-faint text-[10px]">{t("filters.segment")}</span>
         <select name="segment" defaultValue={segment ?? ""} className={field}>
-          <option value="">Wszystkie</option>
+          <option value="">{t("filters.all")}</option>
           {segments.map((s) => (
             <option key={s.key} value={s.key}>
               {s.label}
@@ -96,14 +100,14 @@ export function InsightFilters({
 
       <label className="flex flex-col gap-1">
         <span className="label-tight text-ink-faint text-[10px]">
-          Miejsce odbioru
+          {t("filters.location")}
         </span>
         <select
           name="location"
           defaultValue={locationId ?? ""}
           className={field}
         >
-          <option value="">Wszystkie</option>
+          <option value="">{t("filters.all")}</option>
           {locations.map((l) => (
             <option key={l.id} value={l.id}>
               {l.name}
@@ -120,14 +124,14 @@ export function InsightFilters({
           defaultChecked={compare}
           className="h-4 w-4"
         />
-        Porównaj z poprzednim okresem
+        {t("filters.compare")}
       </label>
 
       <button
         type="submit"
         className="label bg-red hover:bg-red-hover inline-flex h-9 items-center px-5 text-xs text-white transition-colors"
       >
-        Pokaż
+        {t("filters.submit")}
       </button>
     </form>
   );

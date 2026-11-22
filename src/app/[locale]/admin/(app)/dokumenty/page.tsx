@@ -1,4 +1,4 @@
-import { setRequestLocale } from "next-intl/server";
+import { getTranslations, setRequestLocale } from "next-intl/server";
 import { requirePermission } from "@/lib/auth/guard";
 import { can } from "@/lib/auth/permissions";
 import {
@@ -8,12 +8,21 @@ import {
   type WersjaDokumentu,
 } from "@/lib/documents/repo";
 import { formatDatePl } from "@/lib/format";
+import { pick } from "@/lib/i18n-pick";
 import { DokumentForm } from "./DokumentForm";
 import { WierszWersji } from "./WierszWersji";
 
 export const dynamic = "force-dynamic";
 
-export const metadata = { title: "Umowy i dokumenty" };
+export async function generateMetadata({
+  params,
+}: {
+  params: Promise<{ locale: string }>;
+}) {
+  const { locale } = await params;
+  const t = await getTranslations({ locale, namespace: "Admin.documents" });
+  return { title: t("metaTitle") };
+}
 
 /**
  * „Umowy i dokumenty" — punkt 15 zamówienia.
@@ -37,6 +46,7 @@ export default async function Page({
 }) {
   const { locale } = await params;
   setRequestLocale(locale);
+  const t = await getTranslations("Admin.documents");
   const admin = await requirePermission("dokumenty.podglad");
   const mozeZarzadzac = can(admin.role, "dokumenty.zarzadzaj");
 
@@ -55,12 +65,10 @@ export default async function Page({
     <div className="space-y-8">
       <header className="space-y-2">
         <h1 className="font-heading text-ink text-2xl font-bold">
-          Umowy i dokumenty
+          {t("title")}
         </h1>
         <p className="text-ink-muted max-w-2xl text-sm leading-relaxed">
-          Każde wgranie tworzy NOWĄ WERSJĘ — poprzednia zostaje. Klient, któremu
-          udostępniono starszą wersję, ma ją widzieć nadal, więc żadnej wersji
-          nie da się skasować; wersję wycofuje się z obiegu albo zastępuje inną.
+          {t("intro")}
         </p>
       </header>
 
@@ -68,8 +76,7 @@ export default async function Page({
 
       {grupy.size === 0 ? (
         <p className="border-line text-ink-muted border border-dashed p-8 text-center text-sm">
-          Nie ma jeszcze żadnego dokumentu. Pierwszy wgrany plik z kategorią
-          „Przy rezerwacji” trafi do klienta po potwierdzeniu rezerwacji.
+          {t("emptyState")}
         </p>
       ) : (
         <div className="space-y-6">
@@ -80,7 +87,10 @@ export default async function Page({
               <section
                 key={klucz}
                 className="border-line border"
-                aria-label={`${czolo.title} (${czolo.locale.toUpperCase()})`}
+                aria-label={t("groupAria", {
+                  title: czolo.title,
+                  locale: czolo.locale.toUpperCase(),
+                })}
               >
                 <header className="border-line flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1 border-b p-4">
                   <div className="min-w-0">
@@ -89,18 +99,24 @@ export default async function Page({
                     </h2>
                     <p className="text-ink-faint text-xs">
                       {czolo.slug} · {czolo.locale.toUpperCase()} ·{" "}
-                      {ETYKIETY_KATEGORII[czolo.category as Kategoria] ??
-                        czolo.category}
+                      {ETYKIETY_KATEGORII[czolo.category as Kategoria]
+                        ? pick(
+                            ETYKIETY_KATEGORII[czolo.category as Kategoria],
+                            locale,
+                          )
+                        : czolo.category}
                     </p>
                   </div>
                   <p className="text-xs">
                     {obowiazujaca ? (
                       <span className="text-ink">
-                        Obowiązuje wersja {obowiazujaca.version}
+                        {t("currentVersion", {
+                          version: obowiazujaca.version,
+                        })}
                       </span>
                     ) : (
                       <span className="text-ink-muted">
-                        Żadna wersja nie obowiązuje
+                        {t("noCurrentVersion")}
                       </span>
                     )}
                   </p>
@@ -126,12 +142,20 @@ export default async function Page({
                         fileName: w.fileName,
                       }}
                       opis={[
-                        `wgrana ${formatDatePl(w.createdAt.toISOString().slice(0, 10))}`,
+                        t("uploaded", {
+                          date: formatDatePl(
+                            w.createdAt.toISOString().slice(0, 10),
+                          ),
+                        }),
                         w.effectiveFrom
-                          ? `obowiązuje od ${formatDatePl(w.effectiveFrom)}`
+                          ? t("effectiveFromOpis", {
+                              date: formatDatePl(w.effectiveFrom),
+                            })
                           : null,
                         w.fileSize > 0
-                          ? `${Math.max(1, Math.round(w.fileSize / 1024))} kB`
+                          ? t("sizeKb", {
+                              size: Math.max(1, Math.round(w.fileSize / 1024)),
+                            })
                           : null,
                       ]
                         .filter(Boolean)

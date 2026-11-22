@@ -1,12 +1,11 @@
+import { useLocale, useTranslations } from "next-intl";
 import type { CarDay, SalesMonth } from "@/lib/admin/economics";
 import {
-  EXPENSE_LABEL,
-  EXPENSE_GROUP_LABEL,
   EXPENSE_GROUP_OF,
   type ExpenseCategory,
   type ExpenseGroup,
 } from "@/lib/admin/expense-options";
-import { formatPln, pluralPl } from "@/lib/format";
+import { formatPln } from "@/lib/format";
 
 /**
  * Charts for the per-car economics pages.
@@ -51,20 +50,55 @@ const C = {
   baseline: "#6b6b6b",
 };
 
-/** Compact money for axis ends and tight labels: "1,2 tys. zł", "185 tys. zł". */
-function shortPln(grosze: number): string {
-  const zl = grosze / 100;
-  const abs = Math.abs(zl);
-  if (abs >= 1_000_000)
-    return `${(zl / 1_000_000).toLocaleString("pl-PL", { maximumFractionDigits: 1 })} mln zł`;
-  if (abs >= 1000)
-    return `${(zl / 1000).toLocaleString("pl-PL", { maximumFractionDigits: abs >= 10_000 ? 0 : 1 })} tys. zł`;
-  return `${Math.round(zl)} zł`;
+/**
+ * Intl locale tag for the request locale. Same mapping as `lib/format.ts`, so
+ * dates, numbers and currency on these charts agree with the rest of the panel.
+ */
+export function intlLocale(locale: string): string {
+  return locale === "en" ? "en-GB" : "pl";
 }
 
-function formatPl(iso: string): string {
-  const [y, m, d] = iso.split("-");
-  return `${d}.${m}.${y}`;
+/** Compact money for axis ends and tight labels, in the request locale. */
+function shortPln(grosze: number, locale: string): string {
+  return new Intl.NumberFormat(intlLocale(locale), {
+    style: "currency",
+    currency: "PLN",
+    notation: "compact",
+    maximumFractionDigits: 1,
+  }).format(grosze / 100);
+}
+
+/** "2026-09-01" → "01.09.2026" (pl) or "01/09/2026" (en). No timezone math. */
+export function formatDay(iso: string, locale: string): string {
+  const [y, m, d] = iso.split("-").map(Number);
+  return new Intl.DateTimeFormat(intlLocale(locale), {
+    day: "2-digit",
+    month: "2-digit",
+    year: "numeric",
+    timeZone: "UTC",
+  }).format(new Date(Date.UTC(y, m - 1, d)));
+}
+
+/** "2026-08" → "Aug 26" / "sie 26", with the year only where asked. */
+function monthTick(month: string, locale: string, withYear = true): string {
+  const [y, m] = month.split("-").map(Number);
+  const name = new Intl.DateTimeFormat(intlLocale(locale), {
+    month: "short",
+    timeZone: "UTC",
+  })
+    .format(new Date(Date.UTC(y, m - 1, 1)))
+    .replace(".", "");
+  return withYear ? `${name} ${String(y).slice(2)}` : name;
+}
+
+/** "+12.4%" / "−8.1%" / "—" when there was no base to compare against. */
+export function formatPct(pct: number | null, locale: string): string {
+  if (pct == null) return "—";
+  const rounded = Math.round(pct * 10) / 10;
+  const sign = rounded > 0 ? "+" : rounded < 0 ? "−" : "";
+  return `${sign}${Math.abs(rounded).toLocaleString(intlLocale(locale), {
+    maximumFractionDigits: 1,
+  })}%`;
 }
 
 /* ── Legend ───────────────────────────────────────────────────────────────── */
@@ -116,6 +150,8 @@ export function PaybackMeter({
   recoveredGrosze: number;
   purchaseGrosze: number;
 }) {
+  const t = useTranslations("Admin.analytics");
+  const locale = useLocale();
   const ratio = purchaseGrosze > 0 ? recoveredGrosze / purchaseGrosze : 0;
   const pct = Math.round(ratio * 100);
   const filled = Math.max(0, Math.min(1, ratio));
@@ -127,14 +163,17 @@ export function PaybackMeter({
           {pct}%
         </span>
         <span className="text-ink-faint text-xs tabular-nums">
-          {formatPln(recoveredGrosze, "pl")} z {formatPln(purchaseGrosze, "pl")}
+          {t("chart.ofTotal", {
+            value: formatPln(recoveredGrosze, locale),
+            total: formatPln(purchaseGrosze, locale),
+          })}
         </span>
       </div>
       <div
         className="mt-3 h-2 w-full"
         style={{ backgroundColor: C.grid }}
         role="img"
-        aria-label={`Zwrot z zakupu: ${pct} procent`}
+        aria-label={t("chart.paybackAria", { percent: pct })}
       >
         <div
           className="h-full"
@@ -167,8 +206,11 @@ export function NetCurve({
   targetGrosze: number | null;
   height?: number;
 }) {
+  const t = useTranslations("Admin.analytics");
+  const locale = useLocale();
+
   if (days.length < 2) {
-    return <EmptyPlot label="Za mało danych, by narysować krzywą." />;
+    return <EmptyPlot label={t("chart.empty.netCurve")} />;
   }
 
   const W = 1000;
@@ -211,7 +253,11 @@ export function NetCurve({
         className="h-auto w-full"
         preserveAspectRatio="none"
         role="img"
-        aria-label={`Skumulowany wynik od ${formatPl(days[0].date)} do ${formatPl(days[days.length - 1].date)}: ${formatPln(values[values.length - 1], "pl")}`}
+        aria-label={t("chart.netCurve.aria", {
+          from: formatDay(days[0].date, locale),
+          to: formatDay(days[days.length - 1].date, locale),
+          value: formatPln(values[values.length - 1], locale),
+        })}
       >
         <line
           x1={padL}
@@ -238,7 +284,9 @@ export function NetCurve({
               fill="#a5a5a5"
               fontSize="16"
             >
-              cena zakupu {shortPln(targetGrosze)}
+              {t("chart.netCurve.target", {
+                price: shortPln(targetGrosze, locale),
+              })}
             </text>
           </>
         )}
@@ -263,7 +311,12 @@ export function NetCurve({
                 with comment markers, and inside an SVG <title> the HTML parser
                 and the client renderer disagree about them — which is a
                 hydration mismatch that throws away the whole tree. */}
-            <title>{`${formatPl(d.date)} — narastająco ${formatPln(d.cumulativeNetGrosze, "pl")}`}</title>
+            <title>
+              {t("chart.netCurve.tooltip", {
+                date: formatDay(d.date, locale),
+                value: formatPln(d.cumulativeNetGrosze, locale),
+              })}
+            </title>
           </rect>
         ))}
         {/* The end-of-line value: this chart's only direct label, and the only
@@ -280,21 +333,21 @@ export function NetCurve({
           fill="#ffffff"
           fontSize="17"
         >
-          {shortPln(values[values.length - 1])}
+          {shortPln(values[values.length - 1], locale)}
         </text>
       </svg>
       <div className="text-ink-faint mt-1 flex justify-between text-[10px] tabular-nums">
-        <span>{formatPl(days[0].date)}</span>
-        <span>{formatPl(days[days.length - 1].date)}</span>
+        <span>{formatDay(days[0].date, locale)}</span>
+        <span>{formatDay(days[days.length - 1].date, locale)}</span>
       </div>
       {/* Say so when the target is not on the chart. A caption that promises a
           dashed line the reader cannot find is worse than no caption: they
           assume the car is nearly paid off and the line is just hard to see. */}
       {targetGrosze != null && !showTarget && (
         <figcaption className="text-ink-faint mt-2 text-xs">
-          Cena zakupu ({shortPln(targetGrosze)}) jest poza skalą tego wykresu —
-          wynik nie zbliżył się jeszcze na tyle, by dało się je pokazać razem.
-          Postęp zwrotu jest wyżej, na pasku „Zwrot z zakupu”.
+          {t("chart.netCurve.outOfScale", {
+            price: shortPln(targetGrosze, locale),
+          })}
         </figcaption>
       )}
     </figure>
@@ -317,8 +370,11 @@ export function DailyFlow({
   days: CarDay[];
   height?: number;
 }) {
+  const t = useTranslations("Admin.analytics");
+  const locale = useLocale();
+
   if (days.length === 0) {
-    return <EmptyPlot label="Brak danych w tym okresie." />;
+    return <EmptyPlot label={t("chart.empty.flow")} />;
   }
 
   const W = 1000;
@@ -343,7 +399,7 @@ export function DailyFlow({
         className="h-auto w-full"
         preserveAspectRatio="none"
         role="img"
-        aria-label="Dzienny przychód i wydatki"
+        aria-label={t("chart.flow.aria")}
       >
         <line x1={0} x2={W} y1={mid} y2={mid} stroke={C.axis} strokeWidth="1" />
         {days.map((d, i) => {
@@ -377,13 +433,20 @@ export function DailyFlow({
                 fill="transparent"
               >
                 <title>
-                  {`${formatPl(d.date)}${
+                  {`${
                     d.revenueGrosze > 0
-                      ? ` — przychód ${formatPln(d.revenueGrosze, "pl")}`
-                      : " — bez wynajmu"
+                      ? t("chart.flow.revenue", {
+                          date: formatDay(d.date, locale),
+                          amount: formatPln(d.revenueGrosze, locale),
+                        })
+                      : t("chart.flow.idle", {
+                          date: formatDay(d.date, locale),
+                        })
                   }${
                     d.expenseGrosze > 0
-                      ? ` · wydatek ${formatPln(d.expenseGrosze, "pl")}`
+                      ? t("chart.flow.expense", {
+                          amount: formatPln(d.expenseGrosze, locale),
+                        })
                       : ""
                   }`}
                 </title>
@@ -394,8 +457,8 @@ export function DailyFlow({
       </svg>
       <Legend
         items={[
-          { color: C.revenue, label: "Przychód" },
-          { color: C.expense, label: "Wydatki" },
+          { color: C.revenue, label: t("chart.legend.revenue") },
+          { color: C.expense, label: t("chart.legend.expenses") },
         ]}
       />
     </figure>
@@ -412,7 +475,12 @@ export function DailyFlow({
  * "czas postojowy", and seeing it as a run of grey says more than the number.
  */
 export function OccupancyStrip({ days }: { days: CarDay[] }) {
-  if (days.length === 0) return <EmptyPlot label="Brak danych." />;
+  const t = useTranslations("Admin.analytics");
+  const locale = useLocale();
+
+  if (days.length === 0) {
+    return <EmptyPlot label={t("chart.empty.occupancy")} />;
+  }
 
   const W = 1000;
   const H = 26;
@@ -427,7 +495,10 @@ export function OccupancyStrip({ days }: { days: CarDay[] }) {
         className="h-6 w-full"
         preserveAspectRatio="none"
         role="img"
-        aria-label={`Zajętość: ${rented} z ${days.length} dni wynajęte`}
+        aria-label={t("chart.occupancy.aria", {
+          rented,
+          total: days.length,
+        })}
       >
         {days.map((d, i) => (
           <rect
@@ -438,7 +509,14 @@ export function OccupancyStrip({ days }: { days: CarDay[] }) {
             height={H}
             fill={d.rented ? C.revenue : C.idle}
           >
-            <title>{`${formatPl(d.date)} — ${d.rented ? "wynajęty" : "postój"}`}</title>
+            <title>
+              {t("chart.occupancy.tooltip", {
+                date: formatDay(d.date, locale),
+                status: d.rented
+                  ? t("chart.occupancy.rented")
+                  : t("chart.occupancy.idle"),
+              })}
+            </title>
           </rect>
         ))}
       </svg>
@@ -446,13 +524,13 @@ export function OccupancyStrip({ days }: { days: CarDay[] }) {
         items={[
           {
             color: C.revenue,
-            label: "Wynajęty",
-            value: `${rented} ${pluralPl(rented, "dzień", "dni", "dni")}`,
+            label: t("chart.legend.rented"),
+            value: t("units.days", { count: rented }),
           },
           {
             color: C.idle,
-            label: "Postój",
-            value: `${days.length - rented} ${pluralPl(days.length - rented, "dzień", "dni", "dni")}`,
+            label: t("chart.legend.idle"),
+            value: t("units.days", { count: days.length - rented }),
           },
         ]}
       />
@@ -470,11 +548,12 @@ export function CostBreakdown({
   byGroup: Record<ExpenseGroup, number>;
   byCategory: Partial<Record<ExpenseCategory, number>>;
 }) {
+  const t = useTranslations("Admin.analytics");
+  const locale = useLocale();
+
   const total = byGroup.wear + byGroup.standing + byGroup.running;
   if (total === 0) {
-    return (
-      <EmptyPlot label="Brak zapisanych wydatków — dodaj je przy egzemplarzu w zakładce Flota." />
-    );
+    return <EmptyPlot label={t("chart.empty.costs")} />;
   }
 
   const groups = (["wear", "standing", "running"] as const).filter(
@@ -497,7 +576,7 @@ export function CostBreakdown({
         className="h-5 w-full"
         preserveAspectRatio="none"
         role="img"
-        aria-label="Struktura kosztów według grup"
+        aria-label={t("chart.costs.aria")}
       >
         {groups.map((g) => {
           // 2px of surface between segments so neighbouring fills never fuse
@@ -515,9 +594,11 @@ export function CostBreakdown({
               fill={C.group[g]}
             >
               <title>
-                {`${EXPENSE_GROUP_LABEL[g]} — ${formatPln(byGroup[g], "pl")} (${Math.round(
-                  (byGroup[g] / total) * 100,
-                )}%)`}
+                {t("chart.costs.groupTooltip", {
+                  group: t(`expense.group.${g}`),
+                  amount: formatPln(byGroup[g], locale),
+                  percent: Math.round((byGroup[g] / total) * 100),
+                })}
               </title>
             </rect>
           );
@@ -526,8 +607,8 @@ export function CostBreakdown({
       <Legend
         items={groups.map((g) => ({
           color: C.group[g],
-          label: EXPENSE_GROUP_LABEL[g],
-          value: formatPln(byGroup[g], "pl"),
+          label: t(`expense.group.${g}`),
+          value: formatPln(byGroup[g], locale),
         }))}
       />
 
@@ -537,7 +618,7 @@ export function CostBreakdown({
         {ranked.map(([cat, value]) => (
           <li key={cat} className="flex items-center gap-3 text-xs">
             <span className="text-silver w-44 shrink-0 truncate">
-              {EXPENSE_LABEL[cat]}
+              {t(`expense.category.${cat}`)}
             </span>
             <span className="h-2 flex-1" style={{ backgroundColor: C.grid }}>
               <span
@@ -551,7 +632,7 @@ export function CostBreakdown({
               />
             </span>
             <span className="text-silver w-24 shrink-0 text-right tabular-nums">
-              {formatPln(value, "pl")}
+              {formatPln(value, locale)}
             </span>
           </li>
         ))}
@@ -573,32 +654,6 @@ function EmptyPlot({ label }: { label: string }) {
 /* ── Sales trend: month on month, year on year ────────────────────────────── */
 
 /**
- * "2026-08" → "sie", with the year appended only where it changes.
- *
- * Twelve ticks share the width of a phone. Repeating "25" beside every month
- * of 2025 spends that width on the one thing the reader can infer from the
- * tick before it, and the labels start colliding; stating the year at January
- * and at the left edge says the same thing in half the space.
- */
-function monthTick(month: string, withYear = true): string {
-  const [y, m] = month.split("-").map(Number);
-  const name = new Intl.DateTimeFormat("pl-PL", { month: "short" })
-    .format(new Date(Date.UTC(y, m - 1, 1)))
-    .replace(".", "");
-  return withYear ? `${name} ${String(y).slice(2)}` : name;
-}
-
-/** "+12,4%" / "−8,1%" / "—" when there was no base to compare against. */
-export function formatPct(pct: number | null): string {
-  if (pct == null) return "—";
-  const rounded = Math.round(pct * 10) / 10;
-  const sign = rounded > 0 ? "+" : rounded < 0 ? "−" : "";
-  return `${sign}${Math.abs(rounded).toLocaleString("pl-PL", {
-    maximumFractionDigits: 1,
-  })}%`;
-}
-
-/**
  * Twelve months of sales, each beside the same month a year earlier.
  *
  * Two bars per month rather than two lines: the question is "was August better
@@ -609,6 +664,10 @@ export function formatPct(pct: number | null): string {
  * The month still being traded is hatched, not solid. Its bar is genuinely
  * shorter because the month is genuinely unfinished, and a solid bar there
  * would read as a collapse in sales every single month.
+ *
+ * Month ticks: "2026-08" → "sie", with the year appended only where it changes.
+ * Twelve ticks share the width of a phone; repeating the year beside every month
+ * spends that width on the one thing the reader can infer from the tick before.
  */
 export function SalesTrend({
   months,
@@ -617,8 +676,11 @@ export function SalesTrend({
   months: SalesMonth[];
   height?: number;
 }) {
+  const t = useTranslations("Admin.analytics");
+  const locale = useLocale();
+
   if (months.length === 0) {
-    return <EmptyPlot label="Brak danych sprzedażowych." />;
+    return <EmptyPlot label={t("chart.empty.sales")} />;
   }
 
   const W = 1000;
@@ -642,7 +704,7 @@ export function SalesTrend({
         className="h-auto w-full"
         preserveAspectRatio="none"
         role="img"
-        aria-label={`Przychód miesięczny za ostatnie ${months.length} miesięcy, zestawiony z tym samym miesiącem rok wcześniej`}
+        aria-label={t("chart.sales.aria", { count: months.length })}
       >
         <defs>
           <pattern
@@ -713,13 +775,24 @@ export function SalesTrend({
                 fill="transparent"
               >
                 <title>
-                  {`${monthTick(m.month)}${
-                    m.partial ? " (miesiąc w toku)" : ""
-                  } — przychód ${formatPln(m.revenueGrosze, "pl")}${
+                  {`${t("chart.sales.revenueTip", {
+                    month: monthTick(m.month, locale),
+                    partial: m.partial ? t("chart.sales.partial") : "",
+                    revenue: formatPln(m.revenueGrosze, locale),
+                  })}${
                     m.prevYearGrosze != null
-                      ? ` · rok wcześniej ${formatPln(m.prevYearGrosze, "pl")} (r/r ${formatPct(m.yoyPct)})`
-                      : " · brak danych sprzed roku"
-                  }${m.prevMonthGrosze != null ? ` · m/m ${formatPct(m.momPct)}` : ""}`}
+                      ? t("chart.sales.yoyTip", {
+                          amount: formatPln(m.prevYearGrosze, locale),
+                          pct: formatPct(m.yoyPct, locale),
+                        })
+                      : t("chart.sales.noYearTip")
+                  }${
+                    m.prevMonthGrosze != null
+                      ? t("chart.sales.momTip", {
+                          pct: formatPct(m.momPct, locale),
+                        })
+                      : ""
+                  }`}
                 </title>
               </rect>
             </g>
@@ -737,7 +810,7 @@ export function SalesTrend({
       >
         {months.map((m, i) => (
           <span key={m.month} className={m.partial ? "text-silver" : undefined}>
-            {monthTick(m.month, i === 0 || m.month.endsWith("-01"))}
+            {monthTick(m.month, locale, i === 0 || m.month.endsWith("-01"))}
           </span>
         ))}
       </div>
@@ -747,13 +820,12 @@ export function SalesTrend({
           actually described is already the headline tile above. */}
       <Legend
         items={[
-          { color: C.revenue, label: "Przychód w miesiącu" },
-          { color: C.baseline, label: "Ten sam miesiąc rok wcześniej" },
+          { color: C.revenue, label: t("chart.sales.legendRevenue") },
+          { color: C.baseline, label: t("chart.sales.legendPrev") },
         ]}
       />
       <figcaption className="text-ink-faint mt-2 text-[10px]">
-        Skala do {shortPln(peak)}. Ostatni słupek jest kreskowany, bo miesiąc
-        jeszcze trwa — porównuj go z ostrożnością.
+        {t("chart.sales.caption", { peak: shortPln(peak, locale) })}
       </figcaption>
     </figure>
   );

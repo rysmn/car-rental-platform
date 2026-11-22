@@ -1,6 +1,6 @@
-import { promises as fs } from "node:fs";
 import { NextResponse } from "next/server";
 import { currentAdmin } from "@/lib/auth/guard";
+import { getStorage } from "@/lib/storage";
 import { resolveSignaturePath } from "@/lib/storage/signatures";
 
 /**
@@ -22,11 +22,12 @@ export async function GET(
   if (!admin) return new NextResponse("Unauthorized", { status: 401 });
 
   const { path: segments } = await params;
-  const filePath = resolveSignaturePath(segments);
-  if (!filePath) return new NextResponse("Not found", { status: 404 });
+  const key = resolveSignaturePath(segments);
+  if (!key) return new NextResponse("Not found", { status: 404 });
 
   try {
-    const file = await fs.readFile(filePath);
+    const file = await getStorage().get(key);
+    if (!file) return new NextResponse("Not found", { status: 404 });
     return new NextResponse(new Uint8Array(file), {
       headers: {
         "Content-Type": "image/png",

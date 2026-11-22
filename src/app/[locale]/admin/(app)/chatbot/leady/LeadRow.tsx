@@ -1,15 +1,10 @@
 "use client";
 
 import { useActionState, useState } from "react";
+import { useTranslations } from "next-intl";
 import { updateLead, type LeadResult } from "../actions";
 
-const STATUSES: { value: string; label: string }[] = [
-  { value: "new", label: "Nowy" },
-  { value: "contact", label: "Kontakt" },
-  { value: "offer", label: "Oferta" },
-  { value: "reservation", label: "Rezerwacja" },
-  { value: "closed", label: "Zamknięty" },
-];
+const STATUS_VALUES = ["new", "contact", "offer", "reservation", "closed"];
 
 export type LeadView = {
   id: string;
@@ -41,6 +36,7 @@ export type LeadView = {
  * customer said, not a form to rewrite.
  */
 export function LeadRow({ lead }: { lead: LeadView }) {
+  const t = useTranslations("Admin.chatbot");
   const [state, action, pending] = useActionState<LeadResult | null, FormData>(
     updateLead,
     null,
@@ -83,7 +79,7 @@ export function LeadRow({ lead }: { lead: LeadView }) {
           <span className="text-ink-faint text-xs">{lead.location}</span>
         )}
         {lead.seats !== null && (
-          <span className="text-ink-faint text-xs">{lead.seats} os.</span>
+          <span className="text-ink-faint text-xs">{t("leads.seats", { count: lead.seats })}</span>
         )}
         {lead.budget !== null && (
           <span className="text-ink-faint text-xs tabular-nums">
@@ -97,15 +93,16 @@ export function LeadRow({ lead }: { lead: LeadView }) {
         )}
         <span className="ml-auto flex items-center gap-3">
           <span className="border-line text-ink-faint border px-2 text-[10px]">
-            {STATUSES.find((s) => s.value === lead.status)?.label ??
-              lead.status}
+            {t.has(`leadStatus.${lead.status}`)
+              ? t(`leadStatus.${lead.status}`)
+              : lead.status}
           </span>
           {lead.conversationId && (
             <a
               href={`/admin/chatbot/rozmowy?rozmowa=${lead.conversationId}`}
               className="text-ink-faint hover:text-ink text-xs"
             >
-              Rozmowa
+              {t("leads.conversation")}
             </a>
           )}
           <button
@@ -113,7 +110,7 @@ export function LeadRow({ lead }: { lead: LeadView }) {
             onClick={() => setOpen((v) => !v)}
             className="text-ink-faint hover:text-ink text-xs"
           >
-            {open ? "Zamknij" : "Edytuj"}
+            {open ? t("leads.closeEdit") : t("leads.edit")}
           </button>
         </span>
       </div>
@@ -124,7 +121,7 @@ export function LeadRow({ lead }: { lead: LeadView }) {
           server, never posted by the browser. */}
       {lead.question && (
         <p className="text-silver border-line/60 mt-2 border-l-2 pl-3 text-xs italic">
-          „{lead.question}”
+          {t("common.quoted", { text: lead.question })}
         </p>
       )}
 
@@ -137,28 +134,28 @@ export function LeadRow({ lead }: { lead: LeadView }) {
           <input type="hidden" name="id" value={lead.id} />
           <label className="flex flex-col gap-1">
             <span className="label-tight text-ink-faint text-[10px]">
-              Status
+              {t("common.status")}
             </span>
             <select
               name="status"
               defaultValue={lead.status}
               className="border-line-strong bg-surface-1 text-ink h-9 border px-2 text-xs"
             >
-              {STATUSES.map((s) => (
-                <option key={s.value} value={s.value}>
-                  {s.label}
+              {STATUS_VALUES.map((s) => (
+                <option key={s} value={s}>
+                  {t(`leadStatus.${s}`)}
                 </option>
               ))}
             </select>
           </label>
           <label className="flex min-w-[16rem] flex-1 flex-col gap-1">
             <span className="label-tight text-ink-faint text-[10px]">
-              Notatka pracownika
+              {t("leads.staffNote")}
             </span>
             <input
               name="note"
               defaultValue={lead.note ?? ""}
-              placeholder="Oddzwonić po 17, pyta o XC60 na wrzesień"
+              placeholder={t("leads.notePlaceholder")}
               className="border-line-strong bg-surface-1 text-ink placeholder:text-ink-faint h-9 w-full border px-2 text-xs"
             />
           </label>
@@ -167,10 +164,10 @@ export function LeadRow({ lead }: { lead: LeadView }) {
             disabled={pending}
             className="label border-line-strong text-ink hover:border-ink hover:bg-ink/5 inline-flex h-9 items-center border px-4 text-xs transition-colors disabled:opacity-50"
           >
-            {pending ? "Zapisywanie…" : "Zapisz"}
+            {pending ? t("common.saving") : t("common.save")}
           </button>
           {state?.ok && (
-            <span className="text-xs text-emerald-400">Zapisano ✓</span>
+            <span className="text-xs text-emerald-400">{t("common.saved")}</span>
           )}
           {state && !state.ok && (
             <span className="text-red text-xs">{state.error}</span>

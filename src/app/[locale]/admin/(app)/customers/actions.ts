@@ -9,20 +9,25 @@ import { adminActionFailed } from "@/lib/alerts/admin";
 import { eq } from "drizzle-orm";
 import { getDb, schema } from "@/lib/db";
 import { CUSTOMER_FLAGS } from "@/lib/admin/customer-flags";
+import { getTranslations } from "next-intl/server";
 
-const customerInput = z.object({
-  name: z.string().trim().min(2, "Imię i nazwisko").max(120),
-  phone: z.string().trim().min(6, "Numer telefonu").max(40),
-  email: z
-    .string()
-    .trim()
-    .max(200)
-    .refine(
-      (v) => v === "" || /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(v),
-      "Nieprawidłowy adres e-mail",
-    ),
-  notes: z.string().trim().max(1000),
-});
+type Tr = (key: string, values?: Record<string, string | number>) => string;
+
+function customerInputSchema(t: Tr) {
+  return z.object({
+    name: z.string().trim().min(2, t("errNameInvalid")).max(120),
+    phone: z.string().trim().min(6, t("errPhoneInvalid")).max(40),
+    email: z
+      .string()
+      .trim()
+      .max(200)
+      .refine(
+        (v) => v === "" || /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(v),
+        t("errEmailInvalid"),
+      ),
+    notes: z.string().trim().max(1000),
+  });
+}
 
 export type CustomerResult =
   | { ok: true; id: string; name: string }
@@ -46,13 +51,14 @@ export async function createCustomer(
   formData: FormData,
 ): Promise<CustomerResult> {
   const admin = await requirePermission("klienci.podglad");
+  const t = await getTranslations("Admin.customers");
 
   const values: Record<string, string> = {};
   for (const [k, v] of formData.entries()) {
     if (typeof v === "string" && !k.startsWith("$")) values[k] = v;
   }
 
-  const parsed = customerInput.safeParse({
+  const parsed = customerInputSchema(t).safeParse({
     name: formData.get("name") ?? "",
     phone: formData.get("phone") ?? "",
     email: formData.get("email") ?? "",
@@ -73,7 +79,7 @@ export async function createCustomer(
     return {
       ok: false,
       error: "validation",
-      fieldErrors: { phone: "Numer wygląda na niepełny" },
+      fieldErrors: { phone: t("errPhoneIncomplete") },
       values,
     };
   }
@@ -122,18 +128,19 @@ export async function setCustomerFlag(
   formData: FormData,
 ): Promise<FlagResult> {
   const admin = await requirePermission("klienci.podglad");
+  const t = await getTranslations("Admin.customers");
   const parsed = flagInput.safeParse({
     id: formData.get("id") ?? "",
     flag: formData.get("flag") ?? "none",
     notes: formData.get("notes") ?? "",
   });
-  if (!parsed.success) return { ok: false, error: "Popraw dane" };
+  if (!parsed.success) return { ok: false, error: t("errFixInput") };
   const d = parsed.data;
 
   if (d.flag === "blocked" && !d.notes) {
     return {
       ok: false,
-      error: "Napisz w notatce, dlaczego ten klient nie może wynająć auta",
+      error: t("errFlagReason"),
     };
   }
 
@@ -142,7 +149,7 @@ export async function setCustomerFlag(
       .select({ flag: schema.customers.flag, notes: schema.customers.notes })
       .from(schema.customers)
       .where(eq(schema.customers.id, d.id));
-    if (!before) return { ok: false, error: "Nie ma takiego klienta" };
+    if (!before) return { ok: false, error: t("errNoCustomer") };
 
     await getDb()
       .update(schema.customers)
@@ -162,6 +169,95 @@ export async function setCustomerFlag(
     return { ok: true };
   } catch (err) {
     adminActionFailed("customerFlag", err);
-    return { ok: false, error: "Nie udało się zapisać" };
+    return { ok: false, error: t("errFlagSaveFailed") };
+  }
+}
+
+/* ── Dane kontaktowe: imię, telefon, e-mail ───────────────────────────────── */
+
+export type ContactResult = { ok: true } | { ok: false; error: string; fieldErrors?: Record<string, string> };
+
+/**
+ * Poprawia imię, telefon i e-mail klienta.
+ *
+ * Klient jest identyfikowany po `id`, nie po telefonie, więc poprawka numeru
+ * nie scala ani nie blokuje rekordów. Zmiana jest zapisana w dzienniku
+ * zdarzeń z wartościami sprzed i po.
+ */
+export async function updateCustomerContact(
+  _prev: ContactResult | null,
+  formData: FormData,
+): Promise<ContactResult> {
+  const admin = await requirePermission("klienci.podglad");
+  const t = await getTranslations("Admin.customers");
+
+  const id = String(formData.get("id") ?? "");
+  if (!z.string().uuid().safeParse(id).success) {
+    return { ok: false, error: t("errNoCustomer") };
+  }
+
+  const parsed = customerInputSchema(t)
+    .omit({ notes: true })
+    .safeParse({
+      name: formData.get("name") ?? "",
+      phone: formData.get("phone") ?? "",
+      email: formData.get("email") ?? "",
+    });
+  if (!parsed.success) {
+    const fieldErrors: Record<string, string> = {};
+    for (const issue of parsed.error.issues) {
+      const key = String(issue.path[0] ?? "form");
+      if (!fieldErrors[key]) fieldErrors[key] = issue.message;
+    }
+    return { ok: false, error: t("errFixInput"), fieldErrors };
+  }
+  const d = parsed.data;
+  const phone = normalisePhone(d.phone);
+  if (phone.length < 7) {
+    return {
+      ok: false,
+      error: t("errFixInput"),
+      fieldErrors: { phone: t("errPhoneIncomplete") },
+    };
+  }
+
+  try {
+    const db = getDb();
+    const [before] = await db
+      .select({
+        name: schema.customers.name,
+        phone: schema.customers.phone,
+        email: schema.customers.email,
+      })
+      .from(schema.customers)
+      .where(eq(schema.customers.id, id));
+    if (!before) return { ok: false, error: t("errNoCustomer") };
+
+    const email = d.email.trim() || null;
+    await db
+      .update(schema.customers)
+      .set({
+        name: d.name,
+        phone,
+        phoneDisplay: d.phone,
+        email,
+        updatedAt: new Date(),
+      })
+      .where(eq(schema.customers.id, id));
+
+    await recordAudit({
+      adminId: admin.id,
+      action: "customer.contact",
+      entity: "customer",
+      entityId: id,
+      before: { name: before.name, phone: before.phone, email: before.email },
+      after: { name: d.name, phone, email },
+    });
+    revalidatePath("/admin/customers");
+    revalidatePath(`/admin/customers/${id}`);
+    return { ok: true };
+  } catch (err) {
+    adminActionFailed("customerContact", err);
+    return { ok: false, error: t("errFlagSaveFailed") };
   }
 }

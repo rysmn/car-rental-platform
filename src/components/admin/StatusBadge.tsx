@@ -3,6 +3,7 @@ import {
   type ReservationStatus,
 } from "@/lib/admin/reservation-status";
 import { cn } from "@/lib/utils";
+import { pickFrom } from "@/lib/i18n-pick";
 
 const STYLES: Record<ReservationStatus, string> = {
   // Stan przejściowy, nie decyzja obsługi — najbledszy z możliwych, żeby nie
@@ -19,7 +20,14 @@ const STYLES: Record<ReservationStatus, string> = {
   rejected: "border-line text-red",
 };
 
-export function StatusBadge({ status }: { status: ReservationStatus }) {
+export function StatusBadge({
+  status,
+  locale,
+}: {
+  status: ReservationStatus;
+  /** Request locale, passed by the server page that renders the badge. */
+  locale: string;
+}) {
   return (
     <span
       className={cn(
@@ -27,7 +35,7 @@ export function StatusBadge({ status }: { status: ReservationStatus }) {
         STYLES[status],
       )}
     >
-      {STATUS_LABEL[status]}
+      {pickFrom(STATUS_LABEL, status, locale)}
     </span>
   );
 }

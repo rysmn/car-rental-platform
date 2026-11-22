@@ -1,6 +1,7 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
+import { getTranslations } from "next-intl/server";
 import { eq } from "drizzle-orm";
 import { z } from "zod";
 import { getDb, schema } from "@/lib/db";
@@ -58,26 +59,30 @@ const text = (max: number) =>
     .max(max)
     .transform((s) => s.trim() || null);
 
-const FIELD_LABEL: Record<string, string> = {
-  category: "rodzaj kosztu",
-  amount: "kwota",
-  incurredOn: "data",
-  periodStart: "okres od",
-  periodEnd: "okres do (musi być podany razem z „od” i nie wcześniejszy)",
-  interval: "częstotliwość",
-  startOn: "data początkowa",
-  endOn: "data końcowa (nie może być wcześniejsza niż początkowa)",
-  vendor: "kontrahent",
-  note: "opis",
-};
+/** Field keys that appear in validation messages, translated per request. */
+const FIELD_KEYS = [
+  "category",
+  "amount",
+  "incurredOn",
+  "periodStart",
+  "periodEnd",
+  "interval",
+  "startOn",
+  "endOn",
+  "vendor",
+  "note",
+] as const;
 
-function zodError(e: z.ZodError): FormResult {
+async function zodError(e: z.ZodError): Promise<FormResult> {
+  const t = await getTranslations("Admin.finance");
   const first = e.issues[0];
   const key = first?.path[0];
-  const label = typeof key === "string" ? (FIELD_LABEL[key] ?? key) : "";
+  const known = FIELD_KEYS.find((k) => k === key);
   return {
     ok: false,
-    error: label ? `Sprawdź pole: ${label}.` : "Nieprawidłowe dane formularza.",
+    error: known
+      ? t("errors.checkField", { field: t(`fields.${known}`) })
+      : t("errors.invalidForm"),
   };
 }
 
@@ -109,13 +114,6 @@ const ExpenseSchema = z
     { path: ["periodEnd"] },
   );
 
-const INVOICE_ERRORS: Record<string, string> = {
-  empty: "Nie wybrano pliku.",
-  too_large: "Plik jest za duży — maksymalnie 8 MB.",
-  unsupported_type: "Nieobsługiwany format. Dozwolone: PDF, JPG, PNG, WEBP.",
-  write_failed: "Nie udało się zapisać pliku.",
-};
-
 /**
  * Reads the optional invoice off the form.
  *
@@ -130,7 +128,17 @@ async function readInvoice(
   if (!(file instanceof File) || file.size === 0) return { ok: true };
   const saved = await saveInvoice(file);
   if (!saved.ok) {
-    return { ok: false, error: INVOICE_ERRORS[saved.error] ?? "Błąd zapisu." };
+    const t = await getTranslations("Admin.finance");
+    const KEYS: Record<string, string> = {
+      empty: "errors.invoiceEmpty",
+      too_large: "errors.invoiceTooLarge",
+      unsupported_type: "errors.invoiceType",
+      write_failed: "errors.invoiceWrite",
+    };
+    return {
+      ok: false,
+      error: KEYS[saved.error] ? t(KEYS[saved.error]) : t("errors.invoiceGeneric"),
+    };
   }
   return { ok: true, url: saved.url };
 }
@@ -153,8 +161,9 @@ export async function createBusinessExpense(
   formData: FormData,
 ): Promise<FormResult> {
   const admin = await requirePermission("finanse.edytuj");
+  const t = await getTranslations("Admin.finance");
   const parsed = ExpenseSchema.safeParse(Object.fromEntries(formData));
-  if (!parsed.success) return zodError(parsed.error);
+  if (!parsed.success) return await zodError(parsed.error);
   const d = parsed.data;
 
   const invoice = await readInvoice(formData);
@@ -192,7 +201,7 @@ export async function createBusinessExpense(
     return { ok: true };
   } catch (err) {
     adminActionFailed("createBusinessExpense", err);
-    return { ok: false, error: "Wystąpił błąd. Spróbuj ponownie." };
+    return { ok: false, error: await t("errors.generic") };
   }
 }
 
@@ -201,10 +210,11 @@ export async function updateBusinessExpense(
   formData: FormData,
 ): Promise<FormResult> {
   const admin = await requirePermission("finanse.edytuj");
+  const t = await getTranslations("Admin.finance");
   const id = String(formData.get("id") ?? "");
-  if (!UUID_RE.test(id)) return { ok: false, error: "Nieprawidłowe dane." };
+  if (!UUID_RE.test(id)) return { ok: false, error: await t("errors.invalidData") };
   const parsed = ExpenseSchema.safeParse(Object.fromEntries(formData));
-  if (!parsed.success) return zodError(parsed.error);
+  if (!parsed.success) return await zodError(parsed.error);
   const d = parsed.data;
 
   const db = getDb();
@@ -214,7 +224,7 @@ export async function updateBusinessExpense(
       .from(schema.businessExpenses)
       .where(eq(schema.businessExpenses.id, id))
       .limit(1);
-    if (!before) return { ok: false, error: "Nie znaleziono kosztu." };
+    if (!before) return { ok: false, error: await t("errors.expenseNotFound") };
 
     const invoice = await readInvoice(formData);
     if (!invoice.ok) return { ok: false, error: invoice.error };
@@ -262,13 +272,14 @@ export async function updateBusinessExpense(
     return { ok: true };
   } catch (err) {
     adminActionFailed("updateBusinessExpense", err);
-    return { ok: false, error: "Wystąpił błąd. Spróbuj ponownie." };
+    return { ok: false, error: await t("errors.generic") };
   }
 }
 
 export async function deleteBusinessExpense(id: string): Promise<FormResult> {
   const admin = await requirePermission("finanse.edytuj");
-  if (!UUID_RE.test(id)) return { ok: false, error: "Nieprawidłowe dane." };
+  const t = await getTranslations("Admin.finance");
+  if (!UUID_RE.test(id)) return { ok: false, error: await t("errors.invalidData") };
 
   const db = getDb();
   const [before] = await db
@@ -276,7 +287,7 @@ export async function deleteBusinessExpense(id: string): Promise<FormResult> {
     .from(schema.businessExpenses)
     .where(eq(schema.businessExpenses.id, id))
     .limit(1);
-  if (!before) return { ok: false, error: "Nie znaleziono kosztu." };
+  if (!before) return { ok: false, error: await t("errors.expenseNotFound") };
 
   try {
     await db
@@ -299,7 +310,7 @@ export async function deleteBusinessExpense(id: string): Promise<FormResult> {
     return { ok: true };
   } catch (err) {
     adminActionFailed("deleteBusinessExpense", err);
-    return { ok: false, error: "Wystąpił błąd. Spróbuj ponownie." };
+    return { ok: false, error: await t("errors.generic") };
   }
 }
 
@@ -326,8 +337,9 @@ export async function createBusinessRecurring(
   formData: FormData,
 ): Promise<FormResult> {
   const admin = await requirePermission("finanse.edytuj");
+  const t = await getTranslations("Admin.finance");
   const parsed = RecurringSchema.safeParse(Object.fromEntries(formData));
-  if (!parsed.success) return zodError(parsed.error);
+  if (!parsed.success) return await zodError(parsed.error);
   const d = parsed.data;
 
   try {
@@ -363,13 +375,14 @@ export async function createBusinessRecurring(
     return { ok: true };
   } catch (err) {
     adminActionFailed("createBusinessRecurring", err);
-    return { ok: false, error: "Wystąpił błąd. Spróbuj ponownie." };
+    return { ok: false, error: await t("errors.generic") };
   }
 }
 
 export async function deleteBusinessRecurring(id: string): Promise<FormResult> {
   const admin = await requirePermission("finanse.edytuj");
-  if (!UUID_RE.test(id)) return { ok: false, error: "Nieprawidłowe dane." };
+  const t = await getTranslations("Admin.finance");
+  if (!UUID_RE.test(id)) return { ok: false, error: await t("errors.invalidData") };
 
   const db = getDb();
   const [before] = await db
@@ -377,7 +390,7 @@ export async function deleteBusinessRecurring(id: string): Promise<FormResult> {
     .from(schema.businessRecurringCosts)
     .where(eq(schema.businessRecurringCosts.id, id))
     .limit(1);
-  if (!before) return { ok: false, error: "Nie znaleziono definicji." };
+  if (!before) return { ok: false, error: await t("errors.recurringNotFound") };
 
   try {
     // The generated rows deliberately SURVIVE: they are real costs that were
@@ -404,7 +417,7 @@ export async function deleteBusinessRecurring(id: string): Promise<FormResult> {
     return { ok: true };
   } catch (err) {
     adminActionFailed("deleteBusinessRecurring", err);
-    return { ok: false, error: "Wystąpił błąd. Spróbuj ponownie." };
+    return { ok: false, error: await t("errors.generic") };
   }
 }
 
@@ -421,7 +434,8 @@ export async function generateBusinessRecurring(
   id: string,
 ): Promise<FormResult & { created?: number }> {
   const admin = await requirePermission("finanse.edytuj");
-  if (!UUID_RE.test(id)) return { ok: false, error: "Nieprawidłowe dane." };
+  const t = await getTranslations("Admin.finance");
+  if (!UUID_RE.test(id)) return { ok: false, error: await t("errors.invalidData") };
 
   const db = getDb();
   const [def] = await db
@@ -429,11 +443,11 @@ export async function generateBusinessRecurring(
     .from(schema.businessRecurringCosts)
     .where(eq(schema.businessRecurringCosts.id, id))
     .limit(1);
-  if (!def) return { ok: false, error: "Nie znaleziono definicji." };
+  if (!def) return { ok: false, error: await t("errors.recurringNotFound") };
   if (!def.active) {
     return {
       ok: false,
-      error: "Definicja jest wyłączona — włącz ją najpierw.",
+      error: await t("errors.recurringInactive"),
     };
   }
 
@@ -480,6 +494,6 @@ export async function generateBusinessRecurring(
     return { ok: true, created: inserted.length };
   } catch (err) {
     adminActionFailed("generateBusinessRecurring", err);
-    return { ok: false, error: "Wystąpił błąd. Spróbuj ponownie." };
+    return { ok: false, error: await t("errors.generic") };
   }
 }

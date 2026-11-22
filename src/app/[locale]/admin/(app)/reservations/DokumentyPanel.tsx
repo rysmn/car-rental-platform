@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useTransition } from "react";
+import { useTranslations } from "next-intl";
 import { wyslijDokumentyRecznie } from "@/lib/documents/actions";
 import { DOCUMENT_URL_PREFIX } from "@/lib/documents/adres";
 
@@ -42,6 +43,7 @@ export function DokumentyPanel({
   dokumenty: DokumentWiersz[];
   mozeWysylac: boolean;
 }) {
+  const t = useTranslations("Admin.reservations.documents");
   const [czeka, start] = useTransition();
   const [wynik, setWynik] = useState<{ ok: boolean; tekst: string } | null>(
     null,
@@ -50,12 +52,7 @@ export function DokumentyPanel({
 
   if (dokumenty.length === 0) {
     return (
-      <p className="text-ink-muted text-sm leading-relaxed">
-        Do tej rezerwacji nie przypięto żadnych dokumentów. Dokumenty z
-        kategorii „Przy rezerwacji” są przypinane w chwili potwierdzenia —
-        jeżeli lista jest pusta, w katalogu nie było wtedy ani jednego
-        obowiązującego.
-      </p>
+      <p className="text-ink-muted text-sm leading-relaxed">{t("empty")}</p>
     );
   }
 
@@ -88,8 +85,9 @@ export function DokumentyPanel({
                 {d.title}
               </a>
               <p className="text-ink-faint text-xs">
-                {d.autoSend ? "wysyłka automatyczna" : "wysyłka wyłączona"}
-                {d.sendAttempts > 0 && ` · prób: ${d.sendAttempts}`}
+                {d.autoSend ? t("autoSend") : t("autoOff")}
+                {d.sendAttempts > 0 &&
+                  t("attempts", { count: d.sendAttempts })}
               </p>
               {d.stan === "failed" && d.sendError && (
                 <p className="text-ink-muted mt-1 text-xs">{d.sendError}</p>
@@ -98,13 +96,13 @@ export function DokumentyPanel({
             <p className="text-xs whitespace-nowrap">
               {d.stan === "sent" ? (
                 <span className="text-ink">
-                  WYSŁANO
+                  {t("statusSent")}
                   {d.sentAt ? ` · ${d.sentAt}` : ""}
                 </span>
               ) : d.stan === "failed" ? (
-                <span className="text-red">BŁĄD WYSYŁKI</span>
+                <span className="text-red">{t("statusFailed")}</span>
               ) : (
-                <span className="text-ink-muted">NIEWYSŁANY</span>
+                <span className="text-ink-muted">{t("statusNotSent")}</span>
               )}
             </p>
           </li>
@@ -135,28 +133,26 @@ export function DokumentyPanel({
               onClick={() => wyslij(false)}
               className="label bg-red hover:bg-red-hover inline-flex h-11 items-center px-5 text-xs text-white transition-colors disabled:opacity-50"
             >
-              {czeka ? "Wysyłanie…" : "Wyślij klientowi"}
+              {czeka ? t("sending") : t("sendToCustomer")}
             </button>
           )}
           {pytamOPonowienie ? (
             <span className="flex flex-wrap items-center gap-2">
-              <span className="text-ink text-xs">
-                Wysłać kopię wszystkich dokumentów ponownie?
-              </span>
+              <span className="text-ink text-xs">{t("confirmResend")}</span>
               <button
                 type="button"
                 disabled={czeka}
                 onClick={() => wyslij(true)}
                 className="label bg-red hover:bg-red-hover inline-flex h-11 items-center px-4 text-xs text-white transition-colors disabled:opacity-50"
               >
-                Tak, wyślij
+                {t("yesSend")}
               </button>
               <button
                 type="button"
                 onClick={() => setPytam(false)}
                 className="label border-line-strong text-ink hover:border-ink inline-flex h-11 items-center border px-4 text-xs transition-colors"
               >
-                Nie
+                {t("no")}
               </button>
             </span>
           ) : (
@@ -166,7 +162,7 @@ export function DokumentyPanel({
               onClick={() => setPytam(true)}
               className="label border-line-strong text-ink hover:border-ink inline-flex h-11 items-center border px-4 text-xs transition-colors disabled:opacity-50"
             >
-              Wyślij ponownie
+              {t("resend")}
             </button>
           )}
         </div>

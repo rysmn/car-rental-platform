@@ -1,4 +1,4 @@
-import { setRequestLocale } from "next-intl/server";
+import { getTranslations, setRequestLocale } from "next-intl/server";
 import { guardPage } from "@/lib/auth/guard";
 import { Link } from "@/i18n/navigation";
 import { listInbox, inboxCounts, parseInboxFilter } from "@/lib/inbox/repo";
@@ -11,7 +11,15 @@ import {
   STATUS_LABEL,
 } from "@/lib/inbox/labels";
 
-export const metadata = { title: "Skrzynka" };
+export async function generateMetadata({
+  params,
+}: {
+  params: Promise<{ locale: string }>;
+}) {
+  const { locale } = await params;
+  const t = await getTranslations({ locale, namespace: "Admin.inbox" });
+  return { title: t("metaTitle") };
+}
 
 /**
  * Skrzynka — zapytania klientów czekające na odpowiedź CZŁOWIEKA.
@@ -58,6 +66,7 @@ export default async function InboxPage({
 
   const { locale } = await params;
   setRequestLocale(locale);
+  const t = await getTranslations("Admin.inbox");
   const sp = await searchParams;
   const filter = parseInboxFilter(sp);
 
@@ -139,20 +148,20 @@ export default async function InboxPage({
   return (
     <div className="max-w-4xl">
       <header className="mb-6">
-        <h1 className="font-heading text-ink text-2xl font-bold">Skrzynka</h1>
+        <h1 className="font-heading text-ink text-2xl font-bold">{t("title")}</h1>
         <p className="text-silver mt-1 text-sm">
-          Zapytania klientów czekające na odpowiedź. Rezerwacje są w module{" "}
-          <Link
-            href="/admin/reservations"
-            className="underline underline-offset-2"
-          >
-            Rezerwacje
-          </Link>
-          , a awarie techniczne w{" "}
-          <Link href="/admin/alerty" className="underline underline-offset-2">
-            Alertach
-          </Link>{" "}
-          — to trzy różne rzeczy i trzy różne liczniki.
+          {t.rich("intro", {
+            res: (chunks) => (
+              <Link href="/admin/reservations" className="underline underline-offset-2">
+                {chunks}
+              </Link>
+            ),
+            alr: (chunks) => (
+              <Link href="/admin/alerty" className="underline underline-offset-2">
+                {chunks}
+              </Link>
+            ),
+          })}
         </p>
       </header>
 
@@ -167,24 +176,24 @@ export default async function InboxPage({
           })}
           className={chip(!sp.unread && !sp.status && !sp.source && !sp.reason)}
         >
-          Wszystkie
+          {t("filters.all")}
         </Link>
         <Link
           href={href({ unread: sp.unread === "1" ? undefined : "1" })}
           className={chip(sp.unread === "1")}
         >
-          Nieprzeczytane {unreadTotal > 0 ? `(${unreadTotal})` : ""}
+          {t("filters.unread")} {unreadTotal > 0 ? `(${unreadTotal})` : ""}
         </Link>
       </div>
 
       <div className="mb-4 flex flex-wrap gap-2">
-        {Object.entries(SOURCE_LABEL).map(([value, label]) => (
+        {Object.keys(SOURCE_LABEL).map((value) => (
           <Link
             key={value}
             href={href({ source: sp.source === value ? undefined : value })}
             className={chip(sp.source === value)}
           >
-            {label} {bySource.get(value) ? `(${bySource.get(value)})` : ""}
+            {t(`sources.${value}`)} {bySource.get(value) ? `(${bySource.get(value)})` : ""}
           </Link>
         ))}
       </div>
@@ -195,28 +204,28 @@ export default async function InboxPage({
           tylko ściana. */}
       {byReason.size > 0 && (
         <div className="mb-4 flex flex-wrap gap-2">
-          {Object.entries(REASON_LABEL)
-            .filter(([value]) => byReason.has(value))
-            .map(([value, label]) => (
+          {Object.keys(REASON_LABEL)
+            .filter((value) => byReason.has(value))
+            .map((value) => (
               <Link
                 key={value}
                 href={href({ reason: sp.reason === value ? undefined : value })}
                 className={chip(sp.reason === value)}
               >
-                {label} ({byReason.get(value)})
+                {t(`reasons.${value}`)} ({byReason.get(value)})
               </Link>
             ))}
         </div>
       )}
 
       <div className="mb-4 flex flex-wrap gap-2">
-        {Object.entries(STATUS_LABEL).map(([value, label]) => (
+        {Object.keys(STATUS_LABEL).map((value) => (
           <Link
             key={value}
             href={href({ status: sp.status === value ? undefined : value })}
             className={chip(sp.status === value)}
           >
-            {label}
+            {t(`statuses.${value}`)}
           </Link>
         ))}
       </div>
@@ -230,15 +239,15 @@ export default async function InboxPage({
         <input
           name="q"
           defaultValue={sp.q ?? ""}
-          placeholder="Nazwisko, telefon, e-mail, treść"
-          aria-label="Szukaj w skrzynce"
+          placeholder={t("filters.searchPlaceholder")}
+          aria-label={t("filters.searchLabel")}
           className="border-line-strong bg-surface-1 text-ink placeholder:text-ink-faint h-11 min-w-0 flex-1 border px-3 text-xs"
         />
         <button
           type="submit"
           className="label border-line-strong text-ink hover:border-ink tap inline-flex items-center border px-4 text-xs"
         >
-          Szukaj
+          {t("filters.search")}
         </button>
       </form>
 
@@ -247,8 +256,8 @@ export default async function InboxPage({
         {items.length === 0 ? (
           <p className="text-ink-faint p-8 text-center text-sm">
             {sp.q || sp.status || sp.source || sp.unread
-              ? "Nic nie pasuje do tych filtrów."
-              : "Brak zapytań. Pojawią się tu prośby o kontakt z asystenta, zapytania firmowe i zgłoszenia z formularza."}
+              ? t("noResults")
+              : t("empty")}
           </p>
         ) : (
           items.map((i) => (

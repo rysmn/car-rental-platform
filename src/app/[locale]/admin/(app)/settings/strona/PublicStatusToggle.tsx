@@ -1,7 +1,8 @@
 "use client";
 
 import { useActionState, useState } from "react";
-import { updatePublicStatus, type SaveResult } from "./actions";
+import { useTranslations } from "next-intl";
+import { updatePublicStatus, type SaveResult } from "../../actions";
 
 /**
  * The one switch that decides whether visitors see how the fleet is doing today.
@@ -22,6 +23,16 @@ export function PublicStatusToggle({ enabled }: { enabled: boolean }) {
   // Mirrored so the sentence under the switch answers immediately; the value
   // that gets saved is still whatever the form posts.
   const [on, setOn] = useState(enabled);
+  const t = useTranslations("Admin.publicStatus");
+
+  // The action returns stable codes for its own messages; anything else is
+  // passed through unchanged (it is already a finished sentence).
+  const codes: Record<string, string> = {
+    visible: t("visible"),
+    hidden: t("hidden"),
+    generic: t("genericError"),
+  };
+  const text = (code: string) => codes[code] ?? code;
 
   return (
     <form
@@ -42,17 +53,13 @@ export function PublicStatusToggle({ enabled }: { enabled: boolean }) {
         />
         <span>
           <span className="text-ink block text-sm font-semibold">
-            Pokazuj klientom status samochodów
+            {t("title")}
           </span>
           <span className="text-ink-faint mt-1 block text-xs leading-relaxed">
-            {on
-              ? "Przy każdym aucie na stronie widnieje dzisiejszy stan: dostępny, wynajęty, zarezerwowany, zablokowany lub w serwisie."
-              : "Klienci nie widzą stanu aut. Ceny, wyszukiwanie i rezerwacja działają bez zmian."}
+            {on ? t("enabledDesc") : t("disabledDesc")}
           </span>
           <span className="text-ink-faint mt-2 block text-xs leading-relaxed">
-            Ten przełącznik ukrywa wyłącznie napis. Nie zmienia dostępności:
-            auto zajęte w wybranym terminie i tak nie da się zarezerwować,
-            niezależnie od tego ustawienia.
+            {t("note")}
           </span>
         </span>
       </label>
@@ -64,17 +71,17 @@ export function PublicStatusToggle({ enabled }: { enabled: boolean }) {
             type="submit"
             className="label border-line-strong text-ink h-9 border px-4 text-[11px]"
           >
-            Zapisz
+            {t("save")}
           </button>
         </noscript>
-        {pending && <span className="text-ink-faint text-xs">Zapisywanie…</span>}
+        {pending && <span className="text-ink-faint text-xs">{t("saving")}</span>}
         {!pending && state?.ok && (
           <span className="text-xs text-emerald-400">
-            {state.message ?? "Zapisano ✓"}
+            {state.message ? text(state.message) : t("saved")}
           </span>
         )}
         {!pending && state && !state.ok && (
-          <span className="text-red text-xs">{state.error}</span>
+          <span className="text-red text-xs">{text(state.error)}</span>
         )}
       </div>
     </form>

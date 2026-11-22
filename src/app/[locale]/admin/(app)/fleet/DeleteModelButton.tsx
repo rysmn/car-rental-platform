@@ -1,9 +1,11 @@
 "use client";
 
 import { useState, useTransition } from "react";
+import { useTranslations } from "next-intl";
 import { deleteModel } from "./actions";
 
 export function DeleteModelButton({ id }: { id: string }) {
+  const t = useTranslations("Admin.fleet");
   const [pending, start] = useTransition();
   const [error, setError] = useState<string | null>(null);
   const [confirm, setConfirm] = useState(false);
@@ -25,23 +27,21 @@ export function DeleteModelButton({ id }: { id: string }) {
       <div className="flex flex-wrap items-center gap-3">
         {confirm ? (
           <>
-            <span className="text-silver text-sm">
-              Usunąć ten model bezpowrotnie?
-            </span>
+            <span className="text-silver text-sm">{t("deleteConfirm")}</span>
             <button
               type="button"
               onClick={doDelete}
               disabled={pending}
               className="label border-red text-red hover:bg-red inline-flex h-10 items-center border px-5 text-xs transition-colors hover:text-ink disabled:opacity-50"
             >
-              {pending ? "Usuwanie…" : "Tak, usuń model"}
+              {pending ? t("deleting") : t("deleteYes")}
             </button>
             <button
               type="button"
               onClick={() => setConfirm(false)}
               className="text-ink-faint text-xs hover:text-ink"
             >
-              Anuluj
+              {t("cancel")}
             </button>
           </>
         ) : (
@@ -50,7 +50,7 @@ export function DeleteModelButton({ id }: { id: string }) {
             onClick={() => setConfirm(true)}
             className="label border-line-strong text-ink-faint hover:border-red hover:text-red inline-flex h-10 items-center border px-5 text-xs transition-colors"
           >
-            Usuń model
+            {t("deleteModel")}
           </button>
         )}
       </div>

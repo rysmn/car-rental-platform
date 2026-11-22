@@ -13,6 +13,8 @@
  * question asked weeks later ("who let it go, and when?") still has an answer.
  */
 
+import { type Bilingual } from "@/lib/i18n-pick";
+
 export const DEPOSIT_STATUSES = [
   "to_take",
   "held",
@@ -24,22 +26,31 @@ export const DEPOSIT_STATUSES = [
 
 export type DepositStatus = (typeof DEPOSIT_STATUSES)[number];
 
-export const DEPOSIT_STATUS_LABEL: Record<DepositStatus, string> = {
-  to_take: "Do pobrania",
-  held: "Pobrana",
-  blocked: "Zablokowana",
-  to_return: "Do zwrotu",
-  returned: "Zwrócona",
-  partially_kept: "Częściowo zatrzymana",
+export const DEPOSIT_STATUS_LABEL: Record<DepositStatus, Bilingual> = {
+  to_take: { pl: "Do pobrania", en: "To collect" },
+  held: { pl: "Pobrana", en: "Held" },
+  blocked: { pl: "Zablokowana", en: "Blocked" },
+  to_return: { pl: "Do zwrotu", en: "To return" },
+  returned: { pl: "Zwrócona", en: "Returned" },
+  partially_kept: { pl: "Częściowo zatrzymana", en: "Partly kept" },
 };
 
-export const DEPOSIT_STATUS_HINT: Record<DepositStatus, string> = {
-  to_take: "Klient jeszcze nic nie wpłacił",
-  held: "Pieniądze klienta są u nas",
-  blocked: "Blokada na karcie klienta — pieniądze nie są nasze",
-  to_return: "Najem skończony, kaucja należy się klientowi",
-  returned: "Oddana w całości",
-  partially_kept: "Część zatrzymana, reszta oddana",
+export const DEPOSIT_STATUS_HINT: Record<DepositStatus, Bilingual> = {
+  to_take: { pl: "Klient jeszcze nic nie wpłacił", en: "The customer has not paid anything yet" },
+  held: { pl: "Pieniądze klienta są u nas", en: "The customer's money is with us" },
+  blocked: {
+    pl: "Blokada na karcie klienta — pieniądze nie są nasze",
+    en: "A hold on the customer's card — the money is not ours",
+  },
+  to_return: {
+    pl: "Najem skończony, kaucja należy się klientowi",
+    en: "Rental over, the deposit is owed to the customer",
+  },
+  returned: { pl: "Oddana w całości", en: "Returned in full" },
+  partially_kept: {
+    pl: "Część zatrzymana, reszta oddana",
+    en: "Part kept, the rest returned",
+  },
 };
 
 /**

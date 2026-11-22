@@ -1,9 +1,8 @@
 import { notFound } from "next/navigation";
-import { setRequestLocale } from "next-intl/server";
+import { getTranslations, setRequestLocale } from "next-intl/server";
 import { guardPage } from "@/lib/auth/guard";
 import { Link } from "@/i18n/navigation";
 import {
-  DAMAGE_STATUS_LABEL,
   DAMAGE_STATUS_TONE,
   getDamage,
   listCarChoices,
@@ -12,9 +11,18 @@ import {
 } from "@/lib/admin/damages";
 import { DamageForm } from "../DamageForm";
 import { PhotoManager } from "../PhotoManager";
-import { formatDatePl, formatDateTimePl, formatPln } from "@/lib/format";
+import { formatPln } from "@/lib/format";
+import { formatDateTimeLocale, formatIsoDate } from "../../finanse/date-format";
 
-export const metadata = { title: "Szkoda" };
+export async function generateMetadata({
+  params,
+}: {
+  params: Promise<{ locale: string }>;
+}) {
+  const { locale } = await params;
+  const t = await getTranslations({ locale, namespace: "Admin.damages" });
+  return { title: t("detailTitle") };
+}
 
 const UUID_RE =
   /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
@@ -27,6 +35,7 @@ export default async function DamageDetailPage({
   const { locale, id } = await params;
   setRequestLocale(locale);
   await guardPage("wydania.prowadz");
+  const t = await getTranslations("Admin.damages");
 
   if (!UUID_RE.test(id)) notFound();
   const [damage, cars, reservations] = await Promise.all([
@@ -42,7 +51,7 @@ export default async function DamageDetailPage({
         href="/admin/szkody"
         className="label-tight text-ink-faint hover:text-ink -my-2 inline-flex min-h-11 items-center text-[10px] transition-colors"
       >
-        ← Szkody
+        {t("detail.back")}
       </Link>
 
       <header className="mt-4 mb-6 flex flex-wrap items-start justify-between gap-4">
@@ -51,30 +60,33 @@ export default async function DamageDetailPage({
           <p className="text-silver mt-1 text-sm">
             {damage.car}
             {damage.plate ? ` · ${damage.plate}` : ""} ·{" "}
-            {formatDatePl(damage.occurredOn)}
+            {formatIsoDate(damage.occurredOn, locale)}
           </p>
         </div>
         <span
           className={`label-tight border px-2 py-1 text-[10px] ${DAMAGE_STATUS_TONE[damage.status]}`}
         >
-          {DAMAGE_STATUS_LABEL[damage.status]}
+          {t(`status.${damage.status}`)}
         </span>
       </header>
 
       <section className="border-line bg-graphite/40 mb-6 grid gap-4 border p-6 sm:grid-cols-3">
-        <Figure label="Koszt naprawy" value={formatPln(damage.repairCostGrosze, locale)} />
         <Figure
-          label="Nasz koszt"
+          label={t("detail.repairCost")}
+          value={formatPln(damage.repairCostGrosze, locale)}
+        />
+        <Figure
+          label={t("detail.ours")}
           value={formatPln(ourCostGrosze(damage), locale)}
           hint={
             damage.insurer?.trim()
-              ? `udział własny · ${damage.insurer}`
-              : "szkoda własna — bez ubezpieczyciela"
+              ? t("detail.oursHintInsurer", { insurer: damage.insurer })
+              : t("detail.oursHintNone")
           }
         />
         <Figure
-          label="Najem"
-          value={damage.reference ?? "poza najmem"}
+          label={t("detail.rental")}
+          value={damage.reference ?? t("detail.noRental")}
           hint={damage.customerName ?? undefined}
           href={
             damage.reservationId
@@ -85,20 +97,28 @@ export default async function DamageDetailPage({
       </section>
 
       <section className="border-line bg-graphite/40 mb-6 border p-6">
-        <h2 className="label-tight text-ink-faint mb-4 text-[10px]">Zdjęcia</h2>
+        <h2 className="label-tight text-ink-faint mb-4 text-[10px]">
+          {t("detail.photos")}
+        </h2>
         <PhotoManager damageId={damage.id} photos={damage.photos} />
       </section>
 
       <section className="border-line bg-graphite/40 border p-6">
         <h2 className="label-tight text-ink-faint mb-4 text-[10px]">
-          Sprawa
+          {t("detail.case")}
         </h2>
         <DamageForm cars={cars} reservations={reservations} existing={damage} />
       </section>
 
       <p className="text-ink-faint mt-4 text-[11px]">
-        Założona {formatDateTimePl(damage.createdAt)}
-        {damage.closedAt ? ` · zamknięta ${formatDateTimePl(damage.closedAt)}` : ""}
+        {t("detail.opened", {
+          date: formatDateTimeLocale(damage.createdAt, locale),
+        })}
+        {damage.closedAt
+          ? t("detail.closed", {
+              date: formatDateTimeLocale(damage.closedAt, locale),
+            })
+          : ""}
       </p>
     </div>
   );

@@ -19,5 +19,7 @@ export interface StorageDriver {
   put(input: PutObjectInput): Promise<{ key: string }>;
   /** Time-limited read URL for a private object. */
   getSignedUrl(key: string, expiresInSeconds?: number): Promise<string>;
+  /** Serwerowy odczyt całego obiektu. `null`, gdy klucz nie istnieje. */
+  get(key: string): Promise<Buffer | null>;
   delete(key: string): Promise<void>;
 }

@@ -2,6 +2,7 @@
 
 import { useActionState, useRef, useState, useTransition } from "react";
 import Image from "next/image";
+import { useTranslations } from "next-intl";
 import {
   uploadModelImages,
   removeModelImage,
@@ -27,6 +28,7 @@ export function ImageManager({
   modelId: string;
   images: string[];
 }) {
+  const t = useTranslations("Admin.fleet");
   const fileRef = useRef<HTMLInputElement>(null);
   const [state, upload, uploading] = useActionState<
     FormResult | null,
@@ -54,17 +56,13 @@ export function ImageManager({
   return (
     <section className="mt-14">
       <div className="mb-4">
-        <h2 className="label text-ink text-xs">Zdjęcia</h2>
-        <p className="text-ink-faint text-xs">
-          Pierwsze zdjęcie jest okładką — pokazuje się na liście floty i w
-          podglądach linków. Reszta trafia do galerii na stronie auta. JPG, PNG
-          lub WEBP, do 8&nbsp;MB.
-        </p>
+        <h2 className="label text-ink text-xs">{t("photosHeading")}</h2>
+        <p className="text-ink-faint text-xs">{t("photosIntro")}</p>
       </div>
 
       {images.length === 0 ? (
         <p className="border-line bg-graphite/40 text-silver border px-5 py-6 text-center text-sm">
-          Brak zdjęć. Dodaj pierwsze poniżej.
+          {t("noPhotos")}
         </p>
       ) : (
         <ul className="grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-4">
@@ -73,14 +71,14 @@ export function ImageManager({
               <div className="bg-graphite relative aspect-[3/2]">
                 <Image
                   src={url}
-                  alt={`Zdjęcie ${i + 1}`}
+                  alt={t("photoAlt", { n: i + 1 })}
                   fill
                   sizes="(min-width:1024px) 220px, 45vw"
                   className="object-cover"
                 />
                 {i === 0 && (
                   <span className="label-tight bg-red absolute top-2 left-2 px-2 py-1 text-[9px] text-white">
-                    Okładka
+                    {t("cover")}
                   </span>
                 )}
               </div>
@@ -103,7 +101,7 @@ export function ImageManager({
                     onClick={() =>
                       run(() => moveModelImage(modelId, url, "up"))
                     }
-                    aria-label="Przesuń wcześniej"
+                    aria-label={t("moveEarlier")}
                     className="border-line-strong text-silver hover:text-ink h-11 w-11 border text-xs transition-colors disabled:opacity-30 pointer-fine:h-7 pointer-fine:w-7"
                   >
                     ←
@@ -114,7 +112,7 @@ export function ImageManager({
                     onClick={() =>
                       run(() => moveModelImage(modelId, url, "down"))
                     }
-                    aria-label="Przesuń później"
+                    aria-label={t("moveLater")}
                     className="border-line-strong text-silver hover:text-ink h-11 w-11 border text-xs transition-colors disabled:opacity-30 pointer-fine:h-7 pointer-fine:w-7"
                   >
                     →
@@ -128,8 +126,8 @@ export function ImageManager({
                     onClick={() =>
                       run(() => moveModelImage(modelId, url, "cover"))
                     }
-                    aria-label="Ustaw jako okładkę"
-                    title="Ustaw jako okładkę"
+                    aria-label={t("setCover")}
+                    title={t("setCover")}
                     className="border-line-strong text-silver hover:text-ink h-11 w-11 border text-xs transition-colors disabled:opacity-30 pointer-fine:h-7 pointer-fine:w-7"
                   >
                     ★
@@ -139,12 +137,12 @@ export function ImageManager({
                   type="button"
                   disabled={busy}
                   onClick={() => {
-                    if (!confirm("Usunąć to zdjęcie?")) return;
+                    if (!confirm(t("deletePhotoConfirm"))) return;
                     run(() => removeModelImage(modelId, url));
                   }}
                   className="label-tight text-red tap text-[10px] transition-opacity hover:opacity-70 disabled:opacity-30"
                 >
-                  Usuń
+                  {t("remove")}
                 </button>
               </div>
             </li>
@@ -170,7 +168,7 @@ export function ImageManager({
           disabled={busy}
           className="label bg-red hover:bg-red-hover inline-flex h-10 items-center px-6 text-xs text-white transition-colors disabled:opacity-50"
         >
-          {uploading ? "Wysyłanie…" : "Dodaj zdjęcia"}
+          {uploading ? t("uploading") : t("addPhotos")}
         </button>
       </form>
 

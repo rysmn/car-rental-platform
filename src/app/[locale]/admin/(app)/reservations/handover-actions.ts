@@ -3,6 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { and, eq } from "drizzle-orm";
 import { z } from "zod";
+import { getTranslations } from "next-intl/server";
 import { getDb, schema } from "@/lib/db";
 import { requirePermission } from "@/lib/auth/guard";
 import { recordAudit } from "@/lib/auth/audit";
@@ -20,9 +21,9 @@ const handoverInput = z.object({
   kind: z.enum(["pickup", "return"]),
   odometerKm: z.coerce
     .number()
-    .int("Przebieg podaj w pełnych kilometrach")
-    .min(0, "Przebieg nie może być ujemny")
-    .max(2_000_000, "Sprawdź przebieg"),
+    .int("odometerInteger")
+    .min(0, "odometerNegative")
+    .max(2_000_000, "odometerCheck"),
   fuelEighths: z.coerce.number().int().min(0).max(8),
   cleanliness: z.enum(CLEANLINESS_STATES),
   keysCount: z.coerce.number().int().min(0).max(4),
@@ -52,6 +53,7 @@ export async function saveHandover(
   formData: FormData,
 ): Promise<HandoverResult> {
   const admin = await requirePermission("wydania.prowadz");
+  const t = await getTranslations("Admin.reservations.errors");
   const parsed = handoverInput.safeParse({
     reservationId: formData.get("reservationId") ?? "",
     kind: formData.get("kind") ?? "",
@@ -67,7 +69,11 @@ export async function saveHandover(
   if (!parsed.success) {
     return {
       ok: false,
-      error: parsed.error.issues[0]?.message ?? "Popraw dane protokołu",
+      error: parsed.error.issues[0]
+        ? t.has(parsed.error.issues[0].message)
+          ? t(parsed.error.issues[0].message)
+          : parsed.error.issues[0].message
+        : t("handoverInvalid"),
     };
   }
   const d = parsed.data;
@@ -87,8 +93,8 @@ export async function saveHandover(
           ok: false,
           error:
             saved.error === "too_large"
-              ? "Podpis jest za duży"
-              : "Nie udało się zapisać podpisu",
+              ? t("signatureTooLarge")
+              : t("signatureSaveFailed"),
         };
       }
       // Stary plik dopiero teraz — nowy już leży na dysku.
@@ -161,7 +167,7 @@ export async function saveHandover(
     return { ok: true };
   } catch (err) {
     adminActionFailed("Handover", err);
-    return { ok: false, error: "Nie udało się zapisać protokołu" };
+    return { ok: false, error: t("handoverSaveFailed") };
   }
 }
 
@@ -177,10 +183,11 @@ export async function deleteHandover(
   formData: FormData,
 ): Promise<HandoverResult> {
   const admin = await requirePermission("wydania.prowadz");
+  const t = await getTranslations("Admin.reservations.errors");
   const reservationId = String(formData.get("reservationId") ?? "");
   const kind = String(formData.get("kind") ?? "");
   if (kind !== "pickup" && kind !== "return") {
-    return { ok: false, error: "Nieprawidłowe dane" };
+    return { ok: false, error: t("invalidData") };
   }
   try {
     const before = await getHandover(reservationId, kind);
@@ -206,6 +213,6 @@ export async function deleteHandover(
     return { ok: true };
   } catch (err) {
     adminActionFailed("handoverDelete", err);
-    return { ok: false, error: "Nie udało się usunąć protokołu" };
+    return { ok: false, error: t("handoverDeleteFailed") };
   }
 }

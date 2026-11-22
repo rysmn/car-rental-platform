@@ -2,6 +2,7 @@ import "server-only";
 import { sql } from "drizzle-orm";
 import { getDb } from "@/lib/db";
 import { getSetting } from "@/lib/admin/settings";
+import type { Bilingual } from "@/lib/i18n-pick";
 
 /**
  * Is the assistant actually running?
@@ -26,11 +27,11 @@ export type ChatbotState = "active" | "off" | "unavailable";
 
 export type ChatbotStatus = {
   state: ChatbotState;
-  /** "● Aktywny" / "○ Wyłączony" / "⚠ Niedostępny". */
+  /** "●" / "○" / "⚠" — a symbol, the same in both languages. */
   dot: string;
-  label: string;
+  label: Bilingual;
   /** One sentence of evidence for whatever the label claims. */
-  detail: string;
+  detail: Bilingual;
   conversations7d: number;
   lastConversationAt: Date | null;
   /** Rules-only or rules-plus-model, and whether the kill switch is pulled. */
@@ -70,9 +71,11 @@ export async function getChatbotStatus(): Promise<ChatbotStatus> {
       ...base,
       state: "off",
       dot: "○",
-      label: "Wyłączony",
-      detail:
-        "Widget nie jest osadzony na stronie, a jego API odpowiada 404. Ten sam przełącznik zamyka obie połowy.",
+      label: { pl: "Wyłączony", en: "Off" },
+      detail: {
+        pl: "Widget nie jest osadzony na stronie, a jego API odpowiada 404. Ten sam przełącznik zamyka obie połowy.",
+        en: "The widget is not embedded on the site and its API answers 404. The same switch closes both halves.",
+      },
     };
   }
 
@@ -83,31 +86,51 @@ export async function getChatbotStatus(): Promise<ChatbotStatus> {
       ...base,
       state: "unavailable",
       dot: "⚠",
-      label: "Niedostępny",
-      detail:
-        "Włączony, ale wszystkie funkcje są wyłączone — okno się otworzy i odmówi odpowiedzi na każde pytanie.",
+      label: { pl: "Niedostępny", en: "Unavailable" },
+      detail: {
+        pl: "Włączony, ale wszystkie funkcje są wyłączone — okno się otworzy i odmówi odpowiedzi na każde pytanie.",
+        en: "Switched on, but every capability is off — the window opens and refuses to answer every question.",
+      },
     };
   }
 
-  const usage =
+  const usagePl =
     conversations7d > 0
       ? `${conversations7d} ${conversations7d === 1 ? "rozmowa" : conversations7d < 5 ? "rozmowy" : "rozmów"} w ostatnich 7 dniach`
       : lastAt
         ? "bez rozmów w ostatnich 7 dniach"
         : "jeszcze bez żadnej rozmowy";
+  const usageEn =
+    conversations7d > 0
+      ? `${conversations7d} ${conversations7d === 1 ? "conversation" : "conversations"} in the last 7 days`
+      : lastAt
+        ? "no conversations in the last 7 days"
+        : "no conversations yet";
 
-  const brain =
+  const brainPl =
     mode === "hybrid"
       ? settings.aiPaused
         ? "reguły (model językowy wstrzymany przełącznikiem)"
         : "reguły + model językowy przy niepewnych zdaniach"
       : "same reguły";
+  const brainEn =
+    mode === "hybrid"
+      ? settings.aiPaused
+        ? "rules (language model paused by the switch)"
+        : "rules + language model for uncertain sentences"
+      : "rules only";
 
   return {
     ...base,
     state: "active",
     dot: "●",
-    label: "Aktywny — chatbot działa na stronie",
-    detail: `${usage}; ${brain}.`,
+    label: {
+      pl: "Aktywny — chatbot działa na stronie",
+      en: "Active — the chatbot is running on the site",
+    },
+    detail: {
+      pl: `${usagePl}; ${brainPl}.`,
+      en: `${usageEn}; ${brainEn}.`,
+    },
   };
 }

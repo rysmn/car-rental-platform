@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useTransition } from "react";
+import { useTranslations } from "next-intl";
 import {
   usunDokument,
   ustawAktywna,
@@ -38,6 +39,7 @@ export function WersjaAkcje({
   mozeZarzadzac: boolean;
   onEdytuj: () => void;
 }) {
+  const t = useTranslations("Admin.documents");
   const [czeka, start] = useTransition();
   const [blad, setBlad] = useState<string | null>(null);
   const [pytamOUsuniecie, setPytam] = useState(false);
@@ -46,7 +48,7 @@ export function WersjaAkcje({
     setBlad(null);
     start(async () => {
       const r = await fn();
-      if (!r.ok) setBlad(r.error ?? "Nie udało się.");
+      if (!r.ok) setBlad(r.error ?? t("errorFallback"));
       else setPytam(false);
     });
   };
@@ -91,11 +93,7 @@ export function WersjaAkcje({
             go unieważnić, i on musi być widoczny: wersja nieobowiązująca nie
             idzie do nikogo, choćby wysyłkę miała włączoną.
           */
-          title={
-            active
-              ? undefined
-              : "Ta wersja nie obowiązuje, więc nie zostanie wysłana. Ustaw ją jako obowiązującą."
-          }
+          title={active ? undefined : t("autoInactiveTitle")}
           className={`label inline-flex h-11 items-center border px-4 text-xs transition-colors disabled:opacity-50 ${
             autoSend && active
               ? "border-ink text-ink"
@@ -104,15 +102,15 @@ export function WersjaAkcje({
         >
           {autoSend
             ? active
-              ? "Wysyłka: WŁĄCZONA"
-              : "Wysyłka: WŁĄCZONA (wersja nie obowiązuje)"
-            : "Wysyłka: wyłączona"}
+              ? t("autoOn")
+              : t("autoOnInactive")
+            : t("autoOff")}
         </button>
       )}
 
       {mozeZarzadzac && (
         <button type="button" onClick={onEdytuj} className={PRZYCISK}>
-          Edytuj
+          {t("buttonEdit")}
         </button>
       )}
 
@@ -122,7 +120,7 @@ export function WersjaAkcje({
         rel="noreferrer"
         className={PRZYCISK}
       >
-        Otwórz
+        {t("buttonOpen")}
       </a>
 
       {mozeZarzadzac &&
@@ -133,7 +131,7 @@ export function WersjaAkcje({
             onClick={() => wykonaj(() => wycofaj(id))}
             className={PRZYCISK}
           >
-            Wycofaj z obiegu
+            {t("buttonWithdraw")}
           </button>
         ) : (
           <button
@@ -142,21 +140,21 @@ export function WersjaAkcje({
             onClick={() => wykonaj(() => ustawAktywna(id))}
             className="label bg-red hover:bg-red-hover inline-flex h-11 items-center px-4 text-xs text-white transition-colors disabled:opacity-50"
           >
-            Ustaw jako obowiązującą
+            {t("buttonSetActive")}
           </button>
         ))}
 
       {mozeZarzadzac &&
         (pytamOUsuniecie ? (
           <span className="flex flex-wrap items-center gap-2">
-            <span className="text-ink text-xs">Na pewno usunąć?</span>
+            <span className="text-ink text-xs">{t("confirmDelete")}</span>
             <button
               type="button"
               disabled={czeka}
               onClick={() => wykonaj(() => usunDokument(id))}
               className="label bg-red hover:bg-red-hover inline-flex h-11 items-center px-4 text-xs text-white transition-colors disabled:opacity-50"
             >
-              Tak, usuń
+              {t("buttonYesDelete")}
             </button>
             <button
               type="button"
@@ -166,7 +164,7 @@ export function WersjaAkcje({
               }}
               className={PRZYCISK}
             >
-              Nie
+              {t("buttonNo")}
             </button>
           </span>
         ) : (
@@ -176,7 +174,7 @@ export function WersjaAkcje({
             onClick={() => setPytam(true)}
             className="label border-line-strong text-ink-faint hover:border-ink hover:text-ink inline-flex h-11 items-center border px-4 text-xs transition-colors disabled:opacity-50"
           >
-            Usuń
+            {t("buttonDelete")}
           </button>
         ))}
     </div>

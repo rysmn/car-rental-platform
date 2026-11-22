@@ -1,4 +1,4 @@
-import { setRequestLocale } from "next-intl/server";
+import { getTranslations, setRequestLocale } from "next-intl/server";
 import { guardPage } from "@/lib/auth/guard";
 import { Link, type AppHref } from "@/i18n/navigation";
 import { listReservations } from "@/lib/admin/reservations";
@@ -7,7 +7,8 @@ import {
   type ReservationStatus,
 } from "@/lib/admin/reservation-status";
 import { StatusBadge } from "@/components/admin/StatusBadge";
-import { formatPln, formatDatePl } from "@/lib/format";
+import { formatPln } from "@/lib/format";
+import { pickFrom } from "@/lib/i18n-pick";
 import { naleznosciDla } from "@/lib/booking/cancellation-repo";
 
 const STATUSES: ReservationStatus[] = [
@@ -42,6 +43,12 @@ export default async function ReservationsPage({
 
   const { locale } = await params;
   setRequestLocale(locale);
+  const t = await getTranslations("Admin.reservations.list");
+  const day = (iso: string) =>
+    new Intl.DateTimeFormat(locale === "en" ? "en-GB" : "pl-PL", {
+      timeZone: "UTC",
+      dateStyle: "short",
+    }).format(new Date(`${String(iso).slice(0, 10)}T00:00:00Z`));
   const sp = await searchParams;
 
   const status = asStatus(sp.status);
@@ -74,10 +81,8 @@ export default async function ReservationsPage({
     <div>
       <header className="mb-8 flex flex-wrap items-end justify-between gap-4">
         <div>
-          <h1 className="font-heading text-ink text-2xl">Rezerwacje</h1>
-          <p className="text-silver mt-1 text-sm">
-            {total} {total === 1 ? "rezerwacja" : "rezerwacji"} łącznie
-          </p>
+          <h1 className="font-heading text-ink text-2xl">{t("title")}</h1>
+          <p className="text-silver mt-1 text-sm">{t("count", { count: total })}</p>
         </div>
       </header>
 
@@ -86,27 +91,27 @@ export default async function ReservationsPage({
         className="border-line bg-graphite/40 mb-6 flex flex-wrap items-end gap-3 border p-4"
       >
         <label className="flex flex-col gap-1">
-          <span className="label-tight text-ink-faint text-[10px]">Status</span>
+          <span className="label-tight text-ink-faint text-[10px]">{t("status")}</span>
           <select
             name="status"
             defaultValue={status ?? ""}
             className="border-line-strong bg-surface-1 text-ink h-11 border px-3 text-sm"
           >
-            <option value="">Wszystkie</option>
+            <option value="">{t("all")}</option>
             {STATUSES.map((s) => (
               <option key={s} value={s}>
-                {STATUS_LABEL[s]}
+                {pickFrom(STATUS_LABEL, s, locale)}
               </option>
             ))}
           </select>
         </label>
         <label className="flex flex-1 flex-col gap-1">
-          <span className="label-tight text-ink-faint text-[10px]">Szukaj</span>
+          <span className="label-tight text-ink-faint text-[10px]">{t("search")}</span>
           <input
             type="text"
             name="q"
             defaultValue={q ?? ""}
-            placeholder="Numer, nazwisko lub e-mail"
+            placeholder={t("searchPlaceholder")}
             className="border-line-strong placeholder:text-ink-faint bg-surface-1 text-ink h-11 min-w-48 border px-3 text-sm"
           />
         </label>
@@ -114,33 +119,33 @@ export default async function ReservationsPage({
           type="submit"
           className="label border-line-strong text-ink hover:border-ink hover:bg-ink/5 inline-flex h-11 items-center border px-6 text-xs transition-colors"
         >
-          Filtruj
+          {t("filter")}
         </button>
         {(status || q) && (
           <Link
             href="/admin/reservations"
             className="label text-ink-faint hover:text-ink inline-flex h-11 items-center px-3 text-xs transition-colors"
           >
-            Wyczyść
+            {t("clear")}
           </Link>
         )}
       </form>
 
       {items.length === 0 ? (
         <p className="border-line bg-graphite/40 text-silver border p-10 text-center text-sm">
-          Brak rezerwacji dla wybranych filtrów.
+          {t("empty")}
         </p>
       ) : (
         <div className="border-line overflow-x-auto border">
           <table className="w-full min-w-3xl border-collapse text-sm">
             <thead>
               <tr className="border-line bg-graphite/60 border-b text-left">
-                <Th>Numer</Th>
-                <Th>Auto</Th>
-                <Th>Termin</Th>
-                <Th>Klient</Th>
-                <Th className="text-right">Kwota</Th>
-                <Th>Status</Th>
+                <Th>{t("colNumber")}</Th>
+                <Th>{t("colCar")}</Th>
+                <Th>{t("colTerm")}</Th>
+                <Th>{t("colCustomer")}</Th>
+                <Th className="text-right">{t("colAmount")}</Th>
+                <Th>{t("colStatus")}</Th>
               </tr>
             </thead>
             <tbody>
@@ -169,14 +174,14 @@ export default async function ReservationsPage({
                     )}
                   </Td>
                   <Td className="text-silver whitespace-nowrap">
-                    {formatDatePl(r.startDate)} – {formatDatePl(r.endDate)}
+                    {day(r.startDate)} – {day(r.endDate)}
                   </Td>
                   <Td className="text-silver">{r.customerName}</Td>
                   <Td className="text-ink text-right whitespace-nowrap">
                     {formatPln(r.totalGrosze, locale)}
                   </Td>
                   <Td>
-                    <StatusBadge status={r.status as ReservationStatus} />
+                    <StatusBadge status={r.status as ReservationStatus} locale={locale} />
                     {/*
                       Należność POD statusem, w tej samej komórce — bo to jest
                       dopowiedzenie do statusu, a nie osobna informacja. Nowa
@@ -188,10 +193,10 @@ export default async function ReservationsPage({
                       if (!o || o.amountGrosze <= 0) return null;
                       const etykieta =
                         o.status === "waived"
-                          ? "UMORZONE"
+                          ? t("feeWaived")
                           : o.status === "paid"
-                            ? "ZAPŁACONE"
-                            : "DO ZAPŁATY";
+                            ? t("feePaid")
+                            : t("feeDue");
                       return (
                         <span
                           className={`label-tight mt-1 block text-[10px] whitespace-nowrap ${
@@ -214,13 +219,13 @@ export default async function ReservationsPage({
       {pages > 1 && (
         <nav className="mt-6 flex items-center justify-between text-sm">
           <PageLink href={pageHref(page - 1)} disabled={page <= 1}>
-            ← Poprzednia
+            {t("previous")}
           </PageLink>
           <span className="text-ink-faint">
-            Strona {page} z {pages}
+            {t("pageOf", { page, pages })}
           </span>
           <PageLink href={pageHref(page + 1)} disabled={page >= pages}>
-            Następna →
+            {t("next")}
           </PageLink>
         </nav>
       )}

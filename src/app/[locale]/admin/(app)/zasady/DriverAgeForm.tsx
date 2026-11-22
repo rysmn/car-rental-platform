@@ -1,6 +1,7 @@
 "use client";
 
 import { useActionState, useState } from "react";
+import { useLocale, useTranslations } from "next-intl";
 import { saveDriverAgeRules, type SaveResult } from "./actions";
 import { FALLBACK_MIN_AGE } from "@/lib/booking/driver-age-floor";
 import type { RentalRules } from "@/lib/admin/rental-rules";
@@ -17,11 +18,12 @@ import { DRIVER_CLASSES, type DriverClass } from "@/lib/fleet/driver-class";
  */
 
 function Feedback({ state }: { state: SaveResult | null }) {
+  const t = useTranslations("Admin.rules");
   if (!state) return null;
   if (state.ok)
     return (
       <span className="text-xs text-emerald-400">
-        {state.message ?? "Zapisano ✓"}
+        {state.message ?? t("actions.saved")}
       </span>
     );
   return <span className="text-red text-xs">{state.error}</span>;
@@ -32,14 +34,18 @@ function Stamp({
 }: {
   stamp: { updatedAt: string | null; updatedBy: string | null };
 }) {
+  const t = useTranslations("Admin.rules");
+  const locale = useLocale();
   return (
     <p className="text-ink-faint mt-1 text-[10px]">
       {stamp.updatedAt
-        ? `Ostatnia zmiana: ${new Date(stamp.updatedAt).toLocaleString("pl-PL", {
-            dateStyle: "short",
-            timeStyle: "short",
-          })}${stamp.updatedBy ? ` · ${stamp.updatedBy}` : ""}`
-        : "Nigdy nie zmieniane."}
+        ? `${t("stamp.lastChange", {
+            date: new Date(stamp.updatedAt).toLocaleString(
+              locale === "en" ? "en-GB" : "pl-PL",
+              { dateStyle: "short", timeStyle: "short" },
+            ),
+          })}${stamp.updatedBy ? t("stamp.by", { name: stamp.updatedBy }) : ""}`
+        : t("stamp.never")}
     </p>
   );
 }
@@ -68,6 +74,7 @@ function Requirement({
   stamp: { updatedAt: string | null; updatedBy: string | null };
   note?: string;
 }) {
+  const t = useTranslations("Admin.rules");
   const [on, setOn] = useState(defaultOn);
   return (
     <div className="border-line/60 border-b py-3 last:border-0">
@@ -89,7 +96,7 @@ function Requirement({
               : "border-line text-ink-faint border"
           }`}
         >
-          {on ? "OBOWIĄZUJE" : "NIE OBOWIĄZUJE"}
+          {on ? t("requirement.applies") : t("requirement.doesNotApply")}
         </span>
         <span className="ml-auto flex items-center gap-2">
           <input
@@ -99,7 +106,7 @@ function Requirement({
             max={99}
             defaultValue={defaultYears ?? ""}
             placeholder="—"
-            aria-label={`${title} — liczba lat`}
+            aria-label={t("requirement.yearsAria", { title })}
             className="border-line-strong bg-surface-1 text-ink h-9 w-20 border px-2 text-center text-sm"
           />
           <span className="text-ink-faint text-xs">{unit}</span>
@@ -122,32 +129,20 @@ function Requirement({
  * anything. The row stays visible so the requirement is not forgotten.
  */
 function LockedRequirement({ title }: { title: string }) {
+  const t = useTranslations("Admin.rules");
   return (
     <div className="border-line/60 border-b py-3 last:border-0">
       <div className="flex flex-wrap items-center gap-3">
         <span className="text-ink-faint text-sm">{title}</span>
         <span className="label-tight border-line text-ink-faint rounded-pill border px-2 py-0.5 text-[9px] whitespace-nowrap">
-          NIEDOSTĘPNE
+          {t("licence.unavailable")}
         </span>
       </div>
-      <p className="text-ink-faint mt-1 text-xs">
-        Formularz rezerwacji nie zbiera daty uzyskania prawa jazdy, więc systemu
-        nie da się poprosić o sprawdzenie stażu. Do czasu dodania tego pola staż
-        jest wyłączony wszędzie: nie blokuje rezerwacji, nie pojawia się w FAQ,
-        na stronach ofertowych ani w odpowiedziach asystenta.
-      </p>
-      <p className="mt-1 text-[11px] text-amber-500">
-        Osobne zadanie — wraz z potwierdzeniem wymagań u ubezpieczyciela.
-      </p>
+      <p className="text-ink-faint mt-1 text-xs">{t("licence.note")}</p>
+      <p className="mt-1 text-[11px] text-amber-500">{t("licence.locked")}</p>
     </div>
   );
 }
-
-const CLASS_INTRO: Record<DriverClass, string> = {
-  standard: "Auta osobowe podstawowej klasy.",
-  premium: "Auta klasy wyższej i luksusowej.",
-  van_bus: "Busy i auta 9-osobowe.",
-};
 
 export function DriverAgeForm({
   rules,
@@ -160,6 +155,7 @@ export function DriverAgeForm({
   /** Published cars with no class: enforcement stays locked while any exist. */
   unassignedPublished: number;
 }) {
+  const t = useTranslations("Admin.rules");
   const [state, action, pending] = useActionState(saveDriverAgeRules, null);
   const d = rules.driverAge;
   const [enforce, setEnforce] = useState(d.enforcement.inBookingForm);
@@ -173,28 +169,33 @@ export function DriverAgeForm({
             <div className="mb-2 flex flex-wrap items-baseline justify-between gap-2">
               <h3 className="label text-ink text-xs">{c.label}</h3>
               <span className="text-ink-faint text-[10px]">
-                {counts[key]} {counts[key] === 1 ? "auto" : "aut"} ·{" "}
-                {CLASS_INTRO[key]}
+                {t("classes.count", { count: counts[key] })} ·{" "}
+                {t(`classIntro.${key}`)}
               </span>
             </div>
 
             <Requirement
               name={`${key}.age`}
-              title="Minimalny wiek kierowcy"
-              unit="lat"
+              title={t("requirement.minAge")}
+              unit={t("requirement.yearsUnit")}
               min={FALLBACK_MIN_AGE}
               defaultOn={c.minAge.required}
               defaultYears={c.minAge.years}
               stamp={c.minAge}
               whenOn={
                 enforce
-                  ? `Obowiązuje ${c.minAge.years ?? FALLBACK_MIN_AGE} lat. Formularz, FAQ, strony ofertowe i asystent podają tę samą liczbę.`
-                  : `Zapisane ${c.minAge.years ?? FALLBACK_MIN_AGE} lat, ale dziś nie działa: egzekwowanie progów klas jest wyłączone, więc obowiązuje ${FALLBACK_MIN_AGE} lat. Nikt nie zobaczy tej liczby, dopóki nie włączysz przełącznika niżej.`
+                  ? t("requirement.onEnforced", {
+                      years: c.minAge.years ?? FALLBACK_MIN_AGE,
+                    })
+                  : t("requirement.onStored", {
+                      years: c.minAge.years ?? FALLBACK_MIN_AGE,
+                      min: FALLBACK_MIN_AGE,
+                    })
               }
-              whenOff={`Ta klasa spada do progu bezpieczeństwa: ${FALLBACK_MIN_AGE} lat. Wyłączenie nie znosi kontroli wieku — obniża ją do ${FALLBACK_MIN_AGE}.`}
+              whenOff={t("requirement.off", { min: FALLBACK_MIN_AGE })}
             />
 
-            <LockedRequirement title="Minimalny staż prawa jazdy" />
+            <LockedRequirement title={t("requirement.licenceTenure")} />
           </div>
         );
       })}
@@ -211,25 +212,21 @@ export function DriverAgeForm({
           />
           <span className="min-w-0">
             <span className="text-ink text-sm">
-              Egzekwuj progi klas w formularzu rezerwacji
+              {t("enforce.label")}
             </span>
             <span className="text-ink-faint mt-1 block text-xs">
               {enforce
-                ? `Formularz sprawdza wiek wobec klasy wybranego auta i odrzuca rezerwację poniżej progu. Auto bez klasy dostaje ${FALLBACK_MIN_AGE} lat.`
-                : `Obowiązuje jeden próg dla całej floty: ${FALLBACK_MIN_AGE} lat — dokładnie tak, jak formularz działał do tej pory. Progi klas są zapisane, ale nie działają i nikt ich nie widzi.`}
+                ? t("enforce.on", { min: FALLBACK_MIN_AGE })
+                : t("enforce.off", { min: FALLBACK_MIN_AGE })}
             </span>
             <span className="mt-2 block text-[11px] text-amber-500">
-              Kontroli wieku nie da się wyłączyć. {FALLBACK_MIN_AGE} lat to próg
-              wpisany w kod jako zabezpieczenie i obowiązuje niezależnie od
-              ustawień, także gdy odczyt konfiguracji się nie powiedzie albo
-              auto nie ma klasy.
+              {t("enforce.floorNote", { min: FALLBACK_MIN_AGE })}
             </span>
           </span>
         </label>
         {unassignedPublished > 0 ? (
           <p className="mt-2 pl-7 text-[11px] text-amber-500">
-            Zablokowane: {unassignedPublished} opublikowanych aut nie ma klasy.
-            Przypisz je w tabeli poniżej, wtedy przełącznik będzie dostępny.
+            {t("enforce.blocked", { count: unassignedPublished })}
           </p>
         ) : null}
         <div className="pl-7">
@@ -239,14 +236,14 @@ export function DriverAgeForm({
 
       <div>
         <label className="label-tight text-ink-faint text-[10px]" htmlFor="driverAgeNotes">
-          Dodatkowe warunki (dopisywane do odpowiedzi asystenta i do FAQ)
+          {t("notes.label")}
         </label>
         <textarea
           id="driverAgeNotes"
           name="driverAgeNotes"
           rows={2}
           defaultValue={d.notes}
-          placeholder="Puste — nic nie jest dopisywane"
+          placeholder={t("notes.placeholder")}
           className="border-line-strong bg-surface-1 text-ink placeholder:text-ink-faint mt-1 w-full border px-3 py-2 text-sm"
         />
       </div>
@@ -257,7 +254,7 @@ export function DriverAgeForm({
           disabled={pending}
           className="label-tight border-line-strong text-ink hover:border-ink hover:bg-ink/5 tap inline-flex items-center border px-4 text-[10px] transition-colors disabled:opacity-50"
         >
-          {pending ? "Zapisywanie…" : "Zapisz wymagania"}
+          {pending ? t("actions.saving") : t("actions.saveRequirements")}
         </button>
         <Feedback state={state} />
       </div>

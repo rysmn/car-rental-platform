@@ -4,7 +4,6 @@ import { useState } from "react";
 import { useTranslations } from "next-intl";
 import { useRouter } from "@/i18n/navigation";
 import { useEurRate } from "@/components/currency/CurrencyProvider";
-import { CurrencySwitcher } from "@/components/currency/CurrencySwitcher";
 import { filterHref, type FleetFilterTarget } from "./filterTarget";
 import type { BudgetKind } from "@/lib/fleet/filters";
 
@@ -165,22 +164,6 @@ export function FleetBudgetFilter({
           />
         </label>
 
-        {rate && (
-          <label className="block min-w-0 sm:w-32">
-            <span className="label-tight text-silver text-[11px]">
-              {t("budgetCurrency")}
-            </span>
-            <select
-              value={cur}
-              onChange={(e) => setCur(e.target.value === "eur" ? "eur" : "pln")}
-              className={`${inputCls} mt-2`}
-            >
-              <option value="pln">PLN</option>
-              <option value="eur">EUR</option>
-            </select>
-          </label>
-        )}
-
         <div className="flex gap-3">
           <button
             type="submit"
@@ -222,21 +205,6 @@ export function FleetBudgetFilter({
         walucie jest siatka, na którą właśnie patrzy. Od `lg` w górę znika,
         bo tam nagłówkowa jest na ekranie.
       */}
-      {rate && (
-        <div className="border-line mt-4 flex items-center justify-end gap-3 border-t pt-3 xl:hidden">
-          <span className="label-tight text-silver text-[11px]">
-            {currencyLabel}
-          </span>
-          {/* Te same napisy „zł / €" co w nagłówku — jedna kontrolka, jedna
-              nazwa na całej stronie. */}
-          <CurrencySwitcher
-            note={currencyNote}
-            groupLabel={currencyLabel}
-            labelPln="zł"
-            labelEur="€"
-          />
-        </div>
-      )}
     </form>
   );
 }

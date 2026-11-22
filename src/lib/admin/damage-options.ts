@@ -3,6 +3,8 @@
  * NO `server-only`: the forms are client components and need all of it.
  */
 
+import { type Bilingual } from "@/lib/i18n-pick";
+
 export const DAMAGE_STATUSES = [
   "reported",
   "assessment",
@@ -13,20 +15,26 @@ export const DAMAGE_STATUSES = [
 
 export type DamageStatus = (typeof DAMAGE_STATUSES)[number];
 
-export const DAMAGE_STATUS_LABEL: Record<DamageStatus, string> = {
-  reported: "Zgłoszona",
-  assessment: "Wycena",
-  repair: "W naprawie",
-  insurer: "U ubezpieczyciela",
-  closed: "Zamknięta",
+export const DAMAGE_STATUS_LABEL: Record<DamageStatus, Bilingual> = {
+  reported: { pl: "Zgłoszona", en: "Reported" },
+  assessment: { pl: "Wycena", en: "Assessment" },
+  repair: { pl: "W naprawie", en: "In repair" },
+  insurer: { pl: "U ubezpieczyciela", en: "With the insurer" },
+  closed: { pl: "Zamknięta", en: "Closed" },
 };
 
-export const DAMAGE_STATUS_HINT: Record<DamageStatus, string> = {
-  reported: "Spisana, nikt jeszcze nie wycenił",
-  assessment: "Czeka na kosztorys albo oględziny",
-  repair: "Auto w warsztacie",
-  insurer: "Czeka na decyzję ubezpieczyciela — nie na nas",
-  closed: "Rozliczona i zamknięta",
+export const DAMAGE_STATUS_HINT: Record<DamageStatus, Bilingual> = {
+  reported: { pl: "Spisana, nikt jeszcze nie wycenił", en: "Logged, nobody has priced it yet" },
+  assessment: {
+    pl: "Czeka na kosztorys albo oględziny",
+    en: "Waiting for an estimate or an inspection",
+  },
+  repair: { pl: "Auto w warsztacie", en: "Car is in the workshop" },
+  insurer: {
+    pl: "Czeka na decyzję ubezpieczyciela — nie na nas",
+    en: "Waiting for the insurer's decision — not on us",
+  },
+  closed: { pl: "Rozliczona i zamknięta", en: "Settled and closed" },
 };
 
 /**

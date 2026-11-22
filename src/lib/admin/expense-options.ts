@@ -1,3 +1,5 @@
+import type { Bilingual } from "@/lib/i18n-pick";
+
 // Client-safe expense categories + Polish labels. No server imports, so the
 // entry form, the analytics charts and the server actions all read one list.
 
@@ -20,7 +22,7 @@
 export const EXPENSE_GROUPS = [
   {
     key: "wear",
-    label: "Serwis i naprawy",
+    label: { pl: "Serwis i naprawy", en: "Servicing and repairs" },
     categories: [
       "oil",
       "filters",
@@ -35,12 +37,12 @@ export const EXPENSE_GROUPS = [
   },
   {
     key: "standing",
-    label: "Koszty stałe",
+    label: { pl: "Koszty stałe", en: "Fixed costs" },
     categories: ["insurance", "leasing", "tax", "parking"],
   },
   {
     key: "running",
-    label: "Eksploatacja",
+    label: { pl: "Eksploatacja", en: "Operating costs" },
     categories: ["fuel", "cleaning", "equipment", "fine", "other"],
   },
 ] as const;
@@ -54,25 +56,25 @@ export const EXPENSE_CATEGORIES = EXPENSE_GROUPS.flatMap(
 export type ExpenseCategory =
   (typeof EXPENSE_GROUPS)[number]["categories"][number];
 
-export const EXPENSE_LABEL: Record<ExpenseCategory, string> = {
-  oil: "Olej / wymiana oleju",
-  filters: "Filtry",
-  tyres: "Opony",
-  brakes: "Hamulce",
-  service: "Przegląd okresowy",
-  mechanical: "Naprawa mechaniczna",
-  electrical: "Naprawa elektryczna",
-  bodywork: "Blacharka / lakier",
-  inspection: "Badanie techniczne",
-  insurance: "Ubezpieczenie OC/AC",
-  leasing: "Rata leasingu / kredytu",
-  tax: "Podatki i opłaty",
-  parking: "Parking / garaż",
-  fuel: "Paliwo / ładowanie",
-  cleaning: "Mycie / detailing",
-  equipment: "Wyposażenie",
-  fine: "Mandaty i kary",
-  other: "Inne",
+export const EXPENSE_LABEL: Record<ExpenseCategory, Bilingual> = {
+  oil: { pl: "Olej / wymiana oleju", en: "Oil / oil change" },
+  filters: { pl: "Filtry", en: "Filters" },
+  tyres: { pl: "Opony", en: "Tyres" },
+  brakes: { pl: "Hamulce", en: "Brakes" },
+  service: { pl: "Przegląd okresowy", en: "Scheduled service" },
+  mechanical: { pl: "Naprawa mechaniczna", en: "Mechanical repair" },
+  electrical: { pl: "Naprawa elektryczna", en: "Electrical repair" },
+  bodywork: { pl: "Blacharka / lakier", en: "Bodywork / paint" },
+  inspection: { pl: "Badanie techniczne", en: "Technical inspection" },
+  insurance: { pl: "Ubezpieczenie OC/AC", en: "Insurance (liability/comprehensive)" },
+  leasing: { pl: "Rata leasingu / kredytu", en: "Lease / loan instalment" },
+  tax: { pl: "Podatki i opłaty", en: "Taxes and fees" },
+  parking: { pl: "Parking / garaż", en: "Parking / garage" },
+  fuel: { pl: "Paliwo / ładowanie", en: "Fuel / charging" },
+  cleaning: { pl: "Mycie / detailing", en: "Washing / detailing" },
+  equipment: { pl: "Wyposażenie", en: "Equipment" },
+  fine: { pl: "Mandaty i kary", en: "Fines and penalties" },
+  other: { pl: "Inne", en: "Other" },
 };
 
 /** Which group a category belongs to — the reverse of `EXPENSE_GROUPS`. */
@@ -82,7 +84,7 @@ export const EXPENSE_GROUP_OF = Object.fromEntries(
 
 export const EXPENSE_GROUP_LABEL = Object.fromEntries(
   EXPENSE_GROUPS.map((g) => [g.key, g.label]),
-) as Record<ExpenseGroup, string>;
+) as Record<ExpenseGroup, Bilingual>;
 
 export function isExpenseCategory(v: unknown): v is ExpenseCategory {
   return (

@@ -1,6 +1,8 @@
 "use client";
 
+import { pick } from "@/lib/i18n-pick";
 import { useActionState, useState, useTransition } from "react";
+import { useLocale, useTranslations } from "next-intl";
 import {
   createCar,
   updateCar,
@@ -26,11 +28,23 @@ const inputCls =
   "h-10 w-full border border-line-strong bg-surface-1 px-3 text-sm text-ink placeholder:text-ink-faint";
 const labelCls = "label-tight text-[10px] text-ink-faint";
 
+/** Symbol waluty w bieżącym locale (pl: „zł”, en: „PLN”). */
+function currencySymbol(locale: string) {
+  return (
+    new Intl.NumberFormat(locale, { style: "currency", currency: "PLN" })
+      .formatToParts(0)
+      .find((p) => p.type === "currency")?.value ?? "PLN"
+  );
+}
+
 function UnitFields({ unit }: { unit?: FleetUnit }) {
+  const t = useTranslations("Admin.fleet");
+  const locale = useLocale();
+  const currency = currencySymbol(locale);
   return (
     <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
       <label className="flex flex-col gap-1">
-        <span className={labelCls}>Rejestracja *</span>
+        <span className={labelCls}>{t("plate")} *</span>
         <input
           name="plate"
           defaultValue={unit?.plate}
@@ -50,7 +64,7 @@ function UnitFields({ unit }: { unit?: FleetUnit }) {
         />
       </label>
       <label className="flex flex-col gap-1">
-        <span className={labelCls}>Przebieg (km)</span>
+        <span className={labelCls}>{t("mileage")}</span>
         <input
           name="mileageKm"
           type="number"
@@ -60,7 +74,7 @@ function UnitFields({ unit }: { unit?: FleetUnit }) {
         />
       </label>
       <label className="flex flex-col gap-1">
-        <span className={labelCls}>Status</span>
+        <span className={labelCls}>{t("status")}</span>
         <select
           name="status"
           defaultValue={unit?.status ?? "available"}
@@ -68,7 +82,7 @@ function UnitFields({ unit }: { unit?: FleetUnit }) {
         >
           {CAR_STATUSES.map((s) => (
             <option key={s} value={s}>
-              {CAR_STATUS_LABEL[s]}
+              {pick(CAR_STATUS_LABEL[s], locale)}
             </option>
           ))}
         </select>
@@ -78,32 +92,32 @@ function UnitFields({ unit }: { unit?: FleetUnit }) {
           now. "Nie śledzone" is the honest default and does not gate anything —
           a car mid-wash stays bookable. */}
       <label className="flex flex-col gap-1">
-        <span className={labelCls}>Przygotowanie</span>
+        <span className={labelCls}>{t("prep")}</span>
         <select
           name="prepStatus"
           defaultValue={unit?.prepStatus ?? ""}
           className={inputCls}
         >
-          <option value="">Nie śledzone</option>
+          <option value="">{t("prepNotTracked")}</option>
           {PREP_STATUSES.map((s) => (
             <option key={s} value={s}>
-              {PREP_STATUS_LABEL[s]}
+              {pick(PREP_STATUS_LABEL[s], locale)}
             </option>
           ))}
         </select>
       </label>
       <label className="flex flex-col gap-1">
-        <span className={labelCls}>Uwaga do przygotowania</span>
+        <span className={labelCls}>{t("prepNote")}</span>
         <input
           name="prepNote"
           maxLength={200}
           defaultValue={unit?.prepNote ?? ""}
-          placeholder="np. brak kluczyka zapasowego"
+          placeholder={t("prepNotePlaceholder")}
           className={inputCls}
         />
       </label>
       <label className="flex flex-col gap-1">
-        <span className={labelCls}>Data rejestracji</span>
+        <span className={labelCls}>{t("registeredOn")}</span>
         <input
           name="registeredOn"
           type="date"
@@ -114,7 +128,7 @@ function UnitFields({ unit }: { unit?: FleetUnit }) {
       {/* Two policies, two dates: OC lapses on its own schedule and AC on
           another, and one field for both hid whichever expired second. */}
       <label className="flex flex-col gap-1">
-        <span className={labelCls}>Ważność OC</span>
+        <span className={labelCls}>{t("ocExpiry")}</span>
         <input
           name="insuranceExpiry"
           type="date"
@@ -123,7 +137,7 @@ function UnitFields({ unit }: { unit?: FleetUnit }) {
         />
       </label>
       <label className="flex flex-col gap-1">
-        <span className={labelCls}>Ważność AC</span>
+        <span className={labelCls}>{t("acExpiry")}</span>
         <input
           name="acExpiry"
           type="date"
@@ -132,7 +146,7 @@ function UnitFields({ unit }: { unit?: FleetUnit }) {
         />
       </label>
       <label className="flex flex-col gap-1">
-        <span className={labelCls}>Ważność przeglądu</span>
+        <span className={labelCls}>{t("inspectionExpiry")}</span>
         <input
           name="inspectionExpiry"
           type="date"
@@ -143,7 +157,7 @@ function UnitFields({ unit }: { unit?: FleetUnit }) {
       {/* A plan, not a deadline: when the garage is booked. Feeds the same
           five-day reminder as the two dates above. */}
       <label className="flex flex-col gap-1">
-        <span className={labelCls}>Termin serwisu</span>
+        <span className={labelCls}>{t("serviceDue")}</span>
         <input
           name="serviceDue"
           type="date"
@@ -155,17 +169,17 @@ function UnitFields({ unit }: { unit?: FleetUnit }) {
           a car doing 4 000 km a month and one doing 400 wear out on the same
           date and at completely different mileages. */}
       <label className="flex flex-col gap-1">
-        <span className={labelCls}>Interwał serwisu (km)</span>
+        <span className={labelCls}>{t("serviceInterval")}</span>
         <input
           name="serviceIntervalKm"
           inputMode="numeric"
-          placeholder="np. 15000"
+          placeholder={t("eg", { example: "15000" })}
           defaultValue={unit?.serviceIntervalKm ?? ""}
           className={inputCls}
         />
       </label>
       <label className="flex flex-col gap-1">
-        <span className={labelCls}>Przebieg ostatniego serwisu (km)</span>
+        <span className={labelCls}>{t("lastServiceKm")}</span>
         <input
           name="lastServiceKm"
           inputMode="numeric"
@@ -175,17 +189,17 @@ function UnitFields({ unit }: { unit?: FleetUnit }) {
       </label>
       {/* Oil runs on its own, shorter clock than the full service. */}
       <label className="flex flex-col gap-1">
-        <span className={labelCls}>Interwał wymiany oleju (km)</span>
+        <span className={labelCls}>{t("oilInterval")}</span>
         <input
           name="oilIntervalKm"
           inputMode="numeric"
-          placeholder="np. 10000"
+          placeholder={t("eg", { example: "10000" })}
           defaultValue={unit?.oilIntervalKm ?? ""}
           className={inputCls}
         />
       </label>
       <label className="flex flex-col gap-1">
-        <span className={labelCls}>Przebieg ostatniej wymiany oleju (km)</span>
+        <span className={labelCls}>{t("lastOilKm")}</span>
         <input
           name="lastOilKm"
           inputMode="numeric"
@@ -197,20 +211,20 @@ function UnitFields({ unit }: { unit?: FleetUnit }) {
           The alert exists precisely for the case where the season turned and
           nobody swapped them; a self-computing field would never warn. */}
       <label className="flex flex-col gap-1">
-        <span className={labelCls}>Opony założone</span>
+        <span className={labelCls}>{t("tyresFitted")}</span>
         <select
           name="tyresFitted"
           defaultValue={unit?.tyresFitted ?? ""}
           className={inputCls}
         >
-          <option value="">Nie podano</option>
-          <option value="summer">Letnie</option>
-          <option value="winter">Zimowe</option>
-          <option value="all_season">Całoroczne</option>
+          <option value="">{t("tyresNotGiven")}</option>
+          <option value="summer">{t("tyresSummer")}</option>
+          <option value="winter">{t("tyresWinter")}</option>
+          <option value="all_season">{t("tyresAllSeason")}</option>
         </select>
       </label>
       <label className="flex flex-col gap-1">
-        <span className={labelCls}>Data ostatniej wymiany opon</span>
+        <span className={labelCls}>{t("tyresChangedOn")}</span>
         <input
           name="tyresChangedOn"
           type="date"
@@ -222,7 +236,9 @@ function UnitFields({ unit }: { unit?: FleetUnit }) {
           margin and utilisation — it just reports "brak ceny zakupu" instead of
           a break-even date, which is the honest answer. */}
       <label className="flex flex-col gap-1">
-        <span className={labelCls}>Cena zakupu (zł)</span>
+        <span className={labelCls}>
+          {t("purchasePrice", { currency })}
+        </span>
         <input
           name="purchasePrice"
           inputMode="decimal"
@@ -236,7 +252,7 @@ function UnitFields({ unit }: { unit?: FleetUnit }) {
         />
       </label>
       <label className="flex flex-col gap-1">
-        <span className={labelCls}>Data zakupu</span>
+        <span className={labelCls}>{t("purchasedOn")}</span>
         <input
           name="purchasedOn"
           type="date"
@@ -248,7 +264,9 @@ function UnitFields({ unit }: { unit?: FleetUnit }) {
           arrives as an invoice, so without these two fields the analytics
           report a margin the business does not actually have. */}
       <label className="flex flex-col gap-1">
-        <span className={labelCls}>Wartość po amortyzacji (zł)</span>
+        <span className={labelCls}>
+          {t("residualValue", { currency })}
+        </span>
         <input
           name="residualValue"
           inputMode="decimal"
@@ -262,7 +280,7 @@ function UnitFields({ unit }: { unit?: FleetUnit }) {
         />
       </label>
       <label className="flex flex-col gap-1">
-        <span className={labelCls}>Okres amortyzacji (mies.)</span>
+        <span className={labelCls}>{t("depreciationMonths")}</span>
         <input
           name="depreciationMonths"
           type="number"
@@ -274,7 +292,7 @@ function UnitFields({ unit }: { unit?: FleetUnit }) {
         />
       </label>
       <label className="flex flex-col gap-1 lg:col-span-1">
-        <span className={labelCls}>Notatki</span>
+        <span className={labelCls}>{t("notes")}</span>
         <input
           name="notes"
           defaultValue={unit?.notes ?? ""}
@@ -286,9 +304,10 @@ function UnitFields({ unit }: { unit?: FleetUnit }) {
 }
 
 function Feedback({ state }: { state: FormResult | null }) {
+  const t = useTranslations("Admin.fleet");
   if (!state) return null;
   if (state.ok)
-    return <span className="text-xs text-emerald-400">Zapisano ✓</span>;
+    return <span className="text-xs text-emerald-400">{t("saved")}</span>;
   return <span className="text-red text-xs">{state.error}</span>;
 }
 
@@ -304,6 +323,7 @@ export function UnitRow({
   /** Otwarte szkody TEGO egzemplarza — zamknięte tu nie należą. */
   damages?: { id: string; title: string; statusLabel: string }[];
 }) {
+  const t = useTranslations("Admin.fleet");
   const [state, action, pending] = useActionState(updateCar, null);
   const [deleting, startDelete] = useTransition();
   const [delError, setDelError] = useState<string | null>(null);
@@ -340,7 +360,7 @@ export function UnitRow({
                 href={`/admin/szkody/${d.id}`}
                 className="text-ink tap-area -my-1 inline-block py-1 underline-offset-4 hover:underline"
               >
-                Szkoda: {d.title}
+                {t("damageLink", { title: d.title })}
               </a>
               <span className="text-ink-faint ml-2 text-xs">{d.statusLabel}</span>
             </li>
@@ -357,25 +377,25 @@ export function UnitRow({
             disabled={pending}
             className="label border-line-strong inline-flex h-9 items-center border px-4 text-xs text-ink transition-colors hover:border-ink hover:bg-ink/5 disabled:opacity-50"
           >
-            {pending ? "Zapisywanie…" : "Zapisz"}
+            {pending ? t("saving") : t("save")}
           </button>
           {confirm ? (
             <>
-              <span className="text-silver text-xs">Na pewno?</span>
+              <span className="text-silver text-xs">{t("confirmQuestion")}</span>
               <button
                 type="button"
                 onClick={doDelete}
                 disabled={deleting}
                 className="label border-red text-red hover:bg-red inline-flex h-9 items-center border px-4 text-xs transition-colors hover:text-ink disabled:opacity-50"
               >
-                {deleting ? "Usuwanie…" : "Tak, usuń"}
+                {deleting ? t("deleting") : t("confirmYes")}
               </button>
               <button
                 type="button"
                 onClick={() => setConfirm(false)}
                 className="text-ink-faint text-xs hover:text-ink"
               >
-                Anuluj
+                {t("cancel")}
               </button>
             </>
           ) : (
@@ -384,7 +404,7 @@ export function UnitRow({
               onClick={() => setConfirm(true)}
               className="label text-ink-faint hover:text-red tap inline-flex h-9 items-center px-2 text-xs transition-colors"
             >
-              Usuń
+              {t("remove")}
             </button>
           )}
           <Feedback state={state} />
@@ -416,6 +436,8 @@ export function UnitRow({
  * common case — "wróciło, zaczynam kontrolę" — is also one tap.
  */
 function PrepStrip({ unit }: { unit: FleetUnit }) {
+  const t = useTranslations("Admin.fleet");
+  const locale = useLocale();
   const [pending, start] = useTransition();
   const [error, setError] = useState<string | null>(null);
 
@@ -433,7 +455,7 @@ function PrepStrip({ unit }: { unit: FleetUnit }) {
   return (
     <div className="mb-4 flex flex-wrap items-center gap-x-3 gap-y-2">
       <span className="label-tight text-[10px] text-ink-faint">
-        Przygotowanie
+        {t("prep")}
       </span>
       {current ? (
         <span
@@ -442,12 +464,12 @@ function PrepStrip({ unit }: { unit: FleetUnit }) {
               ? "border-emerald-400/50 text-emerald-400"
               : "border-amber-500/50 text-amber-500"
           }`}
-          title={PREP_STATUS_HINT[current]}
+          title={pick(PREP_STATUS_HINT[current], locale)}
         >
-          {PREP_STATUS_LABEL[current]}
+          {pick(PREP_STATUS_LABEL[current], locale)}
         </span>
       ) : (
-        <span className="text-ink-faint text-xs">nie śledzone</span>
+        <span className="text-ink-faint text-xs">{t("prepNotTrackedInline")}</span>
       )}
       {unit.prepNote && (
         <span className="text-silver text-xs">· {unit.prepNote}</span>
@@ -459,7 +481,7 @@ function PrepStrip({ unit }: { unit: FleetUnit }) {
           disabled={pending}
           className="label border-line-strong tap inline-flex h-9 items-center border px-3 text-xs text-ink transition-colors hover:border-ink hover:bg-ink/5 disabled:opacity-50"
         >
-          {pending ? "Zapisywanie…" : `→ ${PREP_STATUS_LABEL[next]}`}
+          {pending ? t("saving") : `→ ${pick(PREP_STATUS_LABEL[next], locale)}`}
         </button>
       )}
       {error && <span className="text-red text-xs">{error}</span>}
@@ -468,6 +490,7 @@ function PrepStrip({ unit }: { unit: FleetUnit }) {
 }
 
 export function AddUnit({ modelId }: { modelId: string }) {
+  const t = useTranslations("Admin.fleet");
   const [state, action, pending] = useActionState(createCar, null);
   const [open, setOpen] = useState(false);
 
@@ -478,7 +501,7 @@ export function AddUnit({ modelId }: { modelId: string }) {
         onClick={() => setOpen(true)}
         className="label border-line-strong inline-flex h-10 items-center border px-5 text-xs text-ink transition-colors hover:border-ink hover:bg-ink/5"
       >
-        + Dodaj egzemplarz
+        {t("addUnit")}
       </button>
     );
   }
@@ -489,7 +512,7 @@ export function AddUnit({ modelId }: { modelId: string }) {
       className="border-line-strong bg-graphite/60 border p-5"
     >
       <input type="hidden" name="modelId" value={modelId} />
-      <p className="label mb-4 text-xs text-ink">Nowy egzemplarz</p>
+      <p className="label mb-4 text-xs text-ink">{t("newUnit")}</p>
       <UnitFields />
       <div className="mt-4 flex items-center gap-3">
         <button
@@ -497,14 +520,14 @@ export function AddUnit({ modelId }: { modelId: string }) {
           disabled={pending}
           className="label bg-red hover:bg-red-hover inline-flex h-9 items-center px-5 text-xs text-white transition-colors disabled:opacity-50"
         >
-          {pending ? "Dodawanie…" : "Dodaj"}
+          {pending ? t("adding") : t("add")}
         </button>
         <button
           type="button"
           onClick={() => setOpen(false)}
           className="text-ink-faint text-xs hover:text-ink"
         >
-          Anuluj
+          {t("cancel")}
         </button>
         <Feedback state={state} />
       </div>

@@ -1,6 +1,7 @@
 "use client";
 
 import { useActionState } from "react";
+import { useTranslations } from "next-intl";
 import { createCustomer, type CustomerResult } from "./actions";
 
 const inputCls =
@@ -18,28 +19,29 @@ export function CustomerForm() {
     CustomerResult | null,
     FormData
   >(createCustomer, null);
+  const t = useTranslations("Admin.customers");
   const kept = state && !state.ok ? state.values : undefined;
   const err = (k: string) =>
     state && !state.ok ? state.fieldErrors?.[k] : undefined;
 
   return (
     <form action={action} className="border-line bg-void border p-5">
-      <p className="label text-[10px] text-ink">Dodaj klienta</p>
+      <p className="label text-[10px] text-ink">{t("addCustomer")}</p>
 
       {state?.ok && (
         <p className="mt-4 border border-emerald-400/40 bg-emerald-400/10 px-4 py-3 text-sm text-emerald-400">
-          Zapisano: {state.name}
+          {t("saved", { name: state.name })}
         </p>
       )}
       {state && !state.ok && state.error === "server" && (
         <p className="border-red/50 bg-red/10 text-red mt-4 border px-4 py-3 text-sm">
-          Nie udało się zapisać. Spróbuj ponownie.
+          {t("saveFailed")}
         </p>
       )}
 
       <div className="mt-4 grid gap-4 sm:grid-cols-2">
         <label className="flex flex-col gap-1">
-          <span className={labelCls}>Imię i nazwisko *</span>
+          <span className={labelCls}>{t("fieldName")}</span>
           <input
             name="name"
             defaultValue={kept?.name ?? ""}
@@ -51,12 +53,12 @@ export function CustomerForm() {
           )}
         </label>
         <label className="flex flex-col gap-1">
-          <span className={labelCls}>Telefon *</span>
+          <span className={labelCls}>{t("fieldPhone")}</span>
           <input
             name="phone"
             defaultValue={kept?.phone ?? ""}
             inputMode="tel"
-            placeholder="+48 …"
+            placeholder={t("placeholderPhone")}
             autoComplete="off"
             className={inputCls}
           />
@@ -65,7 +67,7 @@ export function CustomerForm() {
           )}
         </label>
         <label className="flex flex-col gap-1">
-          <span className={labelCls}>E-mail</span>
+          <span className={labelCls}>{t("fieldEmail")}</span>
           <input
             name="email"
             type="email"
@@ -78,11 +80,11 @@ export function CustomerForm() {
           )}
         </label>
         <label className="flex flex-col gap-1">
-          <span className={labelCls}>Notatka</span>
+          <span className={labelCls}>{t("fieldNotes")}</span>
           <input
             name="notes"
             defaultValue={kept?.notes ?? ""}
-            placeholder="np. stały klient firmowy"
+            placeholder={t("placeholderNotes")}
             autoComplete="off"
             className={inputCls}
           />
@@ -94,10 +96,10 @@ export function CustomerForm() {
         disabled={pending}
         className="label bg-red hover:bg-red-hover mt-5 inline-flex h-11 items-center px-6 text-xs text-white transition-colors disabled:opacity-60"
       >
-        {pending ? "Zapisywanie…" : "Zapisz klienta"}
+        {pending ? t("saving") : t("saveCustomer")}
       </button>
       <p className="text-ink-faint mt-3 text-[11px]">
-        Numer już w bazie? Wpis zostanie zaktualizowany, nie zdublowany.
+        {t("duplicateHint")}
       </p>
     </form>
   );

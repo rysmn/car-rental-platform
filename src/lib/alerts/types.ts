@@ -6,6 +6,8 @@
  * split `lib/fleet/compareLimits` exists for.
  */
 
+import type { Bilingual } from "@/lib/i18n-pick";
+
 export const ALERT_SEVERITIES = [
   "critical",
   "error",
@@ -69,31 +71,43 @@ export type AlertState = (typeof ALERT_STATES)[number];
  * visible on the site; a reservation that threw is an ERROR even though the
  * customer can try again.
  */
-export const SEVERITY_MEANING: Record<AlertSeverity, string> = {
-  critical: "Cały system albo rezerwacje niedostępne — baza, aplikacja, awaria krytyczna.",
-  error: "Konkretna operacja klienta się nie powiodła — rezerwacja, upload, zapis.",
-  warning: "Coś wymaga kontroli, zanim stanie się awarią — brak zdjęcia, niekompletna konfiguracja.",
-  info: "Zdarzenie administracyjne, które warto mieć zapisane.",
+export const SEVERITY_MEANING: Record<AlertSeverity, Bilingual> = {
+  critical: {
+    pl: "Cały system albo rezerwacje niedostępne — baza, aplikacja, awaria krytyczna.",
+    en: "The whole system or reservations unavailable — database, application, critical failure.",
+  },
+  error: {
+    pl: "Konkretna operacja klienta się nie powiodła — rezerwacja, upload, zapis.",
+    en: "A specific customer operation failed — reservation, upload, save.",
+  },
+  warning: {
+    pl: "Coś wymaga kontroli, zanim stanie się awarią — brak zdjęcia, niekompletna konfiguracja.",
+    en: "Something needs checking before it becomes a failure — missing photo, incomplete configuration.",
+  },
+  info: {
+    pl: "Zdarzenie administracyjne, które warto mieć zapisane.",
+    en: "An administrative event worth keeping on record.",
+  },
 };
 
-export const SEVERITY_LABEL: Record<AlertSeverity, string> = {
-  critical: "KRYTYCZNY",
-  error: "BŁĄD",
-  warning: "OSTRZEŻENIE",
-  info: "INFORMACJA",
+export const SEVERITY_LABEL: Record<AlertSeverity, Bilingual> = {
+  critical: { pl: "KRYTYCZNY", en: "CRITICAL" },
+  error: { pl: "BŁĄD", en: "ERROR" },
+  warning: { pl: "OSTRZEŻENIE", en: "WARNING" },
+  info: { pl: "INFORMACJA", en: "INFO" },
 };
 
-export const MODULE_LABEL: Record<AlertModule, string> = {
-  public: "Strona publiczna",
-  booking: "Rezerwacje",
-  chat: "Asystent",
-  fleet: "Flota",
-  media: "Media",
-  admin: "Panel",
-  inbox: "Skrzynka",
-  payments: "Płatności",
-  health: "Kontrola techniczna",
-  security: "Bezpieczeństwo",
+export const MODULE_LABEL: Record<AlertModule, Bilingual> = {
+  public: { pl: "Strona publiczna", en: "Public site" },
+  booking: { pl: "Rezerwacje", en: "Reservations" },
+  chat: { pl: "Asystent", en: "Assistant" },
+  fleet: { pl: "Flota", en: "Fleet" },
+  media: { pl: "Media", en: "Media" },
+  admin: { pl: "Panel", en: "Panel" },
+  inbox: { pl: "Skrzynka", en: "Inbox" },
+  payments: { pl: "Płatności", en: "Payments" },
+  health: { pl: "Kontrola techniczna", en: "Technical checks" },
+  security: { pl: "Bezpieczeństwo", en: "Security" },
 };
 
 /** Worst first — the order the panel lists in, and the order `sort` needs. */

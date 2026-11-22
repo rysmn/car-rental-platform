@@ -1,4 +1,4 @@
-import { setRequestLocale } from "next-intl/server";
+import { getTranslations, setRequestLocale } from "next-intl/server";
 import { guardPage } from "@/lib/auth/guard";
 import { listPricing } from "@/lib/admin/pricing";
 import {
@@ -8,6 +8,16 @@ import {
   CancellationPolicyForm,
 } from "./PricingForms";
 import { getSetting } from "@/lib/admin/settings";
+
+export async function generateMetadata({
+  params,
+}: {
+  params: Promise<{ locale: string }>;
+}) {
+  const { locale } = await params;
+  const t = await getTranslations({ locale, namespace: "Admin.pricing" });
+  return { title: t("title") };
+}
 
 export default async function PricingPage({
   params,
@@ -24,51 +34,43 @@ export default async function PricingPage({
 
   const { locale } = await params;
   setRequestLocale(locale);
+  const t = await getTranslations("Admin.pricing");
   const { models, fees, locations } = await listPricing();
   const cancellation = await getSetting("cancellation");
 
   return (
     <div className="max-w-4xl">
       <header className="mb-8">
-        <h1 className="font-heading text-2xl text-ink">Cennik</h1>
-        <p className="text-silver mt-1 text-sm">
-          Zmiany dotyczą tylko nowych rezerwacji. Złożone rezerwacje mają
-          zapisaną własną wycenę.
-        </p>
+        <h1 className="font-heading text-2xl text-ink">{t("title")}</h1>
+        <p className="text-silver mt-1 text-sm">{t("intro")}</p>
       </header>
 
-      <Section title="Ceny aut" subtitle="Stawka dobowa, miesięczna i kaucja">
+      <Section title={t("cars.title")} subtitle={t("cars.subtitle")}>
         {models.length === 0 ? (
-          <Empty>Brak modeli.</Empty>
+          <Empty>{t("empty.models")}</Empty>
         ) : (
           models.map((m) => <ModelPriceRow key={m.id} model={m} />)
         )}
       </Section>
 
-      <Section
-        title="Opłaty dodatkowe"
-        subtitle="Dopłaty doliczane w kalkulatorze rezerwacji"
-      >
+      <Section title={t("fees.title")} subtitle={t("fees.subtitle")}>
         {fees.length === 0 ? (
-          <Empty>Brak zdefiniowanych opłat.</Empty>
+          <Empty>{t("empty.fees")}</Empty>
         ) : (
           fees.map((f) => <FeeRow key={f.id} fee={f} />)
         )}
       </Section>
 
       <Section
-        title="Anulowanie rezerwacji"
-        subtitle="Progi godzinowe, opłaty i tolerancja nieodebrania auta"
+        title={t("cancellation.title")}
+        subtitle={t("cancellation.subtitle")}
       >
         <CancellationPolicyForm policy={cancellation} />
       </Section>
 
-      <Section
-        title="Miejsca odbioru"
-        subtitle="Opłata za odbiór poza siedzibą"
-      >
+      <Section title={t("locations.title")} subtitle={t("locations.subtitle")}>
         {locations.length === 0 ? (
-          <Empty>Brak lokalizacji.</Empty>
+          <Empty>{t("empty.locations")}</Empty>
         ) : (
           locations.map((l) => <LocationRow key={l.id} location={l} />)
         )}

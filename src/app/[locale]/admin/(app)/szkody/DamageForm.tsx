@@ -2,6 +2,7 @@
 
 import { useActionState, useState } from "react";
 import { useRouter } from "next/navigation";
+import { useTranslations } from "next-intl";
 import {
   createDamage,
   updateDamage,
@@ -9,8 +10,6 @@ import {
 } from "./actions";
 import {
   DAMAGE_STATUSES,
-  DAMAGE_STATUS_HINT,
-  DAMAGE_STATUS_LABEL,
   type DamageRecord,
   type DamageStatus,
 } from "@/lib/admin/damage-options";
@@ -36,6 +35,7 @@ export function DamageForm({
   reservations: { id: string; label: string; carId: string }[];
   existing: DamageRecord | null;
 }) {
+  const t = useTranslations("Admin.damages");
   const router = useRouter();
   const [state, submit, pending] = useActionState<DamageResult | null, FormData>(
     existing ? updateDamage : createDamage,
@@ -59,7 +59,7 @@ export function DamageForm({
 
       <div className="grid gap-4 sm:grid-cols-2">
         <label className="flex flex-col gap-1">
-          <span className={labelCls}>Auto</span>
+          <span className={labelCls}>{t("form.car")}</span>
           <select
             name="carId"
             value={carId}
@@ -75,26 +75,24 @@ export function DamageForm({
         </label>
 
         <label className="flex flex-col gap-1">
-          <span className={labelCls}>Najem (opcjonalnie)</span>
+          <span className={labelCls}>{t("form.rental")}</span>
           <select
             name="reservationId"
             defaultValue={existing?.reservationId ?? ""}
             className={inputCls}
           >
-            <option value="">Poza najmem</option>
+            <option value="">{t("form.noRental")}</option>
             {forCar.map((r) => (
               <option key={r.id} value={r.id}>
                 {r.label}
               </option>
             ))}
           </select>
-          <span className="text-ink-faint text-[11px]">
-            Klient bierze się z najmu — nie wpisuje się go osobno.
-          </span>
+          <span className="text-ink-faint text-[11px]">{t("form.rentalHint")}</span>
         </label>
 
         <label className="flex flex-col gap-1">
-          <span className={labelCls}>Data zdarzenia</span>
+          <span className={labelCls}>{t("form.occurredOn")}</span>
           <input
             type="date"
             name="occurredOn"
@@ -106,7 +104,7 @@ export function DamageForm({
         </label>
 
         <label className="flex flex-col gap-1">
-          <span className={labelCls}>Status sprawy</span>
+          <span className={labelCls}>{t("form.status")}</span>
           <select
             name="status"
             value={status}
@@ -115,40 +113,40 @@ export function DamageForm({
           >
             {DAMAGE_STATUSES.map((s) => (
               <option key={s} value={s}>
-                {DAMAGE_STATUS_LABEL[s]}
+                {t(`status.${s}`)}
               </option>
             ))}
           </select>
           <span className="text-ink-faint text-[11px]">
-            {DAMAGE_STATUS_HINT[status]}
+            {t(`statusHint.${status}`)}
           </span>
         </label>
       </div>
 
       <label className="flex flex-col gap-1">
-        <span className={labelCls}>Co się stało</span>
+        <span className={labelCls}>{t("form.title")}</span>
         <input
           name="title"
           defaultValue={existing?.title ?? ""}
-          placeholder="np. wgnieciony błotnik przedni prawy"
+          placeholder={t("form.titlePlaceholder")}
           className={inputCls}
         />
       </label>
 
       <label className="flex flex-col gap-1">
-        <span className={labelCls}>Opis</span>
+        <span className={labelCls}>{t("form.description")}</span>
         <textarea
           name="description"
           rows={4}
           defaultValue={existing?.description ?? ""}
-          placeholder="okoliczności, świadkowie, notatka policyjna, ustalenia z klientem"
+          placeholder={t("form.descriptionPlaceholder")}
           className="border-line-strong bg-surface-1 text-ink w-full border px-3 py-2 text-sm"
         />
       </label>
 
       <div className="grid gap-4 sm:grid-cols-2">
         <label className="flex flex-col gap-1">
-          <span className={labelCls}>Koszt naprawy (zł)</span>
+          <span className={labelCls}>{t("form.repairCost")}</span>
           <input
             name="repairCost"
             inputMode="decimal"
@@ -160,7 +158,7 @@ export function DamageForm({
           />
         </label>
         <label className="flex flex-col gap-1">
-          <span className={labelCls}>Udział własny (zł)</span>
+          <span className={labelCls}>{t("form.excess")}</span>
           <input
             name="excess"
             inputMode="decimal"
@@ -171,23 +169,21 @@ export function DamageForm({
             className={inputCls}
           />
           <span className="text-ink-faint text-[11px]">
-            {insurer.trim()
-              ? "Z ubezpieczycielem to jest kwota, którą płaci firma."
-              : "Bez ubezpieczyciela firma płaci cały koszt naprawy."}
+            {insurer.trim() ? t("form.excessHintInsurer") : t("form.excessHintNone")}
           </span>
         </label>
         <label className="flex flex-col gap-1">
-          <span className={labelCls}>Ubezpieczyciel</span>
+          <span className={labelCls}>{t("form.insurer")}</span>
           <input
             name="insurer"
             value={insurer}
             onChange={(e) => setInsurer(e.target.value)}
-            placeholder="puste = szkoda własna"
+            placeholder={t("form.insurerPlaceholder")}
             className={inputCls}
           />
         </label>
         <label className="flex flex-col gap-1">
-          <span className={labelCls}>Numer szkody</span>
+          <span className={labelCls}>{t("form.claimNumber")}</span>
           <input
             name="claimNumber"
             defaultValue={existing?.claimNumber ?? ""}
@@ -198,7 +194,7 @@ export function DamageForm({
 
       {state && !state.ok && <p className="text-red text-sm">{state.error}</p>}
       {state?.ok && existing && (
-        <p className="text-sm text-emerald-400">Zapisano.</p>
+        <p className="text-sm text-emerald-400">{t("form.saved")}</p>
       )}
 
       <button
@@ -206,7 +202,11 @@ export function DamageForm({
         disabled={pending}
         className="label bg-red hover:bg-red-hover inline-flex h-12 items-center px-6 text-xs text-white transition-colors disabled:opacity-60"
       >
-        {pending ? "Zapisywanie…" : existing ? "Zapisz zmiany" : "Załóż szkodę"}
+        {pending
+          ? t("form.saving")
+          : existing
+            ? t("form.submitUpdate")
+            : t("form.submitCreate")}
       </button>
     </form>
   );

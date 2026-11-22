@@ -1,6 +1,7 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
+import { getTranslations } from "next-intl/server";
 import { eq } from "drizzle-orm";
 import { z } from "zod";
 import { getDb, schema } from "@/lib/db";
@@ -111,8 +112,9 @@ export async function closeRequest(
   formData: FormData,
 ): Promise<{ ok: boolean; error?: string }> {
   const admin = await requirePermission("skrzynka.obsluz");
+  const t = await getTranslations("Admin.inbox");
   const parsed = closeSchema.safeParse({ id: formData.get("id") });
-  if (!parsed.success) return { ok: false, error: "Nieprawidłowe dane." };
+  if (!parsed.success) return { ok: false, error: t("errors.invalidData") };
 
   try {
     const db = getDb();
@@ -121,7 +123,7 @@ export async function closeRequest(
       .from(schema.chatLeads)
       .where(eq(schema.chatLeads.id, parsed.data.id))
       .limit(1);
-    if (!before) return { ok: false, error: "Nie znaleziono zgłoszenia." };
+    if (!before) return { ok: false, error: t("errors.notFound") };
 
     await db
       .update(schema.chatLeads)
@@ -141,6 +143,6 @@ export async function closeRequest(
     return { ok: true };
   } catch (err) {
     adminActionFailed("inbox.close", err);
-    return { ok: false, error: "Nie udało się zapisać." };
+    return { ok: false, error: t("errors.saveFailed") };
   }
 }

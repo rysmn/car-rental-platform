@@ -1,8 +1,8 @@
 import "server-only";
-import { promises as fs } from "node:fs";
 import path from "node:path";
 import { randomUUID } from "node:crypto";
 import { reportAlert } from "@/lib/alerts/record";
+import { getStorage } from "./index";
 
 /**
  * Persistent media for admin-uploaded images (currently the home hero).
@@ -81,8 +81,12 @@ export async function saveImage(file: File): Promise<SaveResult> {
   const filename = `${randomUUID()}.${match.ext}`;
 
   try {
-    await fs.mkdir(uploadDir(), { recursive: true });
-    await fs.writeFile(path.join(uploadDir(), filename), buffer);
+    await getStorage().put({
+      key: filename,
+      body: buffer,
+      contentType: match.mime,
+      visibility: "private",
+    });
   } catch (err) {
     /*
      * The only failure here that is ours.
@@ -105,7 +109,11 @@ export async function saveImage(file: File): Promise<SaveResult> {
       error: err,
       // The generated name, never the visitor's: their filename is untrusted
       // text and the size is all that is diagnostically useful anyway.
-      context: { katalog: uploadDir(), plik: filename, bajtow: file.size },
+      context: {
+        magazyn: process.env.STORAGE_DRIVER ?? "local",
+        plik: filename,
+        bajtow: file.size,
+      },
     });
     return { ok: false, error: "write_failed" };
   }
@@ -120,9 +128,9 @@ export function mimeForFilename(filename: string): string | null {
 }
 
 /**
- * Resolves a requested media path to an absolute file path, or null if it
- * escapes the upload directory. Rejects traversal both by shape (no separators,
- * no dotfiles) and by result (the resolved path must stay inside UPLOAD_DIR).
+ * Storage key for a requested media file, or null if the name is not one we
+ * issued. The name must match the generated shape, so no separator or dot
+ * segment can get through; the bytes themselves come from the storage driver.
  */
 export function resolveMediaPath(segments: string[]): string | null {
   if (segments.length !== 1) return null;
@@ -138,18 +146,13 @@ export function resolveMediaPath(segments: string[]): string | null {
   }
   if (!/^[a-f0-9-]{36}\.(jpg|png|webp)$/i.test(name)) return null;
 
-  const resolved = path.resolve(uploadDir(), name);
-  const root = path.resolve(uploadDir());
-  if (resolved !== path.join(root, name)) return null;
-
-  return resolved;
+  return name;
 }
 
 /** Removes a previously stored file. Missing files are not an error. */
 export async function deleteImage(url: string): Promise<void> {
   if (!url.startsWith(`${MEDIA_URL_PREFIX}/`)) return;
-  const name = url.slice(MEDIA_URL_PREFIX.length + 1);
-  const resolved = resolveMediaPath([name]);
-  if (!resolved) return;
-  await fs.rm(resolved, { force: true });
+  const key = resolveMediaPath([url.slice(MEDIA_URL_PREFIX.length + 1)]);
+  if (!key) return;
+  await getStorage().delete(key);
 }

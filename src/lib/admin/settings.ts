@@ -2,6 +2,7 @@ import "server-only";
 import { eq } from "drizzle-orm";
 import { z } from "zod";
 import { rentalRulesSchema, RENTAL_RULES_DEFAULT } from "./rental-rules";
+import type { Bilingual } from "@/lib/i18n-pick";
 import {
   cancellationSchema,
   CANCELLATION_DEFAULT,
@@ -39,7 +40,7 @@ const httpUrl = z
   .string()
   .trim()
   .refine((v) => v === "" || /^https?:\/\//i.test(v), {
-    message: "Link musi zaczynać się od http:// lub https://",
+    message: "invalid_url",
   });
 
 export const socialSchema = z.object({
@@ -300,7 +301,7 @@ export const companySchema = z.object({
     .string()
     .trim()
     .refine((v) => v === "" || /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(v), {
-      message: "Nieprawidłowy adres e-mail",
+      message: "invalid_email",
     })
     .default(""),
   nip: z.string().trim().default(""),
@@ -484,7 +485,7 @@ export const chatbotSchema = z.object({
     .string()
     .trim()
     .refine((v) => v === "" || /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(v), {
-      message: "Nieprawidłowy adres e-mail",
+      message: "invalid_email",
     })
     .default(""),
   /** First line the visitor sees. Empty = the bot's built-in greeting. */
@@ -522,12 +523,18 @@ const CHATBOT_DEFAULT: ChatbotSettings = {
  * whether to switch a bot on deserves to read what it cannot do — while there
  * is no code path that can turn any of them off.
  */
-export const CHATBOT_HARD_LIMITS = [
-  "zmieniać cen ani udzielać rabatów",
-  "anulować opłaconej rezerwacji",
-  "zwracać pieniędzy ani zwalniać kaucji",
-  "zmieniać danych klienta ani rezerwacji",
-] as const;
+export const CHATBOT_HARD_LIMITS: readonly Bilingual[] = [
+  { pl: "zmieniać cen ani udzielać rabatów", en: "change prices or grant discounts" },
+  { pl: "anulować opłaconej rezerwacji", en: "cancel a paid reservation" },
+  {
+    pl: "zwracać pieniędzy ani zwalniać kaucji",
+    en: "refund money or release a deposit",
+  },
+  {
+    pl: "zmieniać danych klienta ani rezerwacji",
+    en: "change customer details or reservations",
+  },
+];
 
 /**
  * Whether visitors see the coloured status line on a car.

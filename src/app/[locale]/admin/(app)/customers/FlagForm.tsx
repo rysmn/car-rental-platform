@@ -1,6 +1,8 @@
 "use client";
 
 import { useActionState, useState } from "react";
+import { useLocale, useTranslations } from "next-intl";
+import { pickFrom } from "@/lib/i18n-pick";
 import { setCustomerFlag, type FlagResult } from "./actions";
 import {
   CUSTOMER_FLAGS,
@@ -31,6 +33,8 @@ export function FlagForm({
     null,
   );
   const [picked, setPicked] = useState<CustomerFlag>(flag);
+  const t = useTranslations("Admin.customers");
+  const locale = useLocale();
 
   return (
     <form action={save} className="space-y-4">
@@ -48,35 +52,37 @@ export function FlagForm({
                 : "border-line-strong text-ink-faint hover:border-ink hover:text-ink"
             }`}
           >
-            {CUSTOMER_FLAG_LABEL[f]}
+            {pickFrom(CUSTOMER_FLAG_LABEL, f, locale)}
           </button>
         ))}
       </div>
       <input type="hidden" name="flag" value={picked} />
-      <p className="text-ink-faint text-[11px]">{CUSTOMER_FLAG_HINT[picked]}</p>
+      <p className="text-ink-faint text-[11px]">{pickFrom(CUSTOMER_FLAG_HINT, picked, locale)}</p>
 
       <label className="flex flex-col gap-1">
         <span className="label-tight text-ink-faint text-[10px]">
-          Notatka biura{picked === "blocked" ? " (wymagana)" : ""}
+          {picked === "blocked" ? t("flagNoteRequired") : t("flagNoteLabel")}
         </span>
         <textarea
           name="notes"
           rows={3}
           defaultValue={notes ?? ""}
-          placeholder="widoczna wyłącznie w panelu"
+          placeholder={t("flagNotePlaceholder")}
           className="border-line-strong bg-surface-1 text-ink w-full border px-3 py-2 text-sm"
         />
       </label>
 
       {state && !state.ok && <p className="text-red text-sm">{state.error}</p>}
-      {state?.ok && <p className="text-sm text-emerald-400">Zapisano.</p>}
+      {state?.ok && (
+        <p className="text-sm text-emerald-400">{t("flagSaved")}</p>
+      )}
 
       <button
         type="submit"
         disabled={saving}
         className="label border-line-strong text-ink hover:border-ink hover:bg-ink/5 inline-flex h-11 items-center border px-5 text-xs transition-colors disabled:opacity-60"
       >
-        {saving ? "Zapisywanie…" : "Zapisz flagę"}
+        {saving ? t("flagSaving") : t("flagSave")}
       </button>
     </form>
   );

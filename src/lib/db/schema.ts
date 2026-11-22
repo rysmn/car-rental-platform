@@ -333,8 +333,12 @@ export const customers = pgTable(
   "customers",
   {
     id: uuid("id").defaultRandom().primaryKey(),
-    /** Digits only, optionally leading "+". The lookup key. */
-    phone: text("phone").notNull().unique(),
+    /**
+     * Digits only, optionally leading "+". A lookup aid, NOT the identity:
+     * the customer is identified by `id`. Not unique, because a number can
+     * change hands or be typed wrong, and correcting it must not be blocked.
+     */
+    phone: text("phone").notNull(),
     /** As dialled/typed, for display — the normalised form is above. */
     phoneDisplay: text("phone_display").notNull(),
     name: text("name").notNull(),
@@ -361,7 +365,10 @@ export const customers = pgTable(
       .notNull()
       .defaultNow(),
   },
-  (t) => [index("customers_name_idx").on(t.name)],
+  (t) => [
+    index("customers_name_idx").on(t.name),
+    index("customers_phone_idx").on(t.phone),
+  ],
 );
 
 export type Customer = typeof customers.$inferSelect;

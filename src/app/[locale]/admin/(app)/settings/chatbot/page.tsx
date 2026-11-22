@@ -1,10 +1,18 @@
-import { setRequestLocale } from "next-intl/server";
+import { setRequestLocale, getTranslations } from "next-intl/server";
 import { Link } from "@/i18n/navigation";
 import { getSetting, CHATBOT_HARD_LIMITS } from "@/lib/admin/settings";
 import { getChatbotAiPanel } from "@/lib/admin/chatbot-ai";
 import { ChatbotForm } from "./ChatbotForm";
 
-export const metadata = { title: "Chatbot" };
+export async function generateMetadata({
+  params,
+}: {
+  params: Promise<{ locale: string }>;
+}) {
+  const { locale } = await params;
+  const t = await getTranslations({ locale, namespace: "Admin.settings.chatbot" });
+  return { title: t("metaTitle") };
+}
 
 export default async function ChatbotSettingsPage({
   params,
@@ -13,6 +21,8 @@ export default async function ChatbotSettingsPage({
 }) {
   const { locale } = await params;
   setRequestLocale(locale);
+  const t = await getTranslations("Admin.settings.chatbot");
+  const tc = await getTranslations("Admin.settings.common");
 
   const [settings, ai] = await Promise.all([
     getSetting("chatbot"),
@@ -25,15 +35,13 @@ export default async function ChatbotSettingsPage({
         href="/admin/settings"
         className="-my-2 inline-flex min-h-11 items-center label-tight text-ink-faint hover:text-ink text-[10px]"
       >
-        ← Ustawienia
+        {tc("back")}
       </Link>
       <header className="mt-4 mb-8">
         <h1 className="font-heading text-ink text-2xl font-bold">
-          Asystent (chatbot)
+          {t("title")}
         </h1>
-        <p className="text-silver mt-1 text-sm">
-          Automatyczna obsługa pytań, gdy nikt nie jest przy telefonie.
-        </p>
+        <p className="text-silver mt-1 text-sm">{t("subtitle")}</p>
       </header>
 
       {/* The banner that used to stand here said the bot did not exist yet. It

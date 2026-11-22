@@ -1,21 +1,19 @@
 "use client";
 
 import { useActionState, useState, useTransition } from "react";
+import { useLocale, useTranslations } from "next-intl";
 import {
   createBusinessRecurring,
   deleteBusinessRecurring,
   generateBusinessRecurring,
 } from "./actions";
-import {
-  RECURRING_INTERVALS,
-  INTERVAL_LABEL,
-} from "@/lib/admin/recurring-options";
+import { RECURRING_INTERVALS } from "@/lib/admin/recurring-options";
 import type { BusinessRecurringRow } from "@/lib/admin/business-expenses";
 import {
   BUSINESS_EXPENSE_GROUPS,
-  BUSINESS_EXPENSE_LABEL,
 } from "@/lib/admin/business-expense-options";
-import { formatPln, formatDatePl } from "@/lib/format";
+import { formatPln } from "@/lib/format";
+import { formatIsoDate } from "./date-format";
 
 const inputCls =
   "h-10 w-full border border-line-strong bg-surface-1 px-3 text-sm text-ink placeholder:text-ink-faint";
@@ -27,6 +25,8 @@ function todayValue(): string {
 }
 
 function Row({ item }: { item: BusinessRecurringRow }) {
+  const t = useTranslations("Admin.finance");
+  const locale = useLocale();
   const [busy, start] = useTransition();
   const [message, setMessage] = useState<string | null>(null);
   const [confirm, setConfirm] = useState(false);
@@ -40,8 +40,8 @@ function Row({ item }: { item: BusinessRecurringRow }) {
       } else {
         setMessage(
           res.created === 0
-            ? "Nic do dopisania — wszystkie okresy już są."
-            : `Dopisano ${res.created} pozycji.`,
+            ? t("recurring.nothingToAdd")
+            : t("recurring.added", { count: res.created ?? 0 }),
         );
       }
     });
@@ -58,25 +58,29 @@ function Row({ item }: { item: BusinessRecurringRow }) {
   return (
     <div className="border-line/60 flex flex-wrap items-baseline gap-x-4 gap-y-1 border-b py-3 last:border-0">
       <span className="text-ink min-w-[9rem] text-sm">
-        {BUSINESS_EXPENSE_LABEL[item.category]}
+        {t(`categories.${item.category}`)}
       </span>
       <span className="text-ink text-sm tabular-nums">
-        {formatPln(item.amountGrosze, "pl")}
+        {formatPln(item.amountGrosze, locale)}
       </span>
       <span className="text-silver text-xs">
-        {INTERVAL_LABEL[item.interval]}
+        {t(`intervals.${item.interval}`)}
       </span>
       {item.vendor && (
         <span className="text-silver text-xs">{item.vendor}</span>
       )}
       <span className="text-ink-faint text-xs tabular-nums">
-        od {formatDatePl(item.startOn)}
-        {item.endOn ? ` do ${formatDatePl(item.endOn)}` : ""}
+        {t("recurring.from", { date: formatIsoDate(item.startOn, locale) })}
+        {item.endOn
+          ? ` ${t("recurring.to", { date: formatIsoDate(item.endOn, locale) })}`
+          : ""}
       </span>
-      <span className="text-ink-faint text-xs">dopisano {item.generated}</span>
+      <span className="text-ink-faint text-xs">
+        {t("recurring.generated", { count: item.generated })}
+      </span>
       {!item.active && (
         <span className="border-line text-ink-faint border px-1.5 text-[10px]">
-          wyłączona
+          {t("recurring.disabled")}
         </span>
       )}
       <span className="ml-auto flex items-center gap-3">
@@ -86,7 +90,7 @@ function Row({ item }: { item: BusinessRecurringRow }) {
           disabled={busy || !item.active}
           className="text-silver hover:text-ink text-xs disabled:opacity-40"
         >
-          {busy ? "Pracuję…" : "Dopisz brakujące"}
+          {busy ? t("recurring.generating") : t("recurring.generate")}
         </button>
         {confirm ? (
           <>
@@ -96,14 +100,14 @@ function Row({ item }: { item: BusinessRecurringRow }) {
               disabled={busy}
               className="text-red text-xs disabled:opacity-50"
             >
-              Na pewno?
+              {t("actions.confirmDelete")}
             </button>
             <button
               type="button"
               onClick={() => setConfirm(false)}
               className="text-ink-faint hover:text-ink tap text-xs"
             >
-              Anuluj
+              {t("actions.cancel")}
             </button>
           </>
         ) : (
@@ -112,7 +116,7 @@ function Row({ item }: { item: BusinessRecurringRow }) {
             onClick={() => setConfirm(true)}
             className="text-ink-faint hover:text-red tap text-xs"
           >
-            Usuń
+            {t("actions.delete")}
           </button>
         )}
       </span>
@@ -122,6 +126,7 @@ function Row({ item }: { item: BusinessRecurringRow }) {
 }
 
 function AddRecurring() {
+  const t = useTranslations("Admin.finance");
   const [state, action, pending] = useActionState(
     createBusinessRecurring,
     null,
@@ -135,7 +140,7 @@ function AddRecurring() {
         onClick={() => setOpen(true)}
         className="label border-line-strong text-ink hover:border-ink hover:bg-ink/5 mt-3 inline-flex h-9 items-center border px-4 text-xs transition-colors"
       >
-        + Dodaj abonament
+        {t("recurring.add")}
       </button>
     );
   }
@@ -146,20 +151,20 @@ function AddRecurring() {
       className="border-line-strong bg-graphite/60 mt-3 border p-4"
     >
       <input type="hidden" name="active" value="on" />
-      <p className="label text-ink mb-3 text-xs">Nowy koszt cykliczny</p>
+      <p className="label text-ink mb-3 text-xs">{t("recurring.newTitle")}</p>
       <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
         <label className="flex flex-col gap-1">
-          <span className={labelCls}>Rodzaj *</span>
+          <span className={labelCls}>{t("form.kind")}</span>
           <select
             name="category"
             defaultValue="accounting"
             className={inputCls}
           >
             {BUSINESS_EXPENSE_GROUPS.map((g) => (
-              <optgroup key={g.key} label={g.label}>
+              <optgroup key={g.key} label={t(`groups.${g.key}`)}>
                 {g.categories.map((c) => (
                   <option key={c} value={c}>
-                    {BUSINESS_EXPENSE_LABEL[c]}
+                    {t(`categories.${c}`)}
                   </option>
                 ))}
               </optgroup>
@@ -167,27 +172,27 @@ function AddRecurring() {
           </select>
         </label>
         <label className="flex flex-col gap-1">
-          <span className={labelCls}>Kwota jednej płatności (zł) *</span>
+          <span className={labelCls}>{t("recurring.amount")}</span>
           <input
             name="amount"
             inputMode="decimal"
             required
-            placeholder="600,00"
+            placeholder={t("form.amountPlaceholder")}
             className={inputCls}
           />
         </label>
         <label className="flex flex-col gap-1">
-          <span className={labelCls}>Częstotliwość *</span>
+          <span className={labelCls}>{t("recurring.interval")}</span>
           <select name="interval" defaultValue="monthly" className={inputCls}>
             {RECURRING_INTERVALS.map((i) => (
               <option key={i} value={i}>
-                {INTERVAL_LABEL[i]}
+                {t(`intervals.${i}`)}
               </option>
             ))}
           </select>
         </label>
         <label className="flex flex-col gap-1">
-          <span className={labelCls}>Pierwsza płatność *</span>
+          <span className={labelCls}>{t("recurring.startOn")}</span>
           <input
             name="startOn"
             type="date"
@@ -197,22 +202,22 @@ function AddRecurring() {
           />
         </label>
         <label className="flex flex-col gap-1">
-          <span className={labelCls}>Koniec (opcjonalnie)</span>
+          <span className={labelCls}>{t("form.endOptional")}</span>
           <input name="endOn" type="date" className={inputCls} />
         </label>
         <label className="flex flex-col gap-1">
-          <span className={labelCls}>Kontrahent</span>
+          <span className={labelCls}>{t("form.vendor")}</span>
           <input
             name="vendor"
-            placeholder="Biuro Rachunkowe"
+            placeholder={t("recurring.vendorPlaceholder")}
             className={inputCls}
           />
         </label>
         <label className="flex flex-col gap-1 sm:col-span-2 lg:col-span-3">
-          <span className={labelCls}>Opis</span>
+          <span className={labelCls}>{t("form.note")}</span>
           <input
             name="note"
-            placeholder="Księgowość — umowa miesięczna"
+            placeholder={t("recurring.notePlaceholder")}
             className={inputCls}
           />
         </label>
@@ -223,18 +228,18 @@ function AddRecurring() {
           disabled={pending}
           className="label bg-red hover:bg-red-hover inline-flex h-9 items-center px-5 text-xs text-white transition-colors disabled:opacity-50"
         >
-          {pending ? "Dodawanie…" : "Dodaj"}
+          {pending ? t("actions.adding") : t("actions.add")}
         </button>
         <button
           type="button"
           onClick={() => setOpen(false)}
           className="text-ink-faint hover:text-ink tap text-xs"
         >
-          Zamknij
+          {t("actions.close")}
         </button>
         {state?.ok && (
           <span className="text-xs text-emerald-400">
-            Zapisano ✓ — teraz kliknij „Dopisz brakujące”.
+            {t("recurring.saved")}
           </span>
         )}
         {state && !state.ok && (
@@ -254,6 +259,7 @@ function AddRecurring() {
  * form.
  */
 export function RecurringManager({ items }: { items: BusinessRecurringRow[] }) {
+  const t = useTranslations("Admin.finance");
   const [open, setOpen] = useState(items.length > 0);
 
   return (
@@ -264,11 +270,13 @@ export function RecurringManager({ items }: { items: BusinessRecurringRow[] }) {
         className="border-line tap-block flex w-full items-center justify-between gap-4 border-b pb-2 text-left"
       >
         <span className="label-tight text-ink-faint text-[10px]">
-          Koszty stałe i abonamenty
+          {t("recurring.toggle")}
         </span>
         <span className="flex items-center gap-3 text-xs">
           <span className="text-silver">
-            {items.length === 0 ? "brak" : `${items.length} definicji`}
+            {items.length === 0
+              ? t("recurring.none")
+              : t("recurring.count", { count: items.length })}
           </span>
           <span className="text-ink-faint">{open ? "▲" : "▼"}</span>
         </span>
@@ -276,13 +284,7 @@ export function RecurringManager({ items }: { items: BusinessRecurringRow[] }) {
 
       {open && (
         <div className="mt-3">
-          <p className="text-ink-faint mb-3 text-xs">
-            Wpisz raz to, co płacisz co miesiąc — księgowa, abonament reklamowy,
-            hosting. Definicja sama w sobie nic nie dolicza: „Dopisz brakujące”
-            tworzy prawdziwe pozycje kosztów za wszystkie okresy do dziś, a
-            potem edytujesz je jak każdy inny koszt. Kliknięcie dwa razy nie
-            zdubluje pozycji.
-          </p>
+          <p className="text-ink-faint mb-3 text-xs">{t("recurring.intro")}</p>
           {items.length > 0 && (
             <div className="border-line bg-void/40 border px-4">
               {items.map((r) => (

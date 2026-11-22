@@ -3,6 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { eq } from "drizzle-orm";
 import { cookies } from "next/headers";
+import { getTranslations } from "next-intl/server";
 import { getDb, schema } from "@/lib/db";
 import { requireAdmin } from "@/lib/auth/guard";
 import { recordAudit } from "@/lib/auth/audit";
@@ -50,13 +51,14 @@ export type StartWynik =
 /** Krok 1: wygeneruj sekret i pokaż go do zeskanowania. Nic nie zapisuje. */
 export async function start2FA(): Promise<StartWynik> {
   const admin = await requireAdmin();
+  const t = await getTranslations("Admin.settings.twoFactorActions");
   const [row] = await getDb()
     .select({ totpConfirmedAt: schema.admins.totpConfirmedAt })
     .from(schema.admins)
     .where(eq(schema.admins.id, admin.id))
     .limit(1);
   if (row?.totpConfirmedAt) {
-    return { ok: false, error: "2FA jest już włączone na tym koncie." };
+    return { ok: false, error: t("start.alreadyOn") };
   }
 
   const secret = generateTotpSecret();
@@ -83,6 +85,7 @@ export async function potwierdz2FA(
   haslo: string,
 ): Promise<Wynik2FA & { kody?: string[] }> {
   const admin = await requireAdmin();
+  const t = await getTranslations("Admin.settings.twoFactorActions");
   const db = getDb();
 
   const [row] = await db
@@ -93,29 +96,21 @@ export async function potwierdz2FA(
     .from(schema.admins)
     .where(eq(schema.admins.id, admin.id))
     .limit(1);
-  if (!row) return { ok: false, error: "Nie znaleziono konta." };
+  if (!row) return { ok: false, error: t("confirm.notFound") };
   if (row.totpConfirmedAt) {
-    return { ok: false, error: "2FA jest już włączone." };
+    return { ok: false, error: t("confirm.alreadyOn") };
   }
   if (!(await verifyPassword(row.passwordHash, haslo))) {
-    return { ok: false, error: "Hasło nie pasuje." };
+    return { ok: false, error: t("wrongPassword") };
   }
 
   const jar = await cookies();
   const secret = jar.get(CIASTECZKO)?.value;
   if (!secret) {
-    return {
-      ok: false,
-      error:
-        "Konfiguracja wygasła (10 minut). Zacznij od nowa — poprzedni kod QR jest już nieważny.",
-    };
+    return { ok: false, error: t("confirm.expired") };
   }
   if (!verifyTotp(secret, kod)) {
-    return {
-      ok: false,
-      error:
-        "Kod nie pasuje. Sprawdź, czy w aplikacji widnieje ten sam adres e-mail i czy zegar telefonu jest ustawiony automatycznie.",
-    };
+    return { ok: false, error: t("confirm.wrongCode") };
   }
 
   await db
@@ -142,7 +137,7 @@ export async function potwierdz2FA(
   });
 
   revalidatePath("/admin/settings/konto");
-  return { ok: true, kody, message: "2FA włączone." };
+  return { ok: true, kody, message: t("confirm.enabled") };
 }
 
 /**
@@ -156,6 +151,7 @@ export async function wylacz2FA(
   kod: string,
 ): Promise<Wynik2FA> {
   const admin = await requireAdmin();
+  const t = await getTranslations("Admin.settings.twoFactorActions");
   const db = getDb();
   const [row] = await db
     .select({
@@ -167,10 +163,10 @@ export async function wylacz2FA(
     .where(eq(schema.admins.id, admin.id))
     .limit(1);
   if (!row?.totpConfirmedAt || !row.totpSecret) {
-    return { ok: false, error: "2FA nie jest włączone." };
+    return { ok: false, error: t("disable.notEnabled") };
   }
   if (!(await verifyPassword(row.passwordHash, haslo))) {
-    return { ok: false, error: "Hasło nie pasuje." };
+    return { ok: false, error: t("wrongPassword") };
   }
   if (!verifyTotp(row.totpSecret, kod)) {
     void recordSecurityEvent({
@@ -178,7 +174,7 @@ export async function wylacz2FA(
       endpoint: "admin.2fa_disable",
       adminId: admin.id,
     });
-    return { ok: false, error: "Kod nie pasuje." };
+    return { ok: false, error: t("disable.wrongCode") };
   }
 
   await db.transaction(async (tx) => {
@@ -209,7 +205,7 @@ export async function wylacz2FA(
   });
 
   revalidatePath("/admin/settings/konto");
-  return { ok: true, message: "2FA wyłączone." };
+  return { ok: true, message: t("disable.disabled") };
 }
 
 /** Nowy komplet kodów zapasowych. Unieważnia poprzedni. */
@@ -217,6 +213,7 @@ export async function odnowKodyZapasowe(
   haslo: string,
 ): Promise<Wynik2FA & { kody?: string[] }> {
   const admin = await requireAdmin();
+  const t = await getTranslations("Admin.settings.twoFactorActions");
   const [row] = await getDb()
     .select({
       passwordHash: schema.admins.passwordHash,
@@ -226,10 +223,10 @@ export async function odnowKodyZapasowe(
     .where(eq(schema.admins.id, admin.id))
     .limit(1);
   if (!row?.totpConfirmedAt) {
-    return { ok: false, error: "Najpierw włącz 2FA." };
+    return { ok: false, error: t("reissue.enableFirst") };
   }
   if (!(await verifyPassword(row.passwordHash, haslo))) {
-    return { ok: false, error: "Hasło nie pasuje." };
+    return { ok: false, error: t("wrongPassword") };
   }
 
   const kody = await wydajKodyZapasowe(admin.id);
@@ -241,7 +238,7 @@ export async function odnowKodyZapasowe(
     after: { kodyZapasowe: kody.length },
   });
   revalidatePath("/admin/settings/konto");
-  return { ok: true, kody, message: "Wydano nowe kody. Poprzednie nie działają." };
+  return { ok: true, kody, message: t("reissue.reissued") };
 }
 
 /**
@@ -259,14 +256,15 @@ export async function odnowKodyZapasowe(
  */
 export async function wylogujWszedzie(haslo: string): Promise<Wynik2FA> {
   const admin = await requireAdmin();
+  const t = await getTranslations("Admin.settings.twoFactorActions");
   const [row] = await getDb()
     .select({ passwordHash: schema.admins.passwordHash })
     .from(schema.admins)
     .where(eq(schema.admins.id, admin.id))
     .limit(1);
-  if (!row) return { ok: false, error: "Nie znaleziono konta." };
+  if (!row) return { ok: false, error: t("confirm.notFound") };
   if (!(await verifyPassword(row.passwordHash, haslo))) {
-    return { ok: false, error: "Hasło nie pasuje." };
+    return { ok: false, error: t("wrongPassword") };
   }
 
   await getDb()
@@ -292,11 +290,7 @@ export async function wylogujWszedzie(haslo: string): Promise<Wynik2FA> {
     szczegoly: `Konto ${admin.email} wylogowało się ze wszystkich urządzeń.`,
   });
 
-  return {
-    ok: true,
-    message:
-      "Wszystkie sesje unieważnione. Za chwilę trafisz na ekran logowania — także w tej karcie.",
-  };
+  return { ok: true, message: t("sessions.revoked") };
 }
 
 /** Ile kodów zapasowych zostało — do pokazania w panelu. */

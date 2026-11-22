@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState, useTransition } from "react";
+import { useTranslations } from "next-intl";
 import {
   odblokujKrytyczne,
   zablokujKrytyczne,
@@ -44,6 +45,7 @@ export function CriticalLock({
   const [kod, setKod] = useState("");
   const [blad, setBlad] = useState<string | null>(null);
   const [pending, startTransition] = useTransition();
+  const t = useTranslations("Admin.components");
 
   // Odliczanie liczone w efekcie, nie przy renderze: `Date.now()` w ciele
   // komponentu daje wynik zależny od chwili renderowania, a to jest dokładnie
@@ -95,8 +97,9 @@ export function CriticalLock({
     return (
       <div className="mt-3 border border-amber-500/40 bg-amber-500/5 p-3">
         <p className="text-[10px] text-amber-500">
-          🔓 Operacje krytyczne odblokowane · {minuty}:
-          {String(sekundy).padStart(2, "0")}
+          {t("critical.unlockedBanner", {
+            time: `${minuty}:${String(sekundy).padStart(2, "0")}`,
+          })}
         </p>
         <button
           type="button"
@@ -104,7 +107,7 @@ export function CriticalLock({
           disabled={pending}
           className="label-tight text-ink-faint hover:text-ink mt-2 text-[10px] underline underline-offset-2"
         >
-          Zablokuj teraz
+          {t("critical.lockNow")}
         </button>
       </div>
     );
@@ -117,22 +120,20 @@ export function CriticalLock({
           type="button"
           onClick={() => setOtwarty(true)}
           className="label-tight text-ink-faint hover:text-ink text-[10px]"
-          title="Usuwanie, zmiana cen, eksport danych, zmiany bezpieczeństwa"
+          title={t("critical.titleHint")}
         >
-          🔒 Operacje krytyczne — odblokuj
+          {t("critical.unlockButton")}
         </button>
       ) : (
         <div className="border-line border p-3">
           <p className="text-ink-faint text-[10px] leading-relaxed">
-            Usuwanie aut i rezerwacji, zmiana cen i stanu egzemplarza, eksport
-            danych klientów i zmiany bezpieczeństwa wymagają potwierdzenia.
-            Odblokowanie działa {Math.round(okresMs / 60_000)} minut.
+            {t("critical.explain", { minutes: Math.round(okresMs / 60_000) })}
           </p>
           <input
             type="password"
             value={haslo}
             onChange={(e) => setHaslo(e.target.value)}
-            placeholder="Hasło"
+            placeholder={t("critical.password")}
             autoComplete="current-password"
             className="border-line bg-surface-1 text-ink mt-2 w-full border px-2 py-1.5 text-xs outline-none"
           />
@@ -140,7 +141,7 @@ export function CriticalLock({
             <input
               value={kod}
               onChange={(e) => setKod(e.target.value)}
-              placeholder="Kod 2FA"
+              placeholder={t("critical.twoFactorCode")}
               inputMode="numeric"
               className="border-line bg-surface-1 text-ink mt-2 w-full border px-2 py-1.5 text-xs tracking-widest outline-none"
             />
@@ -153,7 +154,7 @@ export function CriticalLock({
               disabled={pending || !haslo || (ma2FA && !kod)}
               className="label-tight border-line-strong text-ink hover:border-ink inline-flex h-8 items-center border px-3 text-[10px] disabled:opacity-50"
             >
-              Odblokuj
+              {t("critical.unlock")}
             </button>
             <button
               type="button"
@@ -163,7 +164,7 @@ export function CriticalLock({
               }}
               className="label-tight text-ink-faint hover:text-ink text-[10px]"
             >
-              Anuluj
+              {t("critical.cancel")}
             </button>
           </div>
         </div>

@@ -1,6 +1,7 @@
 "use client";
 
 import { useActionState, useState } from "react";
+import { useTranslations } from "next-intl";
 import { requestCacheCleanup, type CacheActionResult } from "./actions";
 
 /**
@@ -28,6 +29,7 @@ export type BuildCacheView = {
 };
 
 export function BuildCacheCard(view: BuildCacheView) {
+  const t = useTranslations("Admin.settings.buildCache");
   const [confirming, setConfirming] = useState(false);
   // The action takes no input — there is exactly one thing it can do, and a
   // form field that could change that is precisely what this must not have.
@@ -40,13 +42,13 @@ export function BuildCacheCard(view: BuildCacheView) {
   >(() => requestCacheCleanup(), null);
 
   const rows: [string, string][] = [
-    ["Status", `${view.dot} ${view.statusLabel}`],
-    ["Aktualny cache", view.cache],
-    ["Dysk", view.disk],
-    ["Próg automatycznego czyszczenia", view.threshold],
-    ["Ostatnie sprawdzenie", view.lastCheck],
-    ["Ostatnie czyszczenie", view.lastCleanup],
-    ["Ostatnio zwolniono", view.lastFreed],
+    [t("rows.status"), `${view.dot} ${view.statusLabel}`],
+    [t("rows.current"), view.cache],
+    [t("rows.disk"), view.disk],
+    [t("rows.threshold"), view.threshold],
+    [t("rows.lastCheck"), view.lastCheck],
+    [t("rows.lastCleanup"), view.lastCleanup],
+    [t("rows.lastFreed"), view.lastFreed],
   ];
 
   const busy = pending || view.awaiting || state?.ok === true;
@@ -68,27 +70,22 @@ export function BuildCacheCard(view: BuildCacheView) {
         <div className="border-line/60 mt-5 border-t pt-5">
           {confirming ? (
             <form action={formAction}>
-              <p className="text-ink text-sm">
-                Czy na pewno chcesz usunąć nieużywany Docker build cache?
-              </p>
-              <p className="text-silver mt-1 text-xs">
-                Nie zostaną usunięte obrazy produkcyjne, rollbacki, volumes ani
-                backupy.
-              </p>
+              <p className="text-ink text-sm">{t("confirm")}</p>
+              <p className="text-silver mt-1 text-xs">{t("confirmNote")}</p>
               <div className="mt-4 flex flex-wrap items-center gap-3">
                 <button
                   type="button"
                   onClick={() => setConfirming(false)}
                   className="text-ink-faint hover:text-ink text-xs"
                 >
-                  Anuluj
+                  {t("cancel")}
                 </button>
                 <button
                   type="submit"
                   disabled={busy}
                   className="label border-line-strong text-ink hover:border-ink hover:bg-ink/5 inline-flex h-9 items-center border px-4 text-xs transition-colors disabled:opacity-50"
                 >
-                  {pending ? "Zlecanie…" : "Wyczyść"}
+                  {pending ? t("queuing") : t("confirmButton")}
                 </button>
               </div>
             </form>
@@ -99,7 +96,7 @@ export function BuildCacheCard(view: BuildCacheView) {
               disabled={busy}
               className="label border-line-strong text-ink hover:border-ink hover:bg-ink/5 inline-flex h-9 items-center border px-4 text-xs transition-colors disabled:opacity-50"
             >
-              Wyczyść build cache
+              {t("clean")}
             </button>
           )}
 
@@ -110,14 +107,12 @@ export function BuildCacheCard(view: BuildCacheView) {
             <p className="text-red mt-3 text-xs">{state.error}</p>
           )}
           {!state && view.awaiting && (
-            <p className="mt-3 text-xs text-amber-500">
-              Czyszczenie jest już zlecone — serwer wykona je w ciągu minuty.
-            </p>
+            <p className="mt-3 text-xs text-amber-500">{t("awaiting")}</p>
           )}
           <p className="text-ink-faint mt-3 text-xs">
-            Przycisk zleca wyłącznie <code>docker builder prune</code>. Panel
-            nie ma dostępu do Dockera — zlecenie odbiera skrypt na serwerze, a
-            ten nie umie usunąć niczego poza build cache.
+            {t.rich("footer", {
+              code: (chunks) => <code>{chunks}</code>,
+            })}
           </p>
         </div>
       )}

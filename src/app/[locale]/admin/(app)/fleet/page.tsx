@@ -1,4 +1,5 @@
-import { setRequestLocale } from "next-intl/server";
+import { getTranslations, setRequestLocale } from "next-intl/server";
+import { pick } from "@/lib/i18n-pick";
 import { guardPage } from "@/lib/auth/guard";
 import { Link } from "@/i18n/navigation";
 import { listFleet } from "@/lib/admin/fleet";
@@ -20,28 +21,29 @@ export default async function FleetPage({
 
   const { locale } = await params;
   setRequestLocale(locale);
+  const t = await getTranslations("Admin.fleet");
   const models = await listFleet();
 
   return (
     <div>
       <header className="mb-8 flex flex-wrap items-end justify-between gap-4">
         <div>
-          <h1 className="font-heading text-ink text-2xl">Flota</h1>
+          <h1 className="font-heading text-ink text-2xl">{t("title")}</h1>
           <p className="text-silver mt-1 text-sm">
-            {models.length} {models.length === 1 ? "model" : "modeli"}
+            {t("modelCount", { count: models.length })}
           </p>
         </div>
         <Link
           href="/admin/fleet/new"
           className="label bg-red hover:bg-red-hover inline-flex h-11 items-center px-6 text-xs text-white transition-colors"
         >
-          + Dodaj model
+          {t("addModel")}
         </Link>
       </header>
 
       {models.length === 0 ? (
         <p className="border-line bg-graphite/40 text-silver border p-10 text-center text-sm">
-          Brak modeli. Dodaj pierwszy, aby pojawił się na stronie.
+          {t("empty")}
         </p>
       ) : (
         <div className="border-line overflow-x-auto border">
@@ -49,22 +51,22 @@ export default async function FleetPage({
             <thead>
               <tr className="border-line bg-graphite/60 border-b text-left">
                 <th className="label-tight text-ink-faint px-4 py-3 text-[10px] font-normal">
-                  Model
+                  {t("colModel")}
                 </th>
                 <th className="label-tight text-ink-faint px-4 py-3 text-[10px] font-normal">
-                  Rok
+                  {t("colYear")}
                 </th>
                 <th className="label-tight text-ink-faint px-4 py-3 text-[10px] font-normal">
-                  Segment
+                  {t("colSegment")}
                 </th>
                 <th className="label-tight text-ink-faint px-4 py-3 text-right text-[10px] font-normal">
-                  Cena / doba
+                  {t("colPrice")}
                 </th>
                 <th className="label-tight text-ink-faint px-4 py-3 text-[10px] font-normal">
-                  Egzemplarze
+                  {t("colUnits")}
                 </th>
                 <th className="label-tight text-ink-faint px-4 py-3 text-[10px] font-normal">
-                  Status
+                  {t("colStatus")}
                 </th>
               </tr>
             </thead>
@@ -90,7 +92,7 @@ export default async function FleetPage({
                   </td>
                   <td className="text-silver px-4 py-3">{m.year}</td>
                   <td className="text-silver px-4 py-3">
-                    {CATEGORY_LABEL[m.category as Category] ?? m.category}
+                    {CATEGORY_LABEL[m.category as Category] ? pick(CATEGORY_LABEL[m.category as Category], locale) : m.category}
                   </td>
                   <td className="text-ink px-4 py-3 text-right">
                     {formatPln(m.dailyPriceGrosze, locale)}
@@ -102,25 +104,25 @@ export default async function FleetPage({
                     <span className="text-ink">{m.units.freeToday}</span>
                     <span className="text-ink-faint">
                       {" "}
-                      / {m.units.total} wolnych dziś
+                      {t("freeTodayOf", { total: m.units.total })}
                     </span>
                     {m.units.reservedToday > 0 && (
                       <span
                         className="label-tight border-line text-ink-faint ml-2 border px-2 py-0.5 text-[10px]"
-                        title="Sprawne, ale zajęte na dziś przez rezerwację lub blokadę"
+                        title={t("reservedTitle")}
                       >
-                        {m.units.reservedToday} zajęte
+                        {t("reservedBadge", { count: m.units.reservedToday })}
                       </span>
                     )}
                   </td>
                   <td className="px-4 py-3">
                     {m.published ? (
                       <span className="label-tight border-line text-silver border px-2 py-1 text-[10px]">
-                        Opublikowany
+                        {t("published")}
                       </span>
                     ) : (
                       <span className="label-tight border-line text-ink-faint border px-2 py-1 text-[10px]">
-                        Ukryty
+                        {t("hidden")}
                       </span>
                     )}
                   </td>

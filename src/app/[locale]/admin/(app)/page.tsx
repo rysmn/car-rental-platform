@@ -1,4 +1,4 @@
-import { setRequestLocale } from "next-intl/server";
+import { getTranslations, setRequestLocale } from "next-intl/server";
 import { auth } from "@/lib/auth/config";
 import {
   getDashboardKpi,
@@ -13,11 +13,11 @@ import { listReservations } from "@/lib/admin/reservations";
 import { StatusBadge } from "@/components/admin/StatusBadge";
 import { type ReservationStatus } from "@/lib/admin/reservation-status";
 import { TodayActions } from "./TodayActions";
-import { PublicStatusToggle } from "./PublicStatusToggle";
 import { getSetting } from "@/lib/admin/settings";
 import { Link, type AppHref } from "@/i18n/navigation";
 import { STATUS_LABEL } from "@/lib/admin/reservation-status";
-import { formatPln, formatDatePl, pluralPl } from "@/lib/format";
+import { pick, pickFrom } from "@/lib/i18n-pick";
+import { formatPln, formatDatePl } from "@/lib/format";
 
 /**
  * The dashboard answers three questions, in this order: what has to happen
@@ -48,16 +48,16 @@ const FLEET_DOT: Record<FleetState, string> = {
   service: "bg-red",
 };
 
-const FLEET_LABEL: Record<FleetState, string> = {
-  available: "Dostępny",
-  rented: "Wynajęty",
-  reserved: "Rezerwacja",
-  blocked: "Zablokowany",
-  service: "Serwis",
-};
-
 /** The operation itself, as an arrow — the direction the car is moving. */
-function OperationCell({ kind }: { kind: TodayOperation["kind"] }) {
+function OperationCell({
+  kind,
+  pickupLabel,
+  returnLabel,
+}: {
+  kind: TodayOperation["kind"];
+  pickupLabel: string;
+  returnLabel: string;
+}) {
   const out = kind === "pickup";
   return (
     <span
@@ -66,9 +66,21 @@ function OperationCell({ kind }: { kind: TodayOperation["kind"] }) {
       }`}
     >
       <span aria-hidden>{out ? "↗" : "↙"}</span>
-      {out ? "Wydanie" : "Zwrot"}
+      {out ? pickupLabel : returnLabel}
     </span>
   );
+}
+
+/**
+ * Which day-columns show at which width. The data always holds 60 days; the
+ * table hides the rest with CSS, so the calendar fills the available width
+ * without a round trip. Static strings so Tailwind keeps them.
+ */
+function dayColumnClass(i: number): string {
+  if (i < 14) return "";
+  if (i < 28) return "hidden md:table-cell";
+  if (i < 42) return "hidden lg:table-cell";
+  return "hidden 2xl:table-cell";
 }
 
 export default async function AdminDashboard({
@@ -78,6 +90,8 @@ export default async function AdminDashboard({
 }) {
   const { locale } = await params;
   setRequestLocale(locale);
+  const t = await getTranslations("Admin.dashboard");
+  const fleetLabel = (state: FleetState) => t(`fleet.${state}`);
 
   const [
     session,
@@ -87,29 +101,27 @@ export default async function AdminDashboard({
     calendar,
     attention,
     recent,
-    publicStatus,
   ] = await Promise.all([
     auth(),
     getDashboardKpi(),
     getMonthFinance(),
     getTodayOperations(),
-    getFleetCalendar(21),
+    getFleetCalendar(60),
     getAttentionItems(),
     listReservations({ page: 1 }),
-    getSetting("publicStatus"),
   ]);
 
   const cards = [
     {
-      label: "Rezerwacje dziś",
+      label: t("kpi.reservationsToday"),
       value: String(kpi.reservationsToday),
-      hint: "wpłynęły dzisiaj",
+      hint: t("kpi.receivedToday"),
       href: "/admin/reservations" as AppHref,
     },
     {
-      label: "Do potwierdzenia",
+      label: t("kpi.toConfirm"),
       value: String(kpi.pending),
-      hint: kpi.pending > 0 ? "czekają na decyzję" : "wszystko rozpatrzone",
+      hint: kpi.pending > 0 ? t("kpi.awaitingDecision") : t("kpi.allProcessed"),
       href: {
         pathname: "/admin/reservations",
         query: { status: "pending" },
@@ -117,27 +129,27 @@ export default async function AdminDashboard({
       urgent: kpi.pending > 0,
     },
     {
-      label: "Wynajęte auta",
+      label: t("kpi.carsRented"),
       value: String(kpi.carsRented),
-      hint: "w rękach klientów",
+      hint: t("kpi.withCustomers"),
       href: "/admin/fleet" as AppHref,
     },
     {
-      label: "Dostępne auta",
+      label: t("kpi.carsAvailable"),
       value: String(kpi.carsAvailable),
-      hint: "gotowe do wydania teraz",
+      hint: t("kpi.readyNow"),
       href: "/admin/fleet" as AppHref,
     },
     {
-      label: "Zwroty dzisiaj",
+      label: t("kpi.returnsToday"),
       value: String(kpi.returnsToday),
-      hint: `wydania: ${kpi.pickupsToday}`,
+      hint: t("kpi.pickups", { count: kpi.pickupsToday }),
       href: "/admin/reservations" as AppHref,
     },
     {
-      label: "Przychód miesiąca",
-      value: formatPln(kpi.revenueMonthGrosze, "pl"),
-      hint: "narastająco, z dni najmu",
+      label: t("kpi.revenueMonth"),
+      value: formatPln(kpi.revenueMonthGrosze, locale),
+      hint: t("kpi.cumulative"),
       href: "/admin/analytics" as AppHref,
     },
   ];
@@ -148,9 +160,9 @@ export default async function AdminDashboard({
           thing on the page: the phone rings, and everything else can wait. */}
       <div className="flex flex-wrap items-start justify-between gap-6">
         <div>
-          <h1 className="font-heading text-3xl font-bold">Pulpit</h1>
+          <h1 className="font-heading text-3xl font-bold">{t("title")}</h1>
           <p className="text-ink-muted mt-2 text-sm">
-            Witaj, {session?.user?.name}.
+            {t("welcome", { name: session?.user?.name ?? "" })}
           </p>
         </div>
 
@@ -159,7 +171,7 @@ export default async function AdminDashboard({
             href="/admin/reservations/new"
             className="label bg-red hover:bg-red-hover inline-flex h-14 items-center px-8 text-sm text-white transition-colors"
           >
-            + Nowa rezerwacja
+            {t("newReservation")}
           </Link>
           <div className="flex flex-wrap gap-2">
             {/* Three shortcuts to where the work actually happens. They land on
@@ -169,25 +181,25 @@ export default async function AdminDashboard({
               href="/admin/customers"
               className="label-tight border-line-strong text-ink hover:border-ink hover:bg-ink/5 tap inline-flex h-10 items-center border px-4 text-[10px] transition-colors"
             >
-              + Dodaj klienta
+              {t("addCustomer")}
             </Link>
             <Link
               href="/admin/fleet"
               className="label-tight border-line-strong text-ink hover:border-ink hover:bg-ink/5 tap inline-flex h-10 items-center border px-4 text-[10px] transition-colors"
             >
-              + Dodaj wydatek
+              {t("addExpense")}
             </Link>
             <Link
               href="/admin/fleet"
               className="label-tight border-line-strong text-ink hover:border-ink hover:bg-ink/5 tap inline-flex h-10 items-center border px-4 text-[10px] transition-colors"
             >
-              + Blokuj auto
+              {t("blockCar")}
             </Link>
             <Link
               href="/admin/fleet/new"
               className="label-tight border-line-strong text-ink hover:border-ink hover:bg-ink/5 tap inline-flex h-10 items-center border px-4 text-[10px] transition-colors"
             >
-              + Dodaj auto
+              {t("addCar")}
             </Link>
           </div>
         </div>
@@ -217,32 +229,35 @@ export default async function AdminDashboard({
       {/* ── Today, hour by hour ─────────────────────────────────────────── */}
       <section className="mt-12">
         <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
-          <h2 className="label text-ink text-xs">Dzisiaj</h2>
+          <h2 className="label text-ink text-xs">{t("today.heading")}</h2>
           <span className="text-ink-faint text-[11px]">
-            {kpi.pickupsToday} wydań · {kpi.returnsToday} zwrotów
+            {t("today.summary", {
+              pickups: kpi.pickupsToday,
+              returns: kpi.returnsToday,
+            })}
           </span>
         </div>
 
         {operations.length === 0 ? (
           <p className="border-line bg-graphite/40 text-silver border p-8 text-center text-sm">
-            Dziś nie ma zaplanowanych wydań ani zwrotów.
+            {t("today.empty")}
           </p>
         ) : (
           <div className="overflow-x-auto">
             <table className="w-full min-w-[820px] border-collapse text-left text-sm">
               <thead>
                 <tr className="border-line text-ink-faint border-y">
-                  <th className="label-tight py-3 pr-6 text-[10px]">Godzina</th>
-                  <th className="label-tight py-3 pr-6 text-[10px]">Klient</th>
+                  <th className="label-tight py-3 pr-6 text-[10px]">{t("today.time")}</th>
+                  <th className="label-tight py-3 pr-6 text-[10px]">{t("today.customer")}</th>
                   <th className="label-tight py-3 pr-6 text-[10px]">
-                    Samochód
+                    {t("today.car")}
                   </th>
                   <th className="label-tight py-3 pr-6 text-[10px]">
-                    Operacja
+                    {t("today.operation")}
                   </th>
-                  <th className="label-tight py-3 pr-6 text-[10px]">Miejsce</th>
-                  <th className="label-tight py-3 pr-6 text-[10px]">Status</th>
-                  <th className="label-tight py-3 text-[10px]">Akcja</th>
+                  <th className="label-tight py-3 pr-6 text-[10px]">{t("today.location")}</th>
+                  <th className="label-tight py-3 pr-6 text-[10px]">{t("today.status")}</th>
+                  <th className="label-tight py-3 text-[10px]">{t("today.action")}</th>
                 </tr>
               </thead>
               <tbody>
@@ -282,7 +297,11 @@ export default async function AdminDashboard({
                       </span>
                     </td>
                     <td className="py-3 pr-6">
-                      <OperationCell kind={o.kind} />
+                      <OperationCell
+                        kind={o.kind}
+                        pickupLabel={t("today.pickup")}
+                        returnLabel={t("today.return")}
+                      />
                     </td>
                     <td className="text-silver py-3 pr-6 whitespace-nowrap">
                       {o.locationName}
@@ -296,10 +315,10 @@ export default async function AdminDashboard({
                         }
                       >
                         {o.status === "confirmed"
-                          ? "Gotowe"
+                          ? t("today.ready")
                           : o.status === "pending"
-                            ? "Do potwierdzenia"
-                            : STATUS_LABEL[o.status]}
+                            ? t("today.toConfirmStatus")
+                            : pickFrom(STATUS_LABEL, o.status, locale)}
                       </span>
                     </td>
                     <td className="py-3 whitespace-nowrap">
@@ -310,7 +329,7 @@ export default async function AdminDashboard({
                         />
                       ) : (
                         <span className="text-ink-faint text-[10px]">
-                          najpierw potwierdź
+                          {t("today.confirmFirst")}
                         </span>
                       )}
                     </td>
@@ -322,20 +341,20 @@ export default async function AdminDashboard({
         )}
       </section>
 
-      {/* ── Fleet calendar, three weeks ─────────────────────────────────── */}
+      {/* ── Fleet calendar: 60 days in the data; the screen width decides how many show ── */}
       <section className="mt-12">
         <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
-          <h2 className="label text-ink text-xs">Kalendarz floty — 21 dni</h2>
+          <h2 className="label text-ink text-xs">{t("fleet.heading")}</h2>
           <ul className="flex flex-wrap gap-x-4 gap-y-1">
             {(
               [
-                ["available", "dostępny"],
-                ["rented", "wynajęty"],
-                ["reserved", "zarezerwowany"],
-                ["blocked", "zablokowany"],
-                ["service", "serwis"],
-              ] as [FleetState, string][]
-            ).map(([state, label]) => (
+                "available",
+                "rented",
+                "reserved",
+                "blocked",
+                "service",
+              ] as FleetState[]
+            ).map((state) => (
               <li
                 key={state}
                 className="text-ink-faint flex items-center gap-1.5 text-[10px]"
@@ -344,7 +363,7 @@ export default async function AdminDashboard({
                   aria-hidden
                   className={`rounded-pill h-2 w-2 ${FLEET_DOT[state]}`}
                 />
-                {label}
+                {fleetLabel(state)}
               </li>
             ))}
           </ul>
@@ -352,17 +371,17 @@ export default async function AdminDashboard({
 
         {calendar.length === 0 ? (
           <p className="border-line bg-graphite/40 text-silver border p-8 text-center text-sm">
-            Brak egzemplarzy we flocie.
+            {t("fleet.empty")}
           </p>
         ) : (
           <div className="overflow-x-auto">
-            <table className="border-collapse text-left text-sm">
+            <table className="w-full border-collapse text-left text-sm">
               <thead>
                 <tr className="text-ink-faint">
                   <th className="label-tight bg-void sticky left-0 z-10 py-2 pr-4 text-[10px]">
-                    Auto
+                    {t("fleet.car")}
                   </th>
-                  {calendar[0].cells.map((c) => {
+                  {calendar[0].cells.map((c, i) => {
                     const [, m, d] = c.date.split("-");
                     // Weekends get a heavier label: a Saturday return and a
                     // Saturday handover are the two things most often missed.
@@ -370,7 +389,7 @@ export default async function AdminDashboard({
                     return (
                       <th
                         key={c.date}
-                        className={`label-tight w-7 px-0 py-2 text-center text-[9px] ${
+                        className={`label-tight w-7 px-0 py-2 text-center text-[9px] ${dayColumnClass(i)} ${
                           dow === 0 || dow === 6 ? "text-silver" : ""
                         }`}
                       >
@@ -400,13 +419,13 @@ export default async function AdminDashboard({
                         {row.plate}
                       </span>
                     </td>
-                    {row.cells.map((c) => (
-                      <td key={c.date} className="px-1 py-1.5">
+                    {row.cells.map((c, i) => (
+                      <td key={c.date} className={`px-1 py-1.5 ${dayColumnClass(i)}`}>
                         {/* Circles, not blocks. A free day is a soft dot so the
                             days that need attention are the ones that carry
                             colour; a wall of solid green reads as busy. */}
                         <span
-                          title={`${c.date} — ${FLEET_LABEL[c.state]}`}
+                          title={`${c.date} — ${fleetLabel(c.state)}`}
                           className={`mx-auto block h-4 w-4 rounded-full ${FLEET_DOT[c.state]} ${
                             c.state === "available" ? "opacity-35" : ""
                           }`}
@@ -421,35 +440,21 @@ export default async function AdminDashboard({
         )}
       </section>
 
-      {/* ── Public vehicle statuses: on / off ───────────────────────────── */}
-      {/*
-        Stoi bezpośrednio pod kalendarzem floty, bo to ten sam obraz oglądany
-        z drugiej strony: wyżej operator widzi, gdzie są auta, tutaj decyduje,
-        czy widzi to również klient.
-      */}
-      <section className="mt-12">
-        <h2 className="label text-ink mb-4 text-xs">
-          Publiczny status samochodów
-        </h2>
-        <div className="max-w-3xl">
-          <PublicStatusToggle enabled={publicStatus.enabled} />
-        </div>
-      </section>
-
       {/* ── Needs attention ─────────────────────────────────────────────── */}
       <section className="mt-12">
         <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
-          <h2 className="label text-ink text-xs">Wymaga uwagi</h2>
+          <h2 className="label text-ink text-xs">{t("attention.heading")}</h2>
           <span className="text-ink-faint text-[11px]">
-            {attention.filter((a) => a.urgent).length} pilnych ·{" "}
-            {attention.length} łącznie
+            {t("attention.counts", {
+              urgent: attention.filter((a) => a.urgent).length,
+              total: attention.length,
+            })}
           </span>
         </div>
 
         {attention.length === 0 ? (
           <p className="border-line bg-graphite/40 text-silver border p-8 text-center text-sm">
-            Nic nie wymaga uwagi: zwroty, płatności, dokumenty i serwisy są na
-            bieżąco.
+            {t("attention.empty")}
           </p>
         ) : (
           <ul className="border-line divide-line divide-y border">
@@ -460,22 +465,22 @@ export default async function AdminDashboard({
                     <span aria-hidden className="text-sm">
                       {a.urgent ? "⚠️" : "•"}
                     </span>
-                    <span className="text-ink text-sm">{a.subject}</span>
+                    <span className="text-ink text-sm">{pick(a.subject, locale)}</span>
                   </span>
                   <span className="flex flex-wrap items-center gap-2">
                     <span
                       className={`text-xs ${a.urgent ? "text-red" : "text-ink-faint"}`}
                     >
-                      {a.detail}
+                      {pick(a.detail, locale)}
                     </span>
                     <span className="label-tight border-line text-ink border px-2 py-0.5 text-[10px]">
-                      {a.action}
+                      {pick(a.action, locale)}
                     </span>
                   </span>
                 </span>
               );
               return (
-                <li key={`${a.kind}-${a.subject}-${i}`}>
+                <li key={`${a.kind}-${a.subject.pl}-${i}`}>
                   {a.href ? (
                     <Link
                       href={a.href as AppHref}
@@ -496,40 +501,40 @@ export default async function AdminDashboard({
       {/* ── This month, in management terms ─────────────────────────────── */}
       <section className="mt-10">
         <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
-          <h2 className="label text-ink text-xs">Ten miesiąc</h2>
+          <h2 className="label text-ink text-xs">{t("month.heading")}</h2>
           <span className="text-ink-faint text-[11px]">
-            {finance.daysElapsed}{" "}
-            {pluralPl(finance.daysElapsed, "dzień", "dni", "dni")} miesiąca ·{" "}
-            {finance.daysRented}{" "}
-            {pluralPl(finance.daysRented, "dzień", "dni", "dni")} najmu
+            {t("month.summary", {
+              elapsed: finance.daysElapsed,
+              rented: finance.daysRented,
+            })}
           </span>
         </div>
         <div className="border-line bg-line grid grid-cols-2 gap-px border lg:grid-cols-3 xl:grid-cols-6">
           <div className="bg-void p-4 sm:p-5">
-            <p className="label-tight text-ink-faint text-[10px]">Przychód</p>
+            <p className="label-tight text-ink-faint text-[10px]">{t("month.revenue")}</p>
             <p className="font-heading text-ink mt-3 text-xl font-bold tabular-nums">
-              {formatPln(finance.revenueGrosze, "pl")}
+              {formatPln(finance.revenueGrosze, locale)}
             </p>
           </div>
           <div className="bg-void p-4 sm:p-5">
-            <p className="label-tight text-ink-faint text-[10px]">Koszty</p>
+            <p className="label-tight text-ink-faint text-[10px]">{t("month.costs")}</p>
             <p className="font-heading text-ink mt-3 text-xl font-bold tabular-nums">
-              {formatPln(finance.expenseGrosze, "pl")}
+              {formatPln(finance.expenseGrosze, locale)}
             </p>
           </div>
           <div className="bg-void p-4 sm:p-5">
-            <p className="label-tight text-ink-faint text-[10px]">Wynik</p>
+            <p className="label-tight text-ink-faint text-[10px]">{t("month.result")}</p>
             <p
               className={`font-heading mt-3 text-xl font-bold tabular-nums ${
                 finance.marginGrosze >= 0 ? "text-emerald-400" : "text-red"
               }`}
             >
-              {formatPln(finance.marginGrosze, "pl")}
+              {formatPln(finance.marginGrosze, locale)}
             </p>
           </div>
           <div className="bg-void p-4 sm:p-5">
             <p className="label-tight text-ink-faint text-[10px]">
-              Obłożenie floty
+              {t("month.utilisation")}
             </p>
             <p className="font-heading text-ink mt-3 text-xl font-bold tabular-nums">
               {/* A fleet that was rented for one day out of two hundred
@@ -552,29 +557,32 @@ export default async function AdminDashboard({
           </div>
           <div className="bg-void p-4 sm:p-5">
             <p className="label-tight text-ink-faint text-[10px]">
-              Średnia cena wynajmu
+              {t("month.avgPrice")}
             </p>
             <p className="font-heading text-ink mt-3 text-xl font-bold tabular-nums">
               {finance.avgDailyRateGrosze == null
                 ? "—"
-                : `${formatPln(finance.avgDailyRateGrosze, "pl")}/dzień`}
+                : t("month.perDay", {
+                    price: formatPln(finance.avgDailyRateGrosze, locale),
+                  })}
             </p>
           </div>
           <div className="bg-void p-4 sm:p-5">
             <p className="label-tight text-ink-faint text-[10px]">
-              Średnia długość wynajmu
+              {t("month.avgLength")}
             </p>
             <p className="font-heading text-ink mt-3 text-xl font-bold tabular-nums">
               {finance.avgRentalDays == null
                 ? "—"
                 : (() => {
                     const v = Math.round(finance.avgRentalDays * 10) / 10;
-                    const label = Number.isInteger(v)
-                      ? pluralPl(v, "dzień", "dni", "dni")
-                      : "dnia";
-                    return `${v.toLocaleString("pl-PL", {
-                      maximumFractionDigits: 1,
-                    })} ${label}`;
+                    return Number.isInteger(v)
+                      ? t("month.avgLengthWhole", { count: v })
+                      : t("month.avgLengthFraction", {
+                          value: v.toLocaleString(locale, {
+                            maximumFractionDigits: 1,
+                          }),
+                        });
                   })()}
             </p>
           </div>
@@ -584,17 +592,17 @@ export default async function AdminDashboard({
       {/* ── Latest bookings ─────────────────────────────────────────────── */}
       <section className="mt-12">
         <div className="mb-4 flex items-center justify-between">
-          <h2 className="label text-ink text-xs">Ostatnie rezerwacje</h2>
+          <h2 className="label text-ink text-xs">{t("recent.heading")}</h2>
           <Link
             href="/admin/reservations"
             className="label-tight text-silver hover:text-ink -my-2 inline-flex min-h-11 items-center text-[10px] transition-colors"
           >
-            Wszystkie →
+            {t("recent.all")}
           </Link>
         </div>
         {recent.items.length === 0 ? (
           <p className="border-line bg-graphite/40 text-silver border p-8 text-center text-sm">
-            Brak rezerwacji.
+            {t("recent.empty")}
           </p>
         ) : (
           <ul className="divide-line border-line divide-y border">
@@ -611,7 +619,7 @@ export default async function AdminDashboard({
                     <span className="text-ink font-mono text-sm">
                       {r.reference}
                     </span>
-                    <StatusBadge status={r.status as ReservationStatus} />
+                    <StatusBadge status={r.status as ReservationStatus} locale={locale} />
                   </span>
                   <span className="text-silver text-sm">
                     {r.brand} {r.model}

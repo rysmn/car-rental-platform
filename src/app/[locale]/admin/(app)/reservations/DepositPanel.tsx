@@ -1,6 +1,7 @@
 "use client";
 
 import { useActionState, useState } from "react";
+import { useLocale, useTranslations } from "next-intl";
 import {
   addDepositEvent,
   deleteLastDepositEvent,
@@ -18,6 +19,7 @@ import {
   type DepositStatus,
 } from "@/lib/admin/deposit-options";
 import { PAYMENT_METHOD_LABEL } from "@/lib/admin/payment-options";
+import { pick, pickFrom } from "@/lib/i18n-pick";
 
 const inputCls =
   "h-11 w-full border border-line-strong bg-surface-1 px-3 text-sm text-ink";
@@ -48,6 +50,9 @@ export function DepositPanel({
   keptGrosze: number;
   events: DepositEvent[];
 }) {
+  const t = useTranslations("Admin.reservations.deposit");
+  const tm = useTranslations("Admin.reservations.methods");
+  const locale = useLocale();
   const [addState, add, adding] = useActionState<DepositResult | null, FormData>(
     addDepositEvent,
     null,
@@ -67,50 +72,53 @@ export function DepositPanel({
     (delState && !delState.ok && delState.error) ||
     null;
 
+  const dayLabel = (iso: string) =>
+    new Intl.DateTimeFormat(locale === "en" ? "en-GB" : "pl-PL", {
+      timeZone: "UTC",
+      dateStyle: "short",
+    }).format(new Date(`${iso}T00:00:00Z`));
+
   return (
     <div className="border-line bg-graphite/40 mt-6 border p-6">
       <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
-        <h2 className="label-tight text-ink-faint text-[10px]">Kaucja</h2>
+        <h2 className="label-tight text-ink-faint text-[10px]">{t("heading")}</h2>
         {status && (
           <span
             className={`label-tight border px-2 py-1 text-[10px] ${DEPOSIT_STATUS_TONE[status]}`}
           >
-            {DEPOSIT_STATUS_LABEL[status]}
+            {pickFrom(DEPOSIT_STATUS_LABEL, status, locale)}
           </span>
         )}
       </div>
 
       {status === null ? (
-        <p className="text-ink-faint text-sm">
-          Ten najem jest w wariancie bez kaucji — nie ma czego pobierać ani
-          zwracać.
-        </p>
+        <p className="text-ink-faint text-sm">{t("noDeposit")}</p>
       ) : (
         <>
           <div className="grid gap-4 sm:grid-cols-3">
             <div>
-              <p className={labelCls}>Wg rezerwacji</p>
+              <p className={labelCls}>{t("due")}</p>
               <p className="font-heading text-ink mt-1 text-lg tabular-nums">
-                {formatPln(dueGrosze, "pl")}
+                {formatPln(dueGrosze, locale)}
               </p>
             </div>
             <div>
-              <p className={labelCls}>Zabezpieczone</p>
+              <p className={labelCls}>{t("secured")}</p>
               <p
                 className={`font-heading mt-1 text-lg tabular-nums ${
                   securedGrosze > 0 ? "text-amber-400" : "text-ink"
                 }`}
               >
-                {formatPln(securedGrosze, "pl")}
+                {formatPln(securedGrosze, locale)}
               </p>
             </div>
             <div>
-              <p className={labelCls}>Zwrócone / zatrzymane</p>
+              <p className={labelCls}>{t("returnedKept")}</p>
               <p className="font-heading text-ink mt-1 text-lg tabular-nums">
-                {formatPln(returnedGrosze, "pl")}
+                {formatPln(returnedGrosze, locale)}
                 {keptGrosze > 0 && (
                   <span className="text-red ml-2 text-sm">
-                    / {formatPln(keptGrosze, "pl")}
+                    / {formatPln(keptGrosze, locale)}
                   </span>
                 )}
               </p>
@@ -118,7 +126,7 @@ export function DepositPanel({
           </div>
 
           <p className="text-ink-faint mt-3 text-[11px]">
-            {DEPOSIT_STATUS_HINT[status]}
+            {pickFrom(DEPOSIT_STATUS_HINT, status, locale)}
           </p>
 
           {events.length > 0 && (
@@ -129,21 +137,25 @@ export function DepositPanel({
                   className="flex flex-wrap items-center justify-between gap-3 py-3"
                 >
                   <span className="text-ink min-w-0 text-sm">
-                    {DEPOSIT_STATUS_LABEL[e.status]}
+                    {pickFrom(DEPOSIT_STATUS_LABEL, e.status, locale)}
                     {DEPOSIT_TAKES_AMOUNT[e.status] && (
                       <span className="ml-2 tabular-nums">
-                        {formatPln(e.amountGrosze, "pl")}
+                        {formatPln(e.amountGrosze, locale)}
                         {e.keptGrosze > 0 && (
                           <span className="text-red">
                             {" "}
-                            (zatrzymane {formatPln(e.keptGrosze, "pl")})
+                            {t("keptSuffix", {
+                              amount: formatPln(e.keptGrosze, locale),
+                            })}
                           </span>
                         )}
                       </span>
                     )}
                     <span className="text-ink-faint ml-3 block text-xs sm:ml-3 sm:inline">
-                      {e.method ? `${PAYMENT_METHOD_LABEL[e.method] ?? e.method} · ` : ""}
-                      {e.createdAt.slice(0, 10).split("-").reverse().join(".")}
+                      {e.method
+                        ? `${PAYMENT_METHOD_LABEL[e.method] ? pick(PAYMENT_METHOD_LABEL[e.method], locale) : e.method} ·`
+                        : ""}
+                      {dayLabel(e.createdAt.slice(0, 10))}
                       {e.by ? ` · ${e.by}` : ""}
                       {e.note ? ` · ${e.note}` : ""}
                     </span>
@@ -160,7 +172,7 @@ export function DepositPanel({
                         disabled={undoing}
                         className="label-tight text-ink-faint hover:text-red text-[10px] transition-colors disabled:opacity-60"
                       >
-                        Cofnij
+                        {t("undo")}
                       </button>
                     </form>
                   )}
@@ -173,7 +185,7 @@ export function DepositPanel({
             <input type="hidden" name="reservationId" value={reservationId} />
             <div className="grid gap-3 sm:grid-cols-4">
               <label className="flex flex-col gap-1">
-                <span className={labelCls}>Krok</span>
+                <span className={labelCls}>{t("step")}</span>
                 <select
                   name="status"
                   value={picked}
@@ -182,7 +194,7 @@ export function DepositPanel({
                 >
                   {DEPOSIT_STATUSES.map((s) => (
                     <option key={s} value={s}>
-                      {DEPOSIT_STATUS_LABEL[s]}
+                      {pickFrom(DEPOSIT_STATUS_LABEL, s, locale)}
                     </option>
                   ))}
                 </select>
@@ -190,8 +202,8 @@ export function DepositPanel({
               <label className="flex flex-col gap-1">
                 <span className={labelCls}>
                   {picked === "returned" || picked === "partially_kept"
-                    ? "Zwracane (zł)"
-                    : "Kwota (zł)"}
+                    ? t("toReturn")
+                    : t("amount")}
                 </span>
                 <input
                   name="amount"
@@ -208,7 +220,7 @@ export function DepositPanel({
                 />
               </label>
               <label className="flex flex-col gap-1">
-                <span className={labelCls}>Zatrzymane (zł)</span>
+                <span className={labelCls}>{t("kept")}</span>
                 <input
                   name="kept"
                   inputMode="decimal"
@@ -218,30 +230,30 @@ export function DepositPanel({
                 />
               </label>
               <label className="flex flex-col gap-1">
-                <span className={labelCls}>Forma</span>
+                <span className={labelCls}>{t("method")}</span>
                 <select
                   name="method"
                   disabled={!DEPOSIT_TAKES_AMOUNT[picked]}
                   className={`${inputCls} disabled:opacity-40`}
                 >
-                  <option value="cash">Gotówka</option>
-                  <option value="card">Karta</option>
-                  <option value="transfer">Przelew</option>
-                  <option value="online">Online</option>
+                  <option value="cash">{tm("cash")}</option>
+                  <option value="card">{tm("card")}</option>
+                  <option value="transfer">{tm("transfer")}</option>
+                  <option value="online">{tm("online")}</option>
                 </select>
               </label>
             </div>
 
             <label className="mt-3 flex flex-col gap-1">
               <span className={labelCls}>
-                Opis{picked === "partially_kept" ? " (wymagany)" : ""}
+                {picked === "partially_kept" ? t("noteRequired") : t("note")}
               </span>
               <input
                 name="note"
                 placeholder={
                   picked === "partially_kept"
-                    ? "za co zatrzymana jest część kaucji"
-                    : "np. blokada na karcie do 30.09"
+                    ? t("notePlaceholderKept")
+                    : t("notePlaceholder")
                 }
                 className={inputCls}
               />
@@ -254,12 +266,9 @@ export function DepositPanel({
               disabled={adding}
               className="label bg-red hover:bg-red-hover mt-4 inline-flex h-11 items-center px-6 text-xs text-white transition-colors disabled:opacity-60"
             >
-              {adding ? "Zapisywanie…" : "Zapisz krok"}
+              {adding ? t("saving") : t("saveStep")}
             </button>
-            <p className="text-ink-faint mt-3 text-[11px]">
-              Historia jest zapisem tego, kto i kiedy ruszył pieniądze klienta —
-              cofnąć można wyłącznie ostatni wpis.
-            </p>
+            <p className="text-ink-faint mt-3 text-[11px]">{t("hint")}</p>
           </form>
         </>
       )}

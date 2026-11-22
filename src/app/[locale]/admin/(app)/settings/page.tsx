@@ -1,11 +1,20 @@
-import { setRequestLocale } from "next-intl/server";
+import { setRequestLocale, getTranslations } from "next-intl/server";
 import { guardPage } from "@/lib/auth/guard";
 import { Link } from "@/i18n/navigation";
 import { getHealthChecks, getAccountSummary } from "@/lib/admin/health";
 import { getChatbotStatus } from "@/lib/admin/chat-status";
+import { pick } from "@/lib/i18n-pick";
 import { getSetting } from "@/lib/admin/settings";
 
-export const metadata = { title: "Ustawienia" };
+export async function generateMetadata({
+  params,
+}: {
+  params: Promise<{ locale: string }>;
+}) {
+  const { locale } = await params;
+  const t = await getTranslations({ locale, namespace: "Admin.settings.hub" });
+  return { title: t("metaTitle") };
+}
 
 /**
  * The settings hub.
@@ -46,6 +55,7 @@ export default async function SettingsHubPage({
 
   const { locale } = await params;
   setRequestLocale(locale);
+  const t = await getTranslations("Admin.settings.hub");
 
   const [checks, accounts, chatbot, google, social, company] =
     await Promise.all([
@@ -65,12 +75,21 @@ export default async function SettingsHubPage({
 
   const securityStatus =
     bad > 0
-      ? { status: `${bad} system nie działa`, tone: "bad" as const }
+      ? {
+          status: t("cards.security.bad", { count: bad }),
+          tone: "bad" as const,
+        }
       : attention > 0
-        ? { status: `${attention} wymaga uwagi`, tone: "warn" as const }
+        ? {
+            status: t("cards.security.attention", { count: attention }),
+            tone: "warn" as const,
+          }
         : unknown > 0
-          ? { status: `${unknown} bez raportu`, tone: "warn" as const }
-          : { status: "Wszystko zameldowane", tone: "good" as const };
+          ? {
+              status: t("cards.security.unknown", { count: unknown }),
+              tone: "warn" as const,
+            }
+          : { status: t("cards.security.good"), tone: "good" as const };
 
   /*
     GOOGLE — status liczony z DANYCH, nigdy z samego faktu, że moduł
@@ -125,52 +144,54 @@ export default async function SettingsHubPage({
   const googleStatus: Pick<Card, "status" | "tone"> =
     nicNieWpisano && jalowe === 0 && widoczne === 0
       ? // Neutralnie, bez tonu — to nie usterka, tylko etap. Wizytówki jeszcze nie ma.
-        { status: "Oczekuje na konfigurację" }
+        { status: t("cards.google.waiting") }
       : jalowe > 0
         ? {
             status:
               jalowe === 1
-                ? "1 przełącznik bez danych"
-                : `${jalowe} przełączniki bez danych`,
+                ? t("cards.google.oneSwitchEmpty")
+                : t("cards.google.switchesEmpty", { count: jalowe }),
             tone: "warn",
           }
         : widoczne > 0
           ? {
-              status: `${widoczne} z 4 elementów na stronie`,
+              status: t("cards.google.ofFour", { count: widoczne }),
               tone: "good",
             }
-          : { status: "Dane wpisane, nic nie pokazane" };
+          : { status: t("cards.google.dataNoShow") };
 
   const cards: Card[] = [
     {
       href: "/admin/settings/konto",
-      title: "Moje konto",
-      description: "Imię, telefon, hasło, ostatnie logowanie",
+      title: t("cards.account.title"),
+      description: t("cards.account.description"),
     },
     {
       href: "/admin/users",
-      title: "Administratorzy",
-      description: "Konta, role, blokowanie dostępu",
+      title: t("cards.admins.title"),
+      description: t("cards.admins.description"),
       status:
         accounts.total === 1
-          ? "Jedno konto — jeden punkt awarii"
-          : `${accounts.total} konta, ${accounts.active} aktywne`,
+          ? t("cards.admins.single")
+          : t("cards.admins.multi", {
+              total: accounts.total,
+              active: accounts.active,
+            }),
       tone: accounts.total === 1 ? "warn" : undefined,
     },
     {
       href: "/admin/settings/strona",
-      title: "Strona publiczna",
-      description:
-        "Dane firmy i kontakt, sekcja startowa, zdjęcia, media społecznościowe, widoczność stron",
+      title: t("cards.public.title"),
+      description: t("cards.public.description"),
     },
     {
       href: "/admin/settings/chatbot",
-      title: "Asystent (chatbot)",
-      description: "Automatyczna obsługa pytań poza godzinami",
+      title: t("cards.chatbot.title"),
+      description: t("cards.chatbot.description"),
       // Read from the running system, never written by hand. The sentence that
       // used to sit here said the bot was "jeszcze nie zbudowany" for weeks
       // after it started answering customers on the public site.
-      status: `${chatbot.dot} ${chatbot.label}`,
+      status: `${chatbot.dot} ${pick(chatbot.label, locale)}`,
       tone:
         chatbot.state === "active"
           ? ("good" as const)
@@ -180,19 +201,19 @@ export default async function SettingsHubPage({
     },
     {
       href: "/admin/settings/bezpieczenstwo",
-      title: "Bezpieczeństwo",
-      description: "Kopie, monitoring, certyfikat, logowania",
+      title: t("cards.security.title"),
+      description: t("cards.security.description"),
       ...securityStatus,
     },
     {
       href: "/admin/settings/legal",
-      title: "Dokumenty prawne",
-      description: "Regulamin i polityka prywatności, oba języki",
+      title: t("cards.legal.title"),
+      description: t("cards.legal.description"),
     },
     {
       href: "/admin/audit",
-      title: "Historia zmian",
-      description: "Kto, co i kiedy zmienił — z wartościami przed i po",
+      title: t("cards.audit.title"),
+      description: t("cards.audit.description"),
     },
     /*
       Ostatni kafel — prawy dolny róg siatki. Siatka ma dwie kolumny
@@ -202,8 +223,8 @@ export default async function SettingsHubPage({
     */
     {
       href: "/admin/settings/google",
-      title: "GOOGLE",
-      description: "Wizytówka Google, mapa, opinie i lokalizacja",
+      title: t("cards.google.title"),
+      description: t("cards.google.description"),
       ...googleStatus,
     },
   ];
@@ -220,10 +241,10 @@ export default async function SettingsHubPage({
   return (
     <div className="max-w-4xl">
       <header className="mb-8">
-        <h1 className="font-heading text-ink text-2xl font-bold">Ustawienia</h1>
-        <p className="text-silver mt-1 text-sm">
-          Konto, strona publiczna, bezpieczeństwo i automatyzacja.
-        </p>
+        <h1 className="font-heading text-ink text-2xl font-bold">
+          {t("title")}
+        </h1>
+        <p className="text-silver mt-1 text-sm">{t("subtitle")}</p>
       </header>
 
       <div className="border-line bg-line grid gap-px border sm:grid-cols-2">
@@ -252,38 +273,49 @@ export default async function SettingsHubPage({
           for "Powiadomienia" should find out here that it does not exist yet,
           instead of concluding they clicked the wrong thing. */}
       <section className="border-line mt-12 border-t pt-8">
-        <h2 className="label text-ink text-xs">Planowane, jeszcze nie ma</h2>
+        <h2 className="label text-ink text-xs">{t("planned.heading")}</h2>
         <ul className="text-ink-faint mt-4 grid gap-2 text-xs sm:grid-cols-2">
           <li>
-            <strong className="text-silver font-normal">
-              Uprawnienia i role
-            </strong>{" "}
-            — pracownik widzi rezerwacje, nie widzi finansów. Sensowne dopiero
-            przy drugiej osobie
+            {t.rich("planned.roles", {
+              strong: (chunks) => (
+                <strong className="text-silver font-normal">{chunks}</strong>
+              ),
+            })}
           </li>
           <li>
-            <strong className="text-silver font-normal">2FA</strong> i „wyloguj
-            ze wszystkich urządzeń” — z kodami zapasowymi, osobno
+            {t.rich("planned.twofa", {
+              strong: (chunks) => (
+                <strong className="text-silver font-normal">{chunks}</strong>
+              ),
+            })}
           </li>
           <li>
-            <strong className="text-silver font-normal">Powiadomienia</strong> —
-            kto dostaje który alert i jakim kanałem
+            {t.rich("planned.notifications", {
+              strong: (chunks) => (
+                <strong className="text-silver font-normal">{chunks}</strong>
+              ),
+            })}
           </li>
           <li>
-            <strong className="text-silver font-normal">Progi alertów</strong> —
-            dziś 30 dni i 5 dni zaszyte w kodzie
+            {t.rich("planned.thresholds", {
+              strong: (chunks) => (
+                <strong className="text-silver font-normal">{chunks}</strong>
+              ),
+            })}
           </li>
           <li>
-            <strong className="text-silver font-normal">Integracje</strong> —
-            stan połączeń, prawdziwy a nie zielona kropka. (Wizytówka Google,
-            opinie, mapa i współrzędne mają już własny kafel „GOOGLE”.)
+            {t.rich("planned.integrations", {
+              strong: (chunks) => (
+                <strong className="text-silver font-normal">{chunks}</strong>
+              ),
+            })}
           </li>
           <li>
-            <strong className="text-silver font-normal">Faktury</strong> i{" "}
-            <strong className="text-silver font-normal">
-              szablony dokumentów
-            </strong>{" "}
-            — osobne moduły, nie sekcje ustawień
+            {t.rich("planned.invoices", {
+              strong: (chunks) => (
+                <strong className="text-silver font-normal">{chunks}</strong>
+              ),
+            })}
           </li>
         </ul>
       </section>

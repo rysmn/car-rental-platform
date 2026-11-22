@@ -1,4 +1,5 @@
-import { setRequestLocale } from "next-intl/server";
+import { getTranslations, setRequestLocale } from "next-intl/server";
+import { useTranslations } from "next-intl";
 import { Link } from "@/i18n/navigation";
 import {
   getChatDaily,
@@ -17,41 +18,22 @@ import {
   getUnavailableDemand,
   filtersToQuery,
   parseFilters,
-  RANGE_LABEL,
   type DemandRow,
 } from "@/lib/admin/chat-demand";
+import { pick } from "@/lib/i18n-pick";
 import { formatDateTimePl } from "@/lib/format";
 import { ChatbotTabs } from "../ChatbotTabs";
 import { Filters } from "./Filters";
 
-export const metadata = { title: "Analityka chatbota" };
-
-const TOPIC_LABEL: Record<string, string> = {
-  FIND_CAR: "dobór auta",
-  CHECK_AVAILABILITY: "dostępność",
-  GET_PRICE: "cena",
-  GET_DEPOSIT: "kaucja",
-  GET_MILEAGE_LIMIT: "limit km",
-  COMPARE_CARS: "porównanie",
-  AIRPORT: "lotnisko",
-  LONG_TERM: "długoterminowy",
-  B2B: "firmy",
-  FAQ: "FAQ",
-  CONTACT_HUMAN: "kontakt z człowiekiem",
-  START_BOOKING: "rezerwacja",
-  GREETING: "powitanie",
-  UNKNOWN: "nierozpoznane",
-  OUT_OF_SCOPE: "odrzucone",
-};
-
-const SEGMENT_LABEL: Record<string, string> = {
-  van: "VAN / BUS",
-  "premium-suv": "SUV / PREMIUM SUV",
-  luxury: "LUKSUSOWY",
-  executive: "KLASA BIZNES",
-  electric: "ELEKTRYCZNY",
-  business: "EKONOMICZNY",
-};
+export async function generateMetadata({
+  params,
+}: {
+  params: Promise<{ locale: string }>;
+}) {
+  const { locale } = await params;
+  const t = await getTranslations({ locale, namespace: "Admin.chatbot" });
+  return { title: t("analytics.metaTitle") };
+}
 
 function Bars({ rows }: { rows: { label: string; n: number }[] }) {
   const max = Math.max(...rows.map((r) => r.n), 1);
@@ -99,6 +81,7 @@ function Step({
   of: number;
   hint?: string;
 }) {
+  const t = useTranslations("Admin.chatbot");
   const unmeasured = value === null;
   const pct = !unmeasured && of > 0 ? Math.round((value / of) * 100) : null;
   return (
@@ -120,7 +103,7 @@ function Step({
       </span>
       {unmeasured && (
         <span className="label-tight border-line text-ink-faint border px-2 py-0.5 text-[10px]">
-          nie mierzone
+          {t("analytics.funnel.notMeasured")}
         </span>
       )}
       {hint && <span className="text-ink-faint w-full text-xs">{hint}</span>}
@@ -137,6 +120,7 @@ function DemandTable({
   emptyText: string;
   filterQuery: (label: string) => Record<string, string>;
 }) {
+  const t = useTranslations("Admin.chatbot");
   if (rows.length === 0) return <Empty>{emptyText}</Empty>;
   return (
     <div className="overflow-x-auto">
@@ -144,21 +128,21 @@ function DemandTable({
         <thead>
           <tr className="border-line text-ink-faint border-y">
             <th className="label-tight py-3 pr-4 text-[10px]">
-              Model / potrzeba
+              {t("analytics.demand.cols.need")}
             </th>
             <th className="label-tight py-3 pr-4 text-right text-[10px]">
-              Zapytania
+              {t("analytics.demand.cols.requests")}
             </th>
             <th className="label-tight py-3 pr-4 text-right text-[10px]">
-              Brak we flocie
+              {t("analytics.demand.cols.notInFleet")}
             </th>
             <th className="label-tight py-3 pr-4 text-right text-[10px]">
-              Brak dostępności
+              {t("analytics.demand.cols.unavailable")}
             </th>
             <th className="label-tight py-3 pr-4 text-right text-[10px]">
-              Do rezerwacji
+              {t("analytics.demand.cols.toBooking")}
             </th>
-            <th className="label-tight py-3 text-[10px]">Ostatnie</th>
+            <th className="label-tight py-3 text-[10px]">{t("analytics.demand.cols.last")}</th>
           </tr>
         </thead>
         <tbody>
@@ -228,6 +212,7 @@ export default async function ChatAnalyticsPage({
 }) {
   const { locale } = await params;
   setRequestLocale(locale);
+  const t = await getTranslations("Admin.chatbot");
   const f = parseFilters(await searchParams);
 
   const [
@@ -259,18 +244,17 @@ export default async function ChatAnalyticsPage({
   ]);
 
   const maxDay = Math.max(...daily.map((d) => d.n), 1);
-  const period = RANGE_LABEL[f.range].toLowerCase();
+  const period = t(`analytics.ranges.${f.range}`).toLowerCase();
   const drillTo = (label: string) => filtersToQuery(f, { model: label });
 
   return (
     <div className="max-w-5xl">
       <header className="mb-6">
         <h1 className="font-heading text-ink text-2xl font-bold">
-          Analityka chatbota
+          {t("analytics.title")}
         </h1>
         <p className="text-silver mt-1 text-sm">
-          Czego klienci szukają — łącznie z samochodami, których nie mamy — i
-          gdzie kończy się droga do rezerwacji.
+          {t("analytics.subtitle")}
         </p>
       </header>
 
@@ -280,91 +264,88 @@ export default async function ChatAnalyticsPage({
 
       {/* ── Lejek ──────────────────────────────────────────────────────── */}
       <section>
-        <h2 className="label text-ink text-xs">Lejek — {period}</h2>
+        <h2 className="label text-ink text-xs">{t("analytics.funnel.title", { period })}</h2>
         <p className="text-ink-faint mt-1 mb-4 text-xs">
           {funnel.since
-            ? `Liczony od ${formatDateTimePl(funnel.since)} — od tej chwili system zapisuje te fakty. Wcześniejsze rozmowy są pominięte, bo dla nich „nie zdarzyło się” i „nie mierzyliśmy” wyglądają identycznie, a licząc je razem wychodził lejek, w którym więcej osób klika „Rezerwuj”, niż w ogóle zobaczyło auto.`
-            : "Brak danych — żadna rozmowa nie zapisała jeszcze tych faktów."}
+            ? t("analytics.funnel.since", { since: formatDateTimePl(funnel.since) })
+            : t("analytics.funnel.none")}
         </p>
         <div className="border-line mt-4 border px-5 py-3">
           <Step
-            label="Rozmowy"
+            label={t("analytics.funnel.steps.conversations")}
             value={funnel.conversations}
             of={funnel.conversations}
           />
           <Step
-            label="Szukali samochodu"
+            label={t("analytics.funnel.steps.searched")}
             value={funnel.searched}
             of={funnel.conversations}
           />
           <Step
-            label="Zobaczyli pasujące auto"
+            label={t("analytics.funnel.steps.matched")}
             value={funnel.matched}
             of={funnel.conversations}
           />
           <Step
-            label="Sprawdzili cenę (wycena na termin)"
+            label={t("analytics.funnel.steps.sawPrice")}
             value={funnel.sawPrice}
             of={funnel.conversations}
           />
           <Step
-            label="Kliknęli „Rezerwuj”"
+            label={t("analytics.funnel.steps.clickedBook")}
             value={funnel.clickedBook}
             of={funnel.conversations}
           />
           <Step
-            label="Otworzyli samochód"
+            label={t("analytics.funnel.steps.carOpened")}
             value={funnel.carOpened}
             of={funnel.conversations}
-            hint="Kliknięcie „Zobacz samochód” w czacie. Do 22.08.2026 oba przyciski na karcie raportowały to samo zdarzenie, więc przeglądanie i chęć rezerwacji były jedną liczbą."
+            hint={t("analytics.funnel.steps.carOpenedHint")}
           />
           <Step
-            label="Rozpoczęli formularz"
+            label={t("analytics.funnel.steps.startedForm")}
             value={funnel.startedForm}
             of={funnel.conversations}
-            hint="Liczone z otwarcia strony rezerwacji z identyfikatorem rozmowy — nie z kliknięcia. Kto zamknie kartę po drodze, zostaje w kroku wyżej."
+            hint={t("analytics.funnel.steps.startedFormHint")}
           />
           <Step
-            label="Zakończyli rezerwację"
+            label={t("analytics.funnel.steps.finished")}
             value={funnel.reservations}
             of={funnel.conversations}
-            hint="Liczone z pola source = chatbot na rezerwacji — z faktycznie powstałych rezerwacji, nie z kliknięć."
+            hint={t("analytics.funnel.steps.finishedHint")}
           />
         </div>
         <p className="text-ink-faint mt-3 text-xs">
-          Każdy krok liczony z osobnego, rzeczywistego zdarzenia: „Rezerwuj” z
-          kliknięcia w czacie, „rozpoczęli formularz” z otwarcia strony
-          rezerwacji, „zakończyli rezerwację” z pola source na powstałej
-          rezerwacji. Żaden nie jest przepisanym krokiem poprzednim.
+          {t("analytics.funnel.note")}
         </p>
 
         <div className="border-line bg-line mt-4 grid gap-px border sm:grid-cols-2 lg:grid-cols-4">
           {[
             {
-              label: "Brak auta we flocie",
+              label: t("analytics.outcomes.noCar"),
               value: funnel.noCar,
-              hint: "prosili o coś, czego nie mamy",
+              hint: t("analytics.outcomes.noCarHint"),
             },
             {
-              label: "Brak dostępności",
+              label: t("analytics.outcomes.unavailable"),
               value: funnel.unavailable,
-              hint: "mamy, ale było zajęte",
+              hint: t("analytics.outcomes.unavailableHint"),
             },
             {
-              label: "Przekazane do pracownika",
+              label: t("analytics.outcomes.handoff"),
               value: funnel.handoff,
-              hint: "prośba o kontakt",
+              hint: t("analytics.outcomes.handoffHint"),
             },
-            { label: "Leady", value: funnel.leads, hint: "zostawili kontakt" },
-          ].map((t) => (
-            <div key={t.label} className="bg-void p-5">
+            { label: t("analytics.outcomes.leads"), value: funnel.leads, hint: t("analytics.outcomes.leadsHint") },
+          ].map((tile) => (
+            <div key={tile.label} className="bg-void p-5">
               <p className="label-tight text-ink-faint text-[10px]">
-                {t.label}
+                {tile.label}
               </p>
               <p className="font-heading text-ink mt-2 text-2xl font-bold tabular-nums">
-                {t.value}
+                {tile.value}
               </p>
-              <p className="text-ink-faint mt-1 text-xs">{t.hint}</p>
+              <p className="text-ink-faint mt-1 text-xs">{tile.hint}</p>
             </div>
           ))}
         </div>
@@ -372,15 +353,13 @@ export default async function ChatAnalyticsPage({
 
       {/* ── Popyt ──────────────────────────────────────────────────────── */}
       <section className="mt-12">
-        <h2 className="label text-ink text-xs">Popyt na samochody</h2>
+        <h2 className="label text-ink text-xs">{t("analytics.demand.title")}</h2>
         <p className="text-ink-faint mt-1 mb-4 text-xs">
-          Jeden wiersz na jedno zainteresowanie w jednej rozmowie. Klient, który
-          trzy razy dopytuje o ten sam model, to jedno zapytanie — inaczej jedna
-          osoba wyglądałaby jak trzy.
+          {t("analytics.demand.desc")}
         </p>
         <DemandTable
           rows={demand}
-          emptyText={`Brak zapytań w wybranym okresie (${period}).`}
+          emptyText={t("analytics.demand.empty", { period })}
           filterQuery={drillTo}
         />
       </section>
@@ -388,10 +367,10 @@ export default async function ChatAnalyticsPage({
       <div className="mt-10 grid gap-10 sm:grid-cols-2">
         <section>
           <h2 className="label text-ink mb-4 text-xs">
-            Najczęściej szukane marki
+            {t("analytics.brands")}
           </h2>
           {brands.length === 0 ? (
-            <Empty>Brak danych.</Empty>
+            <Empty>{t("analytics.empty")}</Empty>
           ) : (
             <Bars rows={brands.map((b) => ({ label: b.name, n: b.n }))} />
           )}
@@ -399,14 +378,14 @@ export default async function ChatAnalyticsPage({
 
         <section>
           <h2 className="label text-ink mb-4 text-xs">
-            Najczęściej szukane segmenty
+            {t("analytics.segments")}
           </h2>
           {segments.length === 0 ? (
-            <Empty>Brak danych.</Empty>
+            <Empty>{t("analytics.empty")}</Empty>
           ) : (
             <Bars
               rows={segments.map((s) => ({
-                label: SEGMENT_LABEL[s.name] ?? s.name,
+                label: t.has(`segments.${s.name}`) ? t(`segments.${s.name}`) : s.name,
                 n: s.n,
               }))}
             />
@@ -415,23 +394,23 @@ export default async function ChatAnalyticsPage({
 
         <section>
           <h2 className="label text-ink mb-4 text-xs">
-            Najczęściej szukana liczba miejsc
+            {t("analytics.seats")}
           </h2>
           {seats.length === 0 ? (
-            <Empty>Brak danych.</Empty>
+            <Empty>{t("analytics.empty")}</Empty>
           ) : (
             <Bars
-              rows={seats.map((s) => ({ label: `${s.name} osób`, n: s.n }))}
+              rows={seats.map((s) => ({ label: t("analytics.seatsCount", { count: Number(s.name) }), n: s.n }))}
             />
           )}
         </section>
 
         <section>
           <h2 className="label text-ink mb-4 text-xs">
-            Zapytania bez przejścia do rezerwacji
+            {t("analytics.noBooking")}
           </h2>
           {noBooking.length === 0 ? (
-            <Empty>Brak danych.</Empty>
+            <Empty>{t("analytics.empty")}</Empty>
           ) : (
             <Bars
               rows={noBooking
@@ -445,35 +424,33 @@ export default async function ChatAnalyticsPage({
       {/* ── Czego nie mamy ─────────────────────────────────────────────── */}
       <section className="mt-12">
         <h2 className="label text-ink text-xs">
-          Najczęściej szukane samochody, których nie ma we flocie
+          {t("analytics.missing.title")}
         </h2>
         <p className="text-ink-faint mt-1 mb-4 text-xs">
-          Lista zakupowa. Kolumny 7 i 30 dni liczone są zawsze od dziś,
-          niezależnie od filtra okresu — kolumna, która zmienia znaczenie razem
-          z rozwijaną listą, jest kolumną, której nie da się zacytować.
+          {t("analytics.missing.desc")}
         </p>
         {missing.length === 0 ? (
           <Empty>
-            W wybranym okresie nikt nie pytał o samochód spoza floty.
+            {t("analytics.missing.empty")}
           </Empty>
         ) : (
           <div className="overflow-x-auto">
             <table className="w-full min-w-[720px] border-collapse text-left text-sm">
               <thead>
                 <tr className="border-line text-ink-faint border-y">
-                  <th className="label-tight py-3 pr-4 text-[10px]">Model</th>
-                  <th className="label-tight py-3 pr-4 text-[10px]">Marka</th>
+                  <th className="label-tight py-3 pr-4 text-[10px]">{t("analytics.missing.cols.model")}</th>
+                  <th className="label-tight py-3 pr-4 text-[10px]">{t("analytics.missing.cols.brand")}</th>
                   <th className="label-tight py-3 pr-4 text-right text-[10px]">
-                    Zapytania
+                    {t("analytics.missing.cols.requests")}
                   </th>
                   <th className="label-tight py-3 pr-4 text-[10px]">
-                    Ostatnie zapytanie
+                    {t("analytics.missing.cols.lastRequest")}
                   </th>
                   <th className="label-tight py-3 pr-4 text-right text-[10px]">
-                    7 dni
+                    {t("analytics.missing.cols.days7")}
                   </th>
                   <th className="label-tight py-3 text-right text-[10px]">
-                    30 dni
+                    {t("analytics.missing.cols.days30")}
                   </th>
                 </tr>
               </thead>
@@ -507,15 +484,14 @@ export default async function ChatAnalyticsPage({
       {/* ── Braki dostępności ──────────────────────────────────────────── */}
       <section className="mt-12">
         <h2 className="label text-ink text-xs">
-          Auta, które mamy — a nie były wolne
+          {t("analytics.unavailableSection.title")}
         </h2>
         <p className="text-ink-faint mt-1 mb-4 text-xs">
-          To jest inna decyzja niż lista wyżej: tu nie chodzi o kupno nowego
-          modelu, tylko o drugą sztukę tego, który już zarabia.
+          {t("analytics.unavailableSection.desc")}
         </p>
         <DemandTable
           rows={unavailable}
-          emptyText="Nikt nie trafił na zajęty termin w wybranym okresie."
+          emptyText={t("analytics.unavailableSection.empty")}
           filterQuery={drillTo}
         />
       </section>
@@ -523,29 +499,24 @@ export default async function ChatAnalyticsPage({
       {/* ── Dlaczego bez rezerwacji ────────────────────────────────────── */}
       <section className="mt-12">
         <h2 className="label text-ink text-xs">
-          Dlaczego nie doszło do rezerwacji
+          {t("analytics.reasons.title")}
         </h2>
         <p className="text-ink-faint mt-1 mb-4 text-xs">
-          Wyliczone z tego, co się wydarzyło, nie zgadywane. „Brak danych” to
-          pełnoprawna odpowiedź i pojawia się zawsze, gdy ślady nie wskazują
-          jednej przyczyny.
+          {t("analytics.reasons.desc")}
         </p>
         {reasons.length === 0 ? (
-          <Empty>Brak rozmów bez rezerwacji w wybranym okresie.</Empty>
+          <Empty>{t("analytics.reasons.empty")}</Empty>
         ) : (
-          <Bars rows={reasons.map((r) => ({ label: r.label, n: r.n }))} />
+          <Bars rows={reasons.map((r) => ({ label: pick(r.label, locale), n: r.n }))} />
         )}
         <p className="text-ink-faint mt-3 text-xs">
-          Pozycji „cena” tu nie ma świadomie: nic w systemie nie odróżnia
-          klienta, który zobaczył cenę i zrezygnował, od tego, który zobaczył
-          cenę i poszedł porównać. Liczba osób, które zobaczyły wycenę, jest w
-          lejku wyżej — jako liczba, nie jako motyw.
+          {t("analytics.reasons.priceNote")}
         </p>
       </section>
 
       {/* ── Wcześniejsze wykresy ───────────────────────────────────────── */}
       <section className="mt-12">
-        <h2 className="label text-ink text-xs">Rozmowy — ostatnie 14 dni</h2>
+        <h2 className="label text-ink text-xs">{t("analytics.daily")}</h2>
         <div className="border-line mt-4 flex items-end gap-1 border p-4">
           {daily.map((d) => (
             <div key={d.day} className="flex flex-1 flex-col items-center">
@@ -567,10 +538,10 @@ export default async function ChatAnalyticsPage({
       <div className="mt-12 grid gap-10 sm:grid-cols-2">
         <section>
           <h2 className="label text-ink mb-4 text-xs">
-            Najczęściej pytane samochody z floty
+            {t("analytics.topCars")}
           </h2>
           {stats.topCars.length === 0 ? (
-            <Empty>Brak danych.</Empty>
+            <Empty>{t("analytics.empty")}</Empty>
           ) : (
             <Bars
               rows={stats.topCars.map((c) => ({ label: c.name, n: c.n }))}
@@ -579,13 +550,13 @@ export default async function ChatAnalyticsPage({
         </section>
 
         <section>
-          <h2 className="label text-ink mb-4 text-xs">O co pytają</h2>
+          <h2 className="label text-ink mb-4 text-xs">{t("analytics.intents")}</h2>
           {prefs.intents.length === 0 ? (
-            <Empty>Brak danych.</Empty>
+            <Empty>{t("analytics.empty")}</Empty>
           ) : (
             <Bars
               rows={prefs.intents.map((i) => ({
-                label: TOPIC_LABEL[i.topic] ?? i.topic,
+                label: t.has(`topics.${i.topic}`) ? t(`topics.${i.topic}`) : i.topic,
                 n: i.n,
               }))}
             />
@@ -594,10 +565,10 @@ export default async function ChatAnalyticsPage({
 
         <section>
           <h2 className="label text-ink mb-4 text-xs">
-            Najczęściej wybierane miejsca odbioru
+            {t("analytics.locations")}
           </h2>
           {prefs.locations.length === 0 ? (
-            <Empty>Brak danych.</Empty>
+            <Empty>{t("analytics.empty")}</Empty>
           ) : (
             <Bars
               rows={prefs.locations.map((l) => ({ label: l.name, n: l.n }))}
@@ -607,10 +578,10 @@ export default async function ChatAnalyticsPage({
 
         <section>
           <h2 className="label text-ink mb-4 text-xs">
-            Najczęściej pytane terminy
+            {t("analytics.months")}
           </h2>
           {prefs.months.length === 0 ? (
-            <Empty>Brak danych.</Empty>
+            <Empty>{t("analytics.empty")}</Empty>
           ) : (
             <Bars
               rows={prefs.months.map((m) => ({ label: m.month, n: m.n }))}

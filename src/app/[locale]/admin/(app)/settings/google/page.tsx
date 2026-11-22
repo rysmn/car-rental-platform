@@ -1,10 +1,18 @@
-import { setRequestLocale } from "next-intl/server";
+import { setRequestLocale, getTranslations } from "next-intl/server";
 import { Link } from "@/i18n/navigation";
 import { guardPage } from "@/lib/auth/guard";
 import { getSetting } from "@/lib/admin/settings";
 import { GoogleMapsForm } from "../SettingsForms";
 
-export const metadata = { title: "Google" };
+export async function generateMetadata({
+  params,
+}: {
+  params: Promise<{ locale: string }>;
+}) {
+  const { locale } = await params;
+  const t = await getTranslations({ locale, namespace: "Admin.settings.googlePage" });
+  return { title: t("metaTitle") };
+}
 
 /**
  * GOOGLE — własny ekran ustawień.
@@ -42,6 +50,8 @@ export default async function GoogleSettingsPage({
 
   const { locale } = await params;
   setRequestLocale(locale);
+  const t = await getTranslations("Admin.settings.googlePage");
+  const tc = await getTranslations("Admin.settings.common");
 
   const [google, social, company] = await Promise.all([
     getSetting("google"),
@@ -55,14 +65,11 @@ export default async function GoogleSettingsPage({
         href="/admin/settings"
         className="label-tight text-ink-faint hover:text-ink -my-2 inline-flex min-h-11 items-center text-[10px]"
       >
-        ← Ustawienia
+        {tc("back")}
       </Link>
       <header className="mt-4 mb-8">
-        <h1 className="font-heading text-ink text-2xl font-bold">GOOGLE</h1>
-        <p className="text-silver mt-1 text-sm">
-          Wizytówka Google, mapa, opinie i lokalizacja. Każdy element ma osobny
-          przełącznik — włączony bez danych nie pokaże się klientowi.
-        </p>
+        <h1 className="font-heading text-ink text-2xl font-bold">{t("title")}</h1>
+        <p className="text-silver mt-1 text-sm">{t("subtitle")}</p>
       </header>
 
       {/*
@@ -72,10 +79,7 @@ export default async function GoogleSettingsPage({
         wziąć ani linku, ani Place ID.
       */}
       <p className="border-line text-ink-faint mb-10 border-l-2 py-1 pl-4 text-xs">
-        Puste pola nie są błędem. Linki, Place ID i współrzędne bierze się z
-        wizytówki Google firmy — dopóki nie zostanie ona założona i
-        zweryfikowana, nie ma czego tu wpisać, a strona publiczna po prostu nie
-        pokazuje tych elementów. Nic nie trzeba tu ustawiać „na zapas”.
+        {t("emptyNote")}
       </p>
 
       <GoogleMapsForm

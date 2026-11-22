@@ -2,6 +2,7 @@
 
 import { useActionState, useEffect, useRef, useState, useTransition } from "react";
 import { Link } from "@/i18n/navigation";
+import { useLocale, useTranslations } from "next-intl";
 import { updateLead, type LeadResult } from "../chatbot/actions";
 import {
   closeRequest,
@@ -13,12 +14,7 @@ import { summarise } from "@/lib/inbox/summary";
 /* Napisy z modułu bez `"use client"` — patrz komentarz w `lib/inbox/labels`.
    Trzymanie ich tutaj sprawiało, że serwerowa lista widziała referencję
    kliencką zamiast obiektu i rząd filtrów źródeł znikał bez śladu. */
-import {
-  REASON_LABEL,
-  SOURCE_LABEL,
-  STATUS_LABEL,
-  STATUS_OPTIONS,
-} from "@/lib/inbox/labels";
+import { STATUS_OPTIONS } from "@/lib/inbox/labels";
 import type { LeadReason, LeadStatus, RequestSource } from "@/lib/db/schema";
 
 export type InboxView = {
@@ -84,6 +80,8 @@ export function InboxItem({
     null,
   );
   const [closeState, closeAction, closing] = useActionState(closeRequest, null);
+  const t = useTranslations("Admin.inbox");
+  const locale = useLocale();
   const [open, setOpen] = useState(autoOpen);
   /* Sprawa otwarta z odnośnika w mailu jest przeczytana od pierwszej klatki —
      stan początkowy, nie `setState` w efekcie, który dokłada drugi render
@@ -161,7 +159,7 @@ export function InboxItem({
     source: item.source,
     status: item.status,
     reservationRef: item.reservationRef,
-  });
+  }, locale);
 
   return (
     <article
@@ -176,7 +174,7 @@ export function InboxItem({
         {/* Kropka nieprzeczytanego. `aria-label`, bo sam kolor nie jest
             informacją dla kogoś, kto go nie widzi. */}
         <span
-          aria-label={unread ? "Nieprzeczytana" : undefined}
+          aria-label={unread ? t("card.unreadLabel") : undefined}
           className={`mt-1.5 h-2 w-2 shrink-0 rounded-full ${
             unread ? "bg-red" : "bg-transparent"
           }`}
@@ -187,11 +185,11 @@ export function InboxItem({
                 właśnie po to: „czatem" mówi, którędy przyszło, „Zapytanie
                 firmowe" — czego dotyczy. Do 44D była tylko pierwsza z nich. */}
             <span className="label-tight border-line text-ink-faint border px-1.5 text-[10px]">
-              {SOURCE_LABEL[item.source] ?? item.source}
+              {t(`sources.${item.source}`)}
             </span>
             {item.reason && (
               <span className="label-tight border-line text-ink border px-1.5 text-[10px]">
-                {REASON_LABEL[item.reason]}
+                {t(`reasons.${item.reason}`)}
               </span>
             )}
             {item.lang && item.lang !== "pl" && (
@@ -203,12 +201,12 @@ export function InboxItem({
               {item.createdLabel}
             </span>
             <span className="border-line text-ink-faint ml-auto border px-2 text-[10px]">
-              {STATUS_LABEL[item.status] ?? item.status}
+              {t(`statuses.${item.status}`)}
             </span>
           </div>
 
           <h2 className={`text-ink mt-2 text-sm ${unread ? "font-bold" : ""}`}>
-            {item.subject ?? item.question?.slice(0, 90) ?? "Prośba o kontakt"}
+            {item.subject ?? item.question?.slice(0, 90) ?? t("card.contactRequest")}
           </h2>
 
           <p className="text-silver mt-1 text-xs">
@@ -244,7 +242,7 @@ export function InboxItem({
           aria-expanded={open}
           className="label text-ink-faint hover:text-ink tap ml-auto inline-flex items-center px-2 text-[11px]"
         >
-          {open ? "Zwiń" : "Otwórz"}
+          {open ? t("card.collapse") : t("card.open")}
         </button>
       </div>
 
@@ -256,7 +254,7 @@ export function InboxItem({
               i tak ma zostać. */}
           {item.question && (
             <p className="text-silver border-line/60 border-l-2 pl-3 text-xs whitespace-pre-wrap italic">
-              „{item.question}”
+              {t("card.quoted", { text: item.question })}
             </p>
           )}
 
@@ -284,10 +282,10 @@ export function InboxItem({
                 className="text-ink-faint hover:text-ink tap-area text-[11px] underline underline-offset-2 disabled:no-underline disabled:opacity-50"
               >
                 {loadingChat
-                  ? "Wczytuję rozmowę…"
+                  ? t("card.loadingChat")
                   : transcript
-                    ? "Rozmowa poniżej"
-                    : "Pokaż całą rozmowę"}
+                    ? t("card.conversationBelow")
+                    : t("card.showFullConversation")}
               </button>
             )}
             {item.reservationRef && (
@@ -295,7 +293,7 @@ export function InboxItem({
                 href="/admin/reservations"
                 className="text-ink-faint hover:text-ink tap-area text-[11px] underline underline-offset-2"
               >
-                Rezerwacja {item.reservationRef}
+                {t("card.bookingRef", { ref: item.reservationRef ?? "" })}
               </Link>
             )}
           </div>
@@ -309,15 +307,14 @@ export function InboxItem({
             <div className="border-line/60 mt-3 max-h-80 overflow-y-auto border p-3">
               {transcript.length === 0 ? (
                 <p className="text-ink-faint text-[11px]">
-                  Transkrypt tej rozmowy już nie istnieje — rozmowy kasujemy po
-                  90 dniach.
+                  {t("card.transcriptGone")}
                 </p>
               ) : (
                 <ol className="space-y-2">
                   {transcript.map((m) => (
                     <li key={m.id} className="text-[11px]">
                       <span className="label-tight text-ink-faint mr-2 text-[9px]">
-                        {m.role === "user" ? "KLIENT" : "ASYSTENT"}
+                        {m.role === "user" ? t("card.customerTag") : t("card.assistantTag")}
                       </span>
                       <span className="text-ink-faint text-[9px]">{m.at}</span>
                       {/* Tekstem, nie znacznikami: wiadomość z `<script>`
@@ -339,7 +336,7 @@ export function InboxItem({
             <input type="hidden" name="id" value={item.id} />
             <label className="flex flex-col gap-1">
               <span className="label-tight text-ink-faint text-[10px]">
-                Status
+                {t("card.status")}
               </span>
               <select
                 name="status"
@@ -348,19 +345,19 @@ export function InboxItem({
               >
                 {STATUS_OPTIONS.map((s) => (
                   <option key={s.value} value={s.value}>
-                    {s.label}
+                    {t(`statuses.${s.value}`)}
                   </option>
                 ))}
               </select>
             </label>
             <label className="flex flex-col gap-1">
               <span className="label-tight text-ink-faint text-[10px]">
-                Notatka pracownika
+                {t("card.staffNote")}
               </span>
               <input
                 name="note"
                 defaultValue={item.note ?? ""}
-                placeholder="Oddzwonić po 17"
+                placeholder={t("card.notePlaceholder")}
                 className="border-line-strong bg-surface-1 text-ink placeholder:text-ink-faint h-11 w-full border px-2 text-xs"
               />
             </label>
@@ -370,10 +367,10 @@ export function InboxItem({
                 disabled={pending}
                 className="label border-line-strong text-ink hover:border-ink hover:bg-ink/5 tap inline-flex items-center border px-4 text-xs transition-colors disabled:opacity-50"
               >
-                {pending ? "Zapisywanie…" : "Zapisz"}
+                {pending ? t("card.saving") : t("card.save")}
               </button>
               {state?.ok && (
-                <span className="text-xs text-emerald-400">Zapisano ✓</span>
+                <span className="text-xs text-emerald-400">{t("card.saved")}</span>
               )}
               {state && !state.ok && (
                 <span className="text-red text-xs">{state.error}</span>
@@ -389,7 +386,7 @@ export function InboxItem({
                 disabled={closing}
                 className="label text-ink-faint hover:text-ink tap inline-flex items-center text-[11px] underline underline-offset-2 disabled:opacity-50"
               >
-                {closing ? "Zamykam…" : "Załatwione — zamknij sprawę"}
+                {closing ? t("card.closing") : t("card.closeCase")}
               </button>
               {closeState && !closeState.ok && (
                 <span className="text-red ml-3 text-xs">

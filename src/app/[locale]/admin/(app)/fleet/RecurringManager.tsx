@@ -1,6 +1,8 @@
 "use client";
 
+import { pick } from "@/lib/i18n-pick";
 import { useActionState, useState, useTransition } from "react";
+import { useLocale, useTranslations } from "next-intl";
 import { createRecurring, deleteRecurring, generateRecurring } from "./actions";
 import {
   RECURRING_INTERVALS,
@@ -8,7 +10,7 @@ import {
   type RecurringRow,
 } from "@/lib/admin/recurring-options";
 import { EXPENSE_GROUPS, EXPENSE_LABEL } from "@/lib/admin/expense-options";
-import { formatPln, formatDatePl } from "@/lib/format";
+import { formatPln } from "@/lib/format";
 
 const inputCls =
   "h-10 w-full border border-line-strong bg-surface-1 px-3 text-sm text-ink placeholder:text-ink-faint";
@@ -19,7 +21,27 @@ function todayValue(): string {
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
 }
 
+/** Symbol waluty w bieżącym locale (pl: „zł”, en: „PLN”). */
+function currencySymbol(locale: string) {
+  return (
+    new Intl.NumberFormat(locale, { style: "currency", currency: "PLN" })
+      .formatToParts(0)
+      .find((p) => p.type === "currency")?.value ?? "PLN"
+  );
+}
+
+function formatDate(iso: string, locale: string): string {
+  const [y, m, d] = iso.split("-").map(Number);
+  return new Date(y, m - 1, d).toLocaleDateString(locale, {
+    day: "2-digit",
+    month: "2-digit",
+    year: "numeric",
+  });
+}
+
 function Row({ item }: { item: RecurringRow }) {
+  const t = useTranslations("Admin.fleet");
+  const locale = useLocale();
   const [busy, start] = useTransition();
   const [message, setMessage] = useState<string | null>(null);
   const [confirm, setConfirm] = useState(false);
@@ -33,8 +55,8 @@ function Row({ item }: { item: RecurringRow }) {
       } else {
         setMessage(
           res.created === 0
-            ? "Nic do dopisania — wszystkie okresy już są."
-            : `Dopisano ${res.created} pozycji.`,
+            ? t("nothingToAdd")
+            : t("addedCount", { count: res.created ?? 0 }),
         );
       }
     });
@@ -51,22 +73,26 @@ function Row({ item }: { item: RecurringRow }) {
   return (
     <div className="border-line/60 flex flex-wrap items-baseline gap-x-4 gap-y-1 border-b py-3 last:border-0">
       <span className="min-w-[9rem] text-sm text-ink">
-        {EXPENSE_LABEL[item.category]}
+        {pick(EXPENSE_LABEL[item.category], locale)}
       </span>
       <span className="text-sm text-ink tabular-nums">
-        {formatPln(item.amountGrosze, "pl")}
+        {formatPln(item.amountGrosze, locale)}
       </span>
       <span className="text-silver text-xs">
-        {INTERVAL_LABEL[item.interval]}
+        {pick(INTERVAL_LABEL[item.interval], locale)}
       </span>
       <span className="text-ink-faint text-xs tabular-nums">
-        od {formatDatePl(item.startOn)}
-        {item.endOn ? ` do ${formatDatePl(item.endOn)}` : ""}
+        {t("rangeFrom", { date: formatDate(item.startOn, locale) })}
+        {item.endOn
+          ? ` ${t("rangeTo", { date: formatDate(item.endOn, locale) })}`
+          : ""}
       </span>
-      <span className="text-ink-faint text-xs">dopisano {item.generated}</span>
+      <span className="text-ink-faint text-xs">
+        {t("generatedLabel", { count: item.generated })}
+      </span>
       {!item.active && (
         <span className="border-line text-ink-faint border px-1.5 text-[10px]">
-          wyłączona
+          {t("inactive")}
         </span>
       )}
       <span className="ml-auto flex items-center gap-3">
@@ -76,7 +102,7 @@ function Row({ item }: { item: RecurringRow }) {
           disabled={busy || !item.active}
           className="text-silver text-xs hover:text-ink disabled:opacity-40"
         >
-          {busy ? "Pracuję…" : "Dopisz brakujące"}
+          {busy ? t("working") : t("addMissing")}
         </button>
         {confirm ? (
           <>
@@ -86,14 +112,14 @@ function Row({ item }: { item: RecurringRow }) {
               disabled={busy}
               className="text-red text-xs disabled:opacity-50"
             >
-              Na pewno?
+              {t("confirmQuestion")}
             </button>
             <button
               type="button"
               onClick={() => setConfirm(false)}
               className="text-ink-faint text-xs hover:text-ink"
             >
-              Anuluj
+              {t("cancel")}
             </button>
           </>
         ) : (
@@ -102,7 +128,7 @@ function Row({ item }: { item: RecurringRow }) {
             onClick={() => setConfirm(true)}
             className="text-ink-faint hover:text-red tap text-xs"
           >
-            Usuń
+            {t("remove")}
           </button>
         )}
       </span>
@@ -112,6 +138,9 @@ function Row({ item }: { item: RecurringRow }) {
 }
 
 function AddRecurring({ carId }: { carId: string }) {
+  const t = useTranslations("Admin.fleet");
+  const locale = useLocale();
+  const currency = currencySymbol(locale);
   const [state, action, pending] = useActionState(createRecurring, null);
   const [open, setOpen] = useState(false);
 
@@ -122,7 +151,7 @@ function AddRecurring({ carId }: { carId: string }) {
         onClick={() => setOpen(true)}
         className="label border-line-strong mt-3 inline-flex h-9 items-center border px-4 text-xs text-ink transition-colors hover:border-ink hover:bg-ink/5"
       >
-        + Dodaj koszt cykliczny
+        {t("addRecurring")}
       </button>
     );
   }
@@ -134,16 +163,16 @@ function AddRecurring({ carId }: { carId: string }) {
     >
       <input type="hidden" name="carId" value={carId} />
       <input type="hidden" name="active" value="on" />
-      <p className="label mb-3 text-xs text-ink">Nowy koszt cykliczny</p>
+      <p className="label mb-3 text-xs text-ink">{t("newRecurring")}</p>
       <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
         <label className="flex flex-col gap-1">
-          <span className={labelCls}>Rodzaj *</span>
+          <span className={labelCls}>{t("kind")} *</span>
           <select name="category" defaultValue="leasing" className={inputCls}>
             {EXPENSE_GROUPS.map((g) => (
-              <optgroup key={g.key} label={g.label}>
+              <optgroup key={g.key} label={pick(g.label, locale)}>
                 {g.categories.map((c) => (
                   <option key={c} value={c}>
-                    {EXPENSE_LABEL[c]}
+                    {pick(EXPENSE_LABEL[c], locale)}
                   </option>
                 ))}
               </optgroup>
@@ -151,7 +180,7 @@ function AddRecurring({ carId }: { carId: string }) {
           </select>
         </label>
         <label className="flex flex-col gap-1">
-          <span className={labelCls}>Kwota jednej raty (zł) *</span>
+          <span className={labelCls}>{t("installment", { currency })} *</span>
           <input
             name="amount"
             inputMode="decimal"
@@ -161,17 +190,17 @@ function AddRecurring({ carId }: { carId: string }) {
           />
         </label>
         <label className="flex flex-col gap-1">
-          <span className={labelCls}>Częstotliwość *</span>
+          <span className={labelCls}>{t("frequency")} *</span>
           <select name="interval" defaultValue="monthly" className={inputCls}>
             {RECURRING_INTERVALS.map((i) => (
               <option key={i} value={i}>
-                {INTERVAL_LABEL[i]}
+                {pick(INTERVAL_LABEL[i], locale)}
               </option>
             ))}
           </select>
         </label>
         <label className="flex flex-col gap-1">
-          <span className={labelCls}>Pierwsza rata *</span>
+          <span className={labelCls}>{t("firstInstallment")} *</span>
           <input
             name="startOn"
             type="date"
@@ -181,14 +210,14 @@ function AddRecurring({ carId }: { carId: string }) {
           />
         </label>
         <label className="flex flex-col gap-1">
-          <span className={labelCls}>Koniec (opcjonalnie)</span>
+          <span className={labelCls}>{t("endOptional")}</span>
           <input name="endOn" type="date" className={inputCls} />
         </label>
         <label className="flex flex-col gap-1">
-          <span className={labelCls}>Opis</span>
+          <span className={labelCls}>{t("note")}</span>
           <input
             name="note"
-            placeholder="Leasing — umowa 4412/2025"
+            placeholder={t("recurringNotePlaceholder")}
             className={inputCls}
           />
         </label>
@@ -199,18 +228,18 @@ function AddRecurring({ carId }: { carId: string }) {
           disabled={pending}
           className="label bg-red hover:bg-red-hover inline-flex h-9 items-center px-5 text-xs text-white transition-colors disabled:opacity-50"
         >
-          {pending ? "Dodawanie…" : "Dodaj"}
+          {pending ? t("adding") : t("add")}
         </button>
         <button
           type="button"
           onClick={() => setOpen(false)}
           className="text-ink-faint text-xs hover:text-ink"
         >
-          Zamknij
+          {t("close")}
         </button>
         {state?.ok && (
           <span className="text-xs text-emerald-400">
-            Zapisano ✓ — teraz kliknij „Dopisz brakujące”.
+            {t("savedAddMissing")}
           </span>
         )}
         {state && !state.ok && (
@@ -236,6 +265,7 @@ export function RecurringManager({
   carId: string;
   items: RecurringRow[];
 }) {
+  const t = useTranslations("Admin.fleet");
   const [open, setOpen] = useState(false);
 
   return (
@@ -246,11 +276,13 @@ export function RecurringManager({
         className="tap-block flex w-full items-center justify-between gap-4 text-left"
       >
         <span className="label-tight text-ink-faint text-[10px]">
-          Koszty cykliczne
+          {t("recurringHeading")}
         </span>
         <span className="flex items-center gap-3 text-xs">
           <span className="text-silver">
-            {items.length === 0 ? "brak" : `${items.length} definicji`}
+            {items.length === 0
+              ? t("none")
+              : t("recurringDefs", { count: items.length })}
           </span>
           <span className="text-ink-faint">{open ? "▲" : "▼"}</span>
         </span>
@@ -258,12 +290,7 @@ export function RecurringManager({
 
       {open && (
         <div className="mt-3">
-          <p className="text-ink-faint mb-3 text-xs">
-            Definicja sama w sobie nic nie dolicza. „Dopisz brakujące” tworzy
-            prawdziwe pozycje w wydatkach za wszystkie okresy do dziś — możesz
-            je potem edytować jak każdy inny wydatek. Kliknięcie dwa razy nie
-            zdubluje pozycji.
-          </p>
+          <p className="text-ink-faint mb-3 text-xs">{t("recurringIntro")}</p>
           {items.length > 0 && (
             <div className="border-line bg-void/40 border px-4">
               {items.map((r) => (

@@ -2,6 +2,7 @@
 // so both the form components and the server actions can share the source of truth.
 
 import type { EditableSegment } from "@/lib/fleet/segments";
+import type { Bilingual } from "@/lib/i18n-pick";
 
 export const CATEGORIES = ["suv", "sedan", "van"] as const;
 export const GEARBOXES = ["automatic", "manual"] as const;
@@ -32,22 +33,22 @@ export type Fuel = (typeof FUELS)[number];
 export type CarStatus = (typeof CAR_STATUSES)[number];
 export type PrepStatus = (typeof PREP_STATUSES)[number];
 
-export const CATEGORY_LABEL: Record<Category, string> = {
-  suv: "SUV",
-  sedan: "Sedan",
-  van: "Van",
+export const CATEGORY_LABEL: Record<Category, Bilingual> = {
+  suv: { pl: "SUV", en: "SUV" },
+  sedan: { pl: "Sedan", en: "Sedan" },
+  van: { pl: "Van", en: "Van" },
 };
 
-export const GEARBOX_LABEL: Record<Gearbox, string> = {
-  automatic: "Automatyczna",
-  manual: "Manualna",
+export const GEARBOX_LABEL: Record<Gearbox, Bilingual> = {
+  automatic: { pl: "Automatyczna", en: "Automatic" },
+  manual: { pl: "Manualna", en: "Manual" },
 };
 
-export const FUEL_LABEL: Record<Fuel, string> = {
-  petrol: "Benzyna",
-  diesel: "Diesel",
-  hybrid: "Hybryda",
-  electric: "Elektryczny",
+export const FUEL_LABEL: Record<Fuel, Bilingual> = {
+  petrol: { pl: "Benzyna", en: "Petrol" },
+  diesel: { pl: "Diesel", en: "Diesel" },
+  hybrid: { pl: "Hybryda", en: "Hybrid" },
+  electric: { pl: "Elektryczny", en: "Electric" },
 };
 
 /**
@@ -58,30 +59,30 @@ export const FUEL_LABEL: Record<Fuel, string> = {
  * those two. Ticking it by hand is what let a Volvo XC60 be a SUV that no SUV
  * search could find, and a Porsche Panamera answer "luksusowy SUV".
  */
-export const SEGMENT_LABEL: Record<EditableSegment, string> = {
-  luxury: "Luxury",
-  executive: "Executive",
-  business: "Business",
+export const SEGMENT_LABEL: Record<EditableSegment, Bilingual> = {
+  luxury: { pl: "Luxury", en: "Luxury" },
+  executive: { pl: "Executive", en: "Executive" },
+  business: { pl: "Business", en: "Business" },
 };
 
-export const SEGMENT_HINT: Record<EditableSegment, string> = {
-  luxury: "Auta topowe, reprezentacyjne",
-  executive: "Limuzyny biznesowe z kierowcą lub bez",
-  business: "Codzienna flota firmowa",
+export const SEGMENT_HINT: Record<EditableSegment, Bilingual> = {
+  luxury: { pl: "Auta topowe, reprezentacyjne", en: "Top-end, representative cars" },
+  executive: { pl: "Limuzyny biznesowe z kierowcą lub bez", en: "Business limousines, with or without a driver" },
+  business: { pl: "Codzienna flota firmowa", en: "Everyday company fleet" },
 };
 
-export const CAR_STATUS_LABEL: Record<CarStatus, string> = {
-  available: "Dostępny",
-  rented: "Wynajęty",
-  service: "Serwis",
-  damaged: "Uszkodzony",
+export const CAR_STATUS_LABEL: Record<CarStatus, Bilingual> = {
+  available: { pl: "Dostępny", en: "Available" },
+  rented: { pl: "Wynajęty", en: "Rented" },
+  service: { pl: "Serwis", en: "In service" },
+  damaged: { pl: "Uszkodzony", en: "Damaged" },
 };
 
-export const PREP_STATUS_LABEL: Record<PrepStatus, string> = {
-  inspection: "Kontrola",
-  cleaning: "Mycie",
-  fueling: "Tankowanie",
-  ready: "Gotowy",
+export const PREP_STATUS_LABEL: Record<PrepStatus, Bilingual> = {
+  inspection: { pl: "Kontrola", en: "Inspection" },
+  cleaning: { pl: "Mycie", en: "Cleaning" },
+  fueling: { pl: "Tankowanie", en: "Refuelling" },
+  ready: { pl: "Gotowy", en: "Ready" },
 };
 
 /**
@@ -90,11 +91,11 @@ export const PREP_STATUS_LABEL: Record<PrepStatus, string> = {
  * "Gotowy" is the only one that is not work outstanding, which is why it is the
  * only one that reads as finished rather than as a queue.
  */
-export const PREP_STATUS_HINT: Record<PrepStatus, string> = {
-  inspection: "Wrócił, sprawdzany po zwrocie",
-  cleaning: "W myjni / detailing",
-  fueling: "Do zatankowania",
-  ready: "Czysty, zatankowany, może jechać",
+export const PREP_STATUS_HINT: Record<PrepStatus, Bilingual> = {
+  inspection: { pl: "Wrócił, sprawdzany po zwrocie", en: "Returned, being checked after return" },
+  cleaning: { pl: "W myjni / detailing", en: "At the car wash / detailing" },
+  fueling: { pl: "Do zatankowania", en: "Needs refuelling" },
+  ready: { pl: "Czysty, zatankowany, może jechać", en: "Clean, refuelled, ready to go" },
 };
 
 /** The next link in the chain, or null when the car is already ready. */

@@ -1,6 +1,7 @@
 "use client";
 
 import { useActionState } from "react";
+import { useTranslations } from "next-intl";
 import { type SaveResult, updateCancellationPolicy, updateFee, updateModelPricing, updatePickupLocation } from "./actions";
 import type { CancellationPolicy } from "@/lib/booking/cancellation";
 import type {
@@ -55,6 +56,7 @@ function SaveBar({
   state: SaveResult | null;
   pending: boolean;
 }) {
+  const t = useTranslations("Admin.pricing");
   return (
     <div className="flex items-center gap-3">
       <button
@@ -62,10 +64,10 @@ function SaveBar({
         disabled={pending}
         className="label border-line-strong inline-flex h-10 items-center border px-5 text-xs text-ink transition-colors hover:border-ink hover:bg-ink/5 disabled:opacity-50"
       >
-        {pending ? "Zapisywanie…" : "Zapisz"}
+        {pending ? t("actions.saving") : t("actions.save")}
       </button>
       {state?.ok && (
-        <span className="text-xs text-emerald-400">Zapisano ✓</span>
+        <span className="text-xs text-emerald-400">{t("actions.saved")}</span>
       )}
       {state && !state.ok && (
         <span className="text-red text-xs">{state.error}</span>
@@ -74,14 +76,16 @@ function SaveBar({
   );
 }
 
-const FEE_LABEL: Record<string, string> = {
-  extra_driver: "Dodatkowy kierowca",
-  child_seat: "Fotelik dziecięcy",
-  protection_package: "Pakiet ochronny",
-  no_deposit: "Zniesienie kaucji",
-};
+const FEE_CODES = [
+  "extra_driver",
+  "child_seat",
+  "protection_package",
+  "no_deposit",
+] as const;
 
 export function ModelPriceRow({ model }: { model: PricingModel }) {
+  const t = useTranslations("Admin.pricing");
+  const c = t("currency");
   const [state, action, pending] = useActionState(updateModelPricing, null);
   return (
     <form
@@ -96,13 +100,13 @@ export function ModelPriceRow({ model }: { model: PricingModel }) {
         <p className="text-ink-faint text-xs">{model.year}</p>
       </div>
       <Field
-        label="1–2 dni"
+        label={t("car.tier1")}
         name="daily"
         defaultValue={pln(model.dailyPriceGrosze)}
-        suffix="zł"
+        suffix={c}
       />
       <Field
-        label="3–6 dni"
+        label={t("car.tier2")}
         name="daily3to6"
         defaultValue={
           model.dailyPrice3to6Grosze === null
@@ -110,10 +114,10 @@ export function ModelPriceRow({ model }: { model: PricingModel }) {
             : pln(model.dailyPrice3to6Grosze)
         }
         placeholder="—"
-        suffix="zł"
+        suffix={c}
       />
       <Field
-        label="7–13 dni"
+        label={t("car.tier3")}
         name="daily7to13"
         defaultValue={
           model.dailyPrice7to13Grosze === null
@@ -121,10 +125,10 @@ export function ModelPriceRow({ model }: { model: PricingModel }) {
             : pln(model.dailyPrice7to13Grosze)
         }
         placeholder="—"
-        suffix="zł"
+        suffix={c}
       />
       <Field
-        label="14–29 dni"
+        label={t("car.tier4")}
         name="daily14to29"
         defaultValue={
           model.dailyPrice14to29Grosze === null
@@ -132,26 +136,26 @@ export function ModelPriceRow({ model }: { model: PricingModel }) {
             : pln(model.dailyPrice14to29Grosze)
         }
         placeholder="—"
-        suffix="zł"
+        suffix={c}
       />
       <Field
-        label="30+ dni (miesiąc)"
+        label={t("car.monthly")}
         name="monthly"
         defaultValue={pln(model.monthlyPriceGrosze)}
-        suffix="zł"
+        suffix={c}
       />
       <Field
-        label="Kaucja"
+        label={t("car.deposit")}
         name="deposit"
         defaultValue={pln(model.depositGrosze)}
-        suffix="zł"
+        suffix={c}
       />
       <Field
-        label="Limit km/dobę"
+        label={t("car.kmPerDay")}
         name="kmPerDay"
         defaultValue={model.kmPerDayLimit}
         step="1"
-        suffix="0 = ∞"
+        suffix={t("car.kmUnlimited")}
       />
       {/*
         Opłata za dodatkowy kilometr — TU i tylko tu właściciel ją ustawia.
@@ -166,7 +170,7 @@ export function ModelPriceRow({ model }: { model: PricingModel }) {
         nadprzebiegu, a nie brakiem danych.
       */}
       <Field
-        label="Opłata za dodatkowy kilometr"
+        label={t("car.extraMileage")}
         name="extraMileage"
         /*
           Dwa miejsca po przecinku w polu, nie „4.5".
@@ -181,7 +185,7 @@ export function ModelPriceRow({ model }: { model: PricingModel }) {
             : (model.extraMileageFeeGrosze / 100).toFixed(2)
         }
         placeholder="—"
-        suffix="zł/km ponad limit"
+        suffix={t("car.extraMileageSuffix")}
       />
       <SaveBar state={state} pending={pending} />
     </form>
@@ -189,7 +193,10 @@ export function ModelPriceRow({ model }: { model: PricingModel }) {
 }
 
 export function FeeRow({ fee }: { fee: PricingFee }) {
+  const t = useTranslations("Admin.pricing");
+  const c = t("currency");
   const [state, action, pending] = useActionState(updateFee, null);
+  const known = (FEE_CODES as readonly string[]).includes(fee.code);
   return (
     <form
       action={action}
@@ -197,26 +204,30 @@ export function FeeRow({ fee }: { fee: PricingFee }) {
     >
       <input type="hidden" name="id" value={fee.id} />
       <div className="min-w-40 flex-1">
-        <p className="text-sm text-ink">{FEE_LABEL[fee.code] ?? fee.code}</p>
+        <p className="text-sm text-ink">
+          {known
+            ? t(`fees.names.${fee.code as (typeof FEE_CODES)[number]}`)
+            : fee.code}
+        </p>
         <p className="text-ink-faint font-mono text-xs">{fee.code}</p>
       </div>
       <Field
-        label="Kwota"
+        label={t("fees.amount")}
         name="amount"
         defaultValue={pln(fee.amountGrosze)}
-        suffix="zł"
+        suffix={c}
       />
       <label className="flex flex-col gap-1">
         <span className="label-tight text-ink-faint text-[10px]">
-          Naliczanie
+          {t("fees.unit")}
         </span>
         <select
           name="unit"
           defaultValue={fee.unit}
           className="border-line-strong h-10 border bg-surface-1 px-2 text-sm text-ink"
         >
-          <option value="per_rental">za najem</option>
-          <option value="per_day">za dobę</option>
+          <option value="per_rental">{t("fees.perRental")}</option>
+          <option value="per_day">{t("fees.perDay")}</option>
         </select>
       </label>
       <label className="tap-block flex h-10 items-center gap-2 self-end">
@@ -226,7 +237,7 @@ export function FeeRow({ fee }: { fee: PricingFee }) {
           defaultChecked={fee.active}
           className="accent-red size-4"
         />
-        <span className="text-silver text-xs">Aktywna</span>
+        <span className="text-silver text-xs">{t("active")}</span>
       </label>
       <SaveBar state={state} pending={pending} />
     </form>
@@ -234,6 +245,8 @@ export function FeeRow({ fee }: { fee: PricingFee }) {
 }
 
 export function LocationRow({ location }: { location: PricingLocation }) {
+  const t = useTranslations("Admin.pricing");
+  const c = t("currency");
   const [state, action, pending] = useActionState(updatePickupLocation, null);
   return (
     <form
@@ -246,10 +259,10 @@ export function LocationRow({ location }: { location: PricingLocation }) {
         <p className="text-ink-faint font-mono text-xs">{location.slug}</p>
       </div>
       <Field
-        label="Opłata"
+        label={t("locations.fee")}
         name="fee"
         defaultValue={pln(location.feeGrosze)}
-        suffix="zł"
+        suffix={c}
       />
       <label className="tap-block flex h-10 items-center gap-2 self-end">
         <input
@@ -258,7 +271,7 @@ export function LocationRow({ location }: { location: PricingLocation }) {
           defaultChecked={location.active}
           className="accent-red size-4"
         />
-        <span className="text-silver text-xs">Aktywna</span>
+        <span className="text-silver text-xs">{t("active")}</span>
       </label>
       <SaveBar state={state} pending={pending} />
     </form>
@@ -279,66 +292,61 @@ export function CancellationPolicyForm({
 }: {
   policy: CancellationPolicy;
 }) {
+  const t = useTranslations("Admin.pricing");
+  const c = t("currency");
   const [state, action, pending] = useActionState(
     updateCancellationPolicy,
     null,
   );
+  const hours = t("cancellation.hoursBeforePickup");
   return (
     <form action={action} className="space-y-4 py-4">
       <div className="flex flex-wrap items-end gap-4">
         <Field
-          label="Bezpłatne anulowanie do"
+          label={t("cancellation.freeUntil")}
           name="freeHours"
           defaultValue={policy.freeHours}
           step="1"
-          suffix="h przed odbiorem"
+          suffix={hours}
         />
         <Field
-          label="Drugi próg"
+          label={t("cancellation.secondThreshold")}
           name="lateHours"
           defaultValue={policy.lateHours}
           step="1"
-          suffix="h przed odbiorem"
+          suffix={hours}
         />
       </div>
       <div className="flex flex-wrap items-end gap-4">
         <Field
-          label="Opłata między progami"
+          label={t("cancellation.tier1")}
           name="tier1"
           defaultValue={pln(policy.tier1Grosze)}
-          suffix="zł"
+          suffix={c}
         />
         <Field
-          label="Opłata poniżej drugiego progu"
+          label={t("cancellation.tier2")}
           name="tier2"
           defaultValue={pln(policy.tier2Grosze)}
-          suffix="zł"
+          suffix={c}
         />
         <Field
-          label="Nieodebranie auta"
+          label={t("cancellation.noShow")}
           name="noShow"
           defaultValue={pln(policy.noShowGrosze)}
-          suffix="zł"
+          suffix={c}
         />
         <Field
-          label="Tolerancja nieodebrania"
+          label={t("cancellation.noShowGrace")}
           name="noShowGraceMinutes"
           defaultValue={policy.noShowGraceMinutes}
           step="1"
-          suffix="min po godzinie odbioru"
+          suffix={t("cancellation.minutesAfterPickup")}
         />
       </div>
       <p className="text-ink-faint text-xs leading-relaxed">
-        <strong className="text-silver">
-          Zmiana progów 24 h / 12 h wymaga też poprawienia §5 Regulaminu
-        </strong>{" "}
-        — dokument prawny wymienia je z nazwy i nie czyta tej konfiguracji.
-        Kwoty są bezpieczne: Regulamin odsyła po nie do rezerwacji i cennika.{" "}
-        Opłata nigdy nie przekracza wartości rezerwacji — rezerwacja za 300 zł
-        i nieodebranie wycenione na 500 zł daje 300 zł. Zmiana działa wyłącznie
-        na nowe rezerwacje: już zawarte mają zapisane własne zasady i rozliczą
-        się według nich. Nieodebranie oznacza obsługa ręcznie, po upływie
-        tolerancji — nic nie nalicza się samo.
+        <strong className="text-silver">{t("cancellation.noteTitle")}</strong>{" "}
+        {t("cancellation.noteBody")}
       </p>
       <SaveBar state={state} pending={pending} />
     </form>

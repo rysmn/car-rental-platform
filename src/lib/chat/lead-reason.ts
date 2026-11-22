@@ -1,5 +1,6 @@
 import type { Intent } from "./nlu";
 import type { LeadReason } from "@/lib/db/schema";
+import type { Bilingual } from "@/lib/i18n-pick";
 
 /**
  * PO CO klient chce rozmawiać z człowiekiem — wyprowadzone z rozmowy, nie
@@ -130,17 +131,17 @@ export function worthAnInboxEntry(
 }
 
 /** Napisy dla panelu. Osobno od `lib/inbox/labels`, bo to słownik czatu. */
-export const REASON_LABEL: Record<LeadReason, string> = {
-  human_request: "Prośba o kontakt",
-  b2b: "Zapytanie firmowe",
-  long_term: "Wynajem długoterminowy",
-  non_fleet: "Auto spoza floty",
-  car_enquiry: "Pytanie o samochód",
-  booking_help: "Pomoc przy rezerwacji",
-  price_offer: "Wycena indywidualna",
-  rules_question: "Warunki wynajmu",
-  emergency: "Sprawa pilna",
-  partnership: "Partnerstwo / inwestycja",
-  reservation_question: "Pytanie do rezerwacji",
-  general: "Zapytanie ogólne",
+export const REASON_LABEL: Record<LeadReason, Bilingual> = {
+  human_request: { pl: "Prośba o kontakt", en: "Request for contact" },
+  b2b: { pl: "Zapytanie firmowe", en: "Business enquiry" },
+  long_term: { pl: "Wynajem długoterminowy", en: "Long-term rental" },
+  non_fleet: { pl: "Auto spoza floty", en: "Car outside the fleet" },
+  car_enquiry: { pl: "Pytanie o samochód", en: "Question about a car" },
+  booking_help: { pl: "Pomoc przy rezerwacji", en: "Help with a reservation" },
+  price_offer: { pl: "Wycena indywidualna", en: "Individual quote" },
+  rules_question: { pl: "Warunki wynajmu", en: "Rental terms" },
+  emergency: { pl: "Sprawa pilna", en: "Urgent matter" },
+  partnership: { pl: "Partnerstwo / inwestycja", en: "Partnership / investment" },
+  reservation_question: { pl: "Pytanie do rezerwacji", en: "Question about a reservation" },
+  general: { pl: "Zapytanie ogólne", en: "General enquiry" },
 };

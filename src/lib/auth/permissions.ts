@@ -1,3 +1,5 @@
+import type { Bilingual } from "@/lib/i18n-pick";
+
 /**
  * Uprawnienia panelu — „czy wolno TĘ operację", a nie „czy to superadmin".
  *
@@ -30,10 +32,10 @@ export const ADMIN_ROLES = ["operator", "admin", "superadmin"] as const;
 export type AdminRole = (typeof ADMIN_ROLES)[number];
 
 /** Nazwy ról w panelu. */
-export const ROLE_LABEL: Record<AdminRole, string> = {
-  operator: "Pracownik",
-  admin: "Administrator",
-  superadmin: "Właściciel",
+export const ROLE_LABEL: Record<AdminRole, Bilingual> = {
+  operator: { pl: "Pracownik", en: "Staff" },
+  admin: { pl: "Administrator", en: "Administrator" },
+  superadmin: { pl: "Właściciel", en: "Owner" },
 };
 
 /**

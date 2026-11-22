@@ -3,6 +3,7 @@ import { getDb } from "@/lib/db";
 import { getSetting } from "./settings";
 import { usageToday, nextResetUtc, DAILY_NEURON_CAP } from "@/lib/chat/ai/budget";
 import { configFromEnv, DEFAULT_MODEL } from "@/lib/chat/ai/cloudflare";
+import type { Bilingual } from "@/lib/i18n-pick";
 
 /**
  * What the admin panel is allowed to know about the AI layer.
@@ -24,7 +25,7 @@ export type ChatbotAiPanel = {
   mode: "deterministic" | "hybrid";
   status: AiStatus;
   /** Why the status is what it is, in words an operator can act on. */
-  explanation: string;
+  explanation: Bilingual;
   /** True when both credentials are present. Never the values. */
   configured: boolean;
   /** The model id — public information, not a secret. */
@@ -60,22 +61,37 @@ export async function getChatbotAiPanel(now = new Date()): Promise<ChatbotAiPane
    * credentials that would send them hunting for the wrong problem.
    */
   let status: AiStatus;
-  let explanation: string;
+  let explanation: Bilingual;
   if (chatbot.mode !== "hybrid") {
     status = "PAUSED";
-    explanation = "Tryb deterministyczny — model nie jest pytany.";
+    explanation = {
+      pl: "Tryb deterministyczny — model nie jest pytany.",
+      en: "Deterministic mode — the model is not consulted.",
+    };
   } else if (chatbot.aiPaused) {
     status = "PAUSED";
-    explanation = "Zatrzymane ręcznie przełącznikiem awaryjnym.";
+    explanation = {
+      pl: "Zatrzymane ręcznie przełącznikiem awaryjnym.",
+      en: "Stopped manually by the emergency switch.",
+    };
   } else if (!configured) {
     status = "UNAVAILABLE";
-    explanation = "Brak poświadczeń Cloudflare — chatbot działa na regułach.";
+    explanation = {
+      pl: "Brak poświadczeń Cloudflare — chatbot działa na regułach.",
+      en: "No Cloudflare credentials — the chatbot runs on rules.",
+    };
   } else if (usage.remaining <= 0) {
     status = "UNAVAILABLE";
-    explanation = "Dzienny limit wyczerpany — wraca po północy UTC.";
+    explanation = {
+      pl: "Dzienny limit wyczerpany — wraca po północy UTC.",
+      en: "Daily limit used up — it returns after midnight UTC.",
+    };
   } else {
     status = "ACTIVE";
-    explanation = "Model odpowiada na pytania, których reguły nie rozstrzygają.";
+    explanation = {
+      pl: "Model odpowiada na pytania, których reguły nie rozstrzygają.",
+      en: "The model answers questions that the rules do not settle.",
+    };
   }
 
   return {

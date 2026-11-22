@@ -1,6 +1,8 @@
 "use client";
 
 import { useRef, useState, useTransition } from "react";
+import { useLocale, useTranslations } from "next-intl";
+import { pickFrom } from "@/lib/i18n-pick";
 import { dodajWersje } from "@/lib/documents/actions";
 import { ETYKIETY_KATEGORII, KATEGORIE } from "@/lib/documents/kategorie";
 
@@ -13,6 +15,8 @@ import { ETYKIETY_KATEGORII, KATEGORIE } from "@/lib/documents/kategorie";
  * dokumentu — jeżeli taki już istnieje, to jest po prostu jego kolejne wydanie.
  */
 export function DokumentForm() {
+  const t = useTranslations("Admin.documents");
+  const locale = useLocale();
   const [czeka, start] = useTransition();
   const [wynik, setWynik] = useState<{ ok: boolean; tekst: string } | null>(
     null,
@@ -27,7 +31,10 @@ export function DokumentForm() {
         start(async () => {
           const r = await dodajWersje(fd);
           if (r.ok) {
-            setWynik({ ok: true, tekst: `Zapisano jako wersję ${r.version}.` });
+            setWynik({
+              ok: true,
+              tekst: t("savedAsVersion", { version: r.version }),
+            });
             form.current?.reset();
           } else {
             setWynik({ ok: false, tekst: r.error });
@@ -37,46 +44,44 @@ export function DokumentForm() {
       className="border-line space-y-4 border p-5"
     >
       <h2 className="font-heading text-ink text-base font-bold">
-        Wgraj dokument lub nową wersję
+        {t("uploadHeading")}
       </h2>
 
       <div className="grid gap-4 sm:grid-cols-2">
         <label className="block space-y-1">
-          <span className="text-ink-faint text-xs">
-            Identyfikator (ten sam dla kolejnych wersji)
-          </span>
+          <span className="text-ink-faint text-xs">{t("fieldSlug")}</span>
           <input
             name="slug"
             required
-            placeholder="umowa-najmu"
+            placeholder={t("slugPlaceholder")}
             pattern="[a-z0-9\-]+"
             className="border-line bg-void text-ink h-11 w-full border px-3 text-sm"
           />
         </label>
 
         <label className="block space-y-1">
-          <span className="text-ink-faint text-xs">Nazwa widoczna</span>
+          <span className="text-ink-faint text-xs">{t("fieldTitle")}</span>
           <input
             name="title"
             required
-            placeholder="Umowa najmu pojazdu"
+            placeholder={t("titlePlaceholder")}
             className="border-line bg-void text-ink h-11 w-full border px-3 text-sm"
           />
         </label>
 
         <label className="block space-y-1">
-          <span className="text-ink-faint text-xs">Język</span>
+          <span className="text-ink-faint text-xs">{t("fieldLocale")}</span>
           <select
             name="locale"
             className="border-line bg-void text-ink h-11 w-full border px-3 text-sm"
           >
-            <option value="pl">polski</option>
-            <option value="en">angielski</option>
+            <option value="pl">{t("localePl")}</option>
+            <option value="en">{t("localeEn")}</option>
           </select>
         </label>
 
         <label className="block space-y-1">
-          <span className="text-ink-faint text-xs">Kategoria</span>
+          <span className="text-ink-faint text-xs">{t("fieldCategory")}</span>
           <select
             name="category"
             defaultValue="booking"
@@ -84,7 +89,7 @@ export function DokumentForm() {
           >
             {KATEGORIE.map((k) => (
               <option key={k} value={k}>
-                {ETYKIETY_KATEGORII[k]}
+                {pickFrom(ETYKIETY_KATEGORII, k, locale)}
               </option>
             ))}
           </select>
@@ -92,7 +97,7 @@ export function DokumentForm() {
 
         <label className="block space-y-1">
           <span className="text-ink-faint text-xs">
-            Obowiązuje od (opcjonalnie)
+            {t("fieldEffectiveFrom")}
           </span>
           <input
             type="date"
@@ -102,7 +107,7 @@ export function DokumentForm() {
         </label>
 
         <label className="block space-y-1">
-          <span className="text-ink-faint text-xs">Plik PDF (do 12 MB)</span>
+          <span className="text-ink-faint text-xs">{t("fieldFile")}</span>
           <input
             type="file"
             name="plik"
@@ -114,7 +119,7 @@ export function DokumentForm() {
       </div>
 
       <label className="block space-y-1">
-        <span className="text-ink-faint text-xs">Opis (opcjonalnie)</span>
+        <span className="text-ink-faint text-xs">{t("fieldDescription")}</span>
         <textarea
           name="description"
           rows={2}
@@ -124,17 +129,12 @@ export function DokumentForm() {
 
       <label className="flex items-center gap-3">
         <input type="checkbox" name="aktywuj" className="h-5 w-5" />
-        <span className="text-ink text-sm">
-          Ustaw jako obowiązującą — poprzednia wersja przestanie obowiązywać
-        </span>
+        <span className="text-ink text-sm">{t("checkActivate")}</span>
       </label>
 
       <label className="flex items-center gap-3">
         <input type="checkbox" name="bilingual" className="h-5 w-5" />
-        <span className="text-ink text-sm">
-          Plik zawiera obie wersje językowe PL i EN — trafi do klienta w obu
-          językach
-        </span>
+        <span className="text-ink text-sm">{t("checkBilingual")}</span>
       </label>
 
       {wynik && (
@@ -151,7 +151,7 @@ export function DokumentForm() {
         disabled={czeka}
         className="label bg-red hover:bg-red-hover inline-flex h-11 items-center px-6 text-xs text-white transition-colors disabled:opacity-50"
       >
-        {czeka ? "Zapisywanie…" : "Zapisz wersję"}
+        {czeka ? t("saving") : t("saveVersion")}
       </button>
     </form>
   );

@@ -1,5 +1,6 @@
 import "server-only";
 import { z } from "zod";
+import type { Bilingual } from "@/lib/i18n-pick";
 import {
   DRIVER_CLASSES,
   type DriverClass,
@@ -54,10 +55,10 @@ export {
 export const RULE_STATUSES = ["active", "needs_decision", "disabled"] as const;
 export type RuleStatus = (typeof RULE_STATUSES)[number];
 
-export const STATUS_LABEL: Record<RuleStatus, string> = {
-  active: "AKTYWNA",
-  needs_decision: "WYMAGA DECYZJI",
-  disabled: "WYŁĄCZONA",
+export const STATUS_LABEL: Record<RuleStatus, Bilingual> = {
+  active: { pl: "AKTYWNA", en: "ACTIVE" },
+  needs_decision: { pl: "WYMAGA DECYZJI", en: "DECISION NEEDED" },
+  disabled: { pl: "WYŁĄCZONA", en: "DISABLED" },
 };
 
 /* ── Shapes ──────────────────────────────────────────────────────────────── */
@@ -653,9 +654,9 @@ export function rulesToFaq(
 
 export type RuleSummary = {
   key: string;
-  title: string;
+  title: Bilingual;
   status: RuleStatus;
-  detail: string;
+  detail: Bilingual;
 };
 
 /** One line per section, for the counters at the top of the panel. */
@@ -666,47 +667,74 @@ export function summarise(rules: RentalRules): RuleSummary[] {
   return [
     {
       key: "documents",
-      title: "Dokumenty kierowcy",
+      title: { pl: "Dokumenty kierowcy", en: "Driver documents" },
       // The base rule is always in force, so this section is never "undecided".
       status: "active",
       detail:
         switches === 0
-          ? "Zasada podstawowa obowiązuje. Żaden z trzech przełączników nie jest włączony."
-          : `Zasada podstawowa obowiązuje. Włączone przełączniki: ${switches} z 3.`,
+          ? {
+              pl: "Zasada podstawowa obowiązuje. Żaden z trzech przełączników nie jest włączony.",
+              en: "The base rule applies. None of the three switches is on.",
+            }
+          : {
+              pl: `Zasada podstawowa obowiązuje. Włączone przełączniki: ${switches} z 3.`,
+              en: `The base rule applies. Switches on: ${switches} of 3.`,
+            },
     },
     {
       key: "driverAge",
-      title: "Wiek kierowcy i staż prawa jazdy",
+      title: {
+        pl: "Wiek kierowcy i staż prawa jazdy",
+        en: "Driver age and licence tenure",
+      },
       status: driverAgeStatus(),
       detail: driverRulesEnforced(rules)
-        ? `Progi klas egzekwowane w formularzu: ${DRIVER_CLASSES.map(
-            (c) =>
-              `${rules.driverAge.classes[c]?.label ?? c} ${effectiveDriverLimits(rules, c).minAge}`,
-          ).join(", ")} lat.`
-        : `Formularz odrzuca poniżej ${FALLBACK_MIN_AGE} lat (próg bezpieczeństwa). Progi klas nie są jeszcze egzekwowane.`,
+        ? {
+            pl: `Progi klas egzekwowane w formularzu: ${DRIVER_CLASSES.map(
+              (c) =>
+                `${rules.driverAge.classes[c]?.label ?? c} ${effectiveDriverLimits(rules, c).minAge}`,
+            ).join(", ")} lat.`,
+            en: `Class thresholds enforced in the booking form: ${DRIVER_CLASSES.map(
+              (c) =>
+                `${rules.driverAge.classes[c]?.label ?? c} ${effectiveDriverLimits(rules, c).minAge}`,
+            ).join(", ")} years.`,
+          }
+        : {
+            pl: `Formularz odrzuca poniżej ${FALLBACK_MIN_AGE} lat (próg bezpieczeństwa). Progi klas nie są jeszcze egzekwowane.`,
+            en: `The form rejects anyone under ${FALLBACK_MIN_AGE} (safety floor). Class thresholds are not enforced yet.`,
+          },
     },
     {
       key: "abroad",
-      title: "Wyjazdy zagraniczne",
+      title: { pl: "Wyjazdy zagraniczne", en: "Travel abroad" },
       status: rules.abroad.status,
-      detail: "Zasada Z-1, zatwierdzona 20.08.2026. Bez listy krajów dozwolonych.",
+      detail: {
+        pl: "Zasada Z-1, zatwierdzona 20.08.2026. Bez listy krajów dozwolonych.",
+        en: "Rule Z-1, approved 20.08.2026. No list of permitted countries.",
+      },
     },
     {
       key: "excess",
-      title: "Udział własny / szkody",
+      title: { pl: "Udział własny / szkody", en: "Excess / damage" },
       status: rules.excess.status,
       detail:
         rules.excess.amountGrosze === null
-          ? "Brak zatwierdzonej kwoty."
-          : `Zatwierdzone: ${Math.round(rules.excess.amountGrosze / 100)} zł.`,
+          ? { pl: "Brak zatwierdzonej kwoty.", en: "No approved amount." }
+          : {
+              pl: `Zatwierdzone: ${Math.round(rules.excess.amountGrosze / 100)} zł.`,
+              en: `Approved: ${Math.round(rules.excess.amountGrosze / 100)} PLN.`,
+            },
     },
     {
       key: "emergency",
-      title: "Wypadek i awaria",
+      title: { pl: "Wypadek i awaria", en: "Accident and breakdown" },
       status: rules.emergency.status,
       detail: rules.emergency.phone
-        ? `Numer: ${rules.emergency.phone}`
-        : "Brak numeru pomocy drogowej i procedury.",
+        ? { pl: `Numer: ${rules.emergency.phone}`, en: `Number: ${rules.emergency.phone}` }
+        : {
+            pl: "Brak numeru pomocy drogowej i procedury.",
+            en: "No roadside assistance number or procedure.",
+          },
     },
   ];
 }

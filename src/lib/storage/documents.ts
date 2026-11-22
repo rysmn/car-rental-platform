@@ -1,8 +1,11 @@
 import "server-only";
-import { promises as fs } from "node:fs";
-import path from "node:path";
 import { randomUUID } from "node:crypto";
-import { uploadDir } from "./media";
+import { getStorage } from "./index";
+
+/** Klucz obiektu w magazynie (lokalnie: `.storage/documents/…`, w S3: prefiks `documents/`). */
+function kluczDokumentu(fileName: string): string {
+  return `documents/${fileName}`;
+}
 
 /**
  * Umowy, regulaminy i pozostałe dokumenty — punkty 15 i 16.
@@ -24,7 +27,6 @@ import { uploadDir } from "./media";
  * jest deklaracją, nie dowodem.
  */
 
-const SUBDIR = "documents";
 
 // Prefiks adresu mieszka w `lib/documents/adres.ts` — tamten plik nie ma
 // `server-only`, więc zna go także przeglądarka. Tu byłby nieosiągalny dla
@@ -32,10 +34,6 @@ const SUBDIR = "documents";
 export { DOCUMENT_URL_PREFIX } from "@/lib/documents/adres";
 
 const MAX_BYTES = 12 * 1024 * 1024;
-
-export function documentDir(): string {
-  return path.join(uploadDir(), SUBDIR);
-}
 
 /** `%PDF-` — pierwsze pięć bajtów każdego prawdziwego PDF-a. */
 function jestPdf(b: Buffer): boolean {
@@ -67,8 +65,12 @@ export async function saveDocument(file: File): Promise<WynikZapisu> {
   // przemycić separatora ścieżki ani drugiego rozszerzenia.
   const fileName = `${randomUUID()}.pdf`;
   try {
-    await fs.mkdir(documentDir(), { recursive: true });
-    await fs.writeFile(path.join(documentDir(), fileName), buffer);
+    await getStorage().put({
+      key: kluczDokumentu(fileName),
+      body: buffer,
+      contentType: "application/pdf",
+      visibility: "private",
+    });
   } catch {
     return { ok: false, error: "write_failed" };
   }
@@ -85,7 +87,7 @@ export async function saveDocument(file: File): Promise<WynikZapisu> {
 export async function readDocument(fileName: string): Promise<Buffer | null> {
   if (!/^[0-9a-f-]{36}\.pdf$/i.test(fileName)) return null;
   try {
-    return await fs.readFile(path.join(documentDir(), fileName));
+    return await getStorage().get(kluczDokumentu(fileName));
   } catch {
     return null;
   }
@@ -105,7 +107,7 @@ export async function readDocument(fileName: string): Promise<Buffer | null> {
 export async function deleteDocumentFile(fileName: string): Promise<void> {
   if (!/^[0-9a-f-]{36}\.pdf$/i.test(fileName)) return;
   try {
-    await fs.unlink(path.join(documentDir(), fileName));
+    await getStorage().delete(kluczDokumentu(fileName));
   } catch {
     /* pliku już nie ma — to jest ten stan, o który chodziło */
   }

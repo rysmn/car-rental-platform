@@ -20,7 +20,7 @@ const timeOfDay = z
   .string()
   .trim()
   .refine((v) => v === "" || /^([01]\d|2[0-3]):[0-5]\d$/.test(v), {
-    message: "Godzina musi mieć format GG:MM (np. 09:00)",
+    message: "invalid_time",
   });
 
 const daySchema = z.object({
@@ -121,7 +121,7 @@ const phoneTime = z
   .string()
   .trim()
   .refine((v) => /^([01]\d|2[0-3]):[0-5]\d$/.test(v) || v === "24:00", {
-    message: "Godzina musi mieć format GG:MM (np. 07:00 albo 24:00)",
+    message: "invalid_time",
   });
 
 export const phoneHoursSchema = z.object({

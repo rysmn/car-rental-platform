@@ -8,8 +8,10 @@ import {
 } from "@/lib/admin/customer-flags";
 import { useActionState, useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
+import { useLocale, useTranslations } from "next-intl";
 import { createPhoneBooking, type PhoneBookingResult } from "../actions";
 import { formatPln } from "@/lib/format";
+import { pickFrom } from "@/lib/i18n-pick";
 
 const inputCls =
   "h-11 w-full border border-line-strong bg-surface-1 px-3 text-sm text-ink placeholder:text-ink-faint";
@@ -46,35 +48,6 @@ function isoOffset(days: number): string {
   ).padStart(2, "0")}`;
 }
 
-/** The quote's own line codes, in the words the operator uses on the phone. */
-const LINE_LABEL: Record<string, string> = {
-  location: "Dostawa / miejsce odbioru",
-  extra_driver: "Dodatkowy kierowca",
-  child_seat: "Fotelik dziecięcy",
-  protection_package: "Pakiet ochronny",
-  no_deposit: "Wariant bez kaucji",
-};
-
-const ERROR_TEXT: Record<string, string> = {
-  validation: "Popraw zaznaczone pola.",
-  not_found: "Nie znaleziono auta albo miejsca odbioru.",
-  full: "Brak wolnego egzemplarza tego modelu w tym terminie.",
-  overlap: "Ten egzemplarz jest już zajęty w tym terminie.",
-  server: "Nie udało się zapisać. Spróbuj ponownie.",
-};
-
-/**
- * The phone-call form, in the order the call actually goes: who is this, when
- * do they want it, what is free, what does it cost, how are they paying, is it
- * firm.
- *
- * Three things happen while the operator types, all of them answered by the
- * server: the number is looked up in the directory, the car list is narrowed
- * to what is genuinely free for those dates, and the price is quoted by the
- * same function that will charge it. None of that is reimplemented in the
- * browser — a figure read out down the phone and the amount actually saved
- * must not be allowed to differ.
- */
 /**
  * Kopia poprzedniego najmu — to, co się nie zmienia między jednym a drugim.
  *
@@ -95,6 +68,18 @@ export type Prefill = {
   depositVariant: string;
 };
 
+/**
+ * The phone-call form, in the order the call actually goes: who is this, when
+ * do they want it, what is free, what does it cost, how are they paying, is it
+ * firm.
+ *
+ * Three things happen while the operator types, all of them answered by the
+ * server: the number is looked up in the directory, the car list is narrowed
+ * to what is genuinely free for those dates, and the price is quoted by the
+ * same function that will charge it. None of that is reimplemented in the
+ * browser — a figure read out down the phone and the amount actually saved
+ * must not be allowed to differ.
+ */
 export function NewReservationForm({
   models,
   locations,
@@ -104,6 +89,9 @@ export function NewReservationForm({
   locations: LocationOption[];
   prefill?: Prefill;
 }) {
+  const t = useTranslations("Admin.reservations.newBooking");
+  const tm = useTranslations("Admin.reservations.methods");
+  const locale = useLocale();
   const router = useRouter();
   const [state, action, pending] = useActionState<
     PhoneBookingResult | null,
@@ -233,6 +221,23 @@ export function NewReservationForm({
     depositVariant,
   ]);
 
+  /** The quote's own line codes, in the words the operator uses on the phone. */
+  const LINE_LABEL: Record<string, string> = {
+    location: t("location"),
+    extra_driver: t("extraDriver"),
+    child_seat: t("childSeat"),
+    protection_package: t("protectionPackage"),
+    no_deposit: t("noDepositLine"),
+  };
+
+  const ERROR_TEXT: Record<string, string> = {
+    validation: t("errValidation"),
+    not_found: t("errNotFound"),
+    full: t("errFull"),
+    overlap: t("errOverlap"),
+    server: t("errServer"),
+  };
+
   const freeOf = (id: string) =>
     availability?.find((a) => a.id === id)?.free ?? null;
   const selectedFree = freeOf(modelId);
@@ -243,7 +248,7 @@ export function NewReservationForm({
     return (
       <div className="border-line bg-void border p-8">
         <p className="label-tight text-[10px] text-emerald-400">
-          Rezerwacja zapisana
+          {t("saved")}
         </p>
         <p className="font-heading mt-3 text-3xl font-bold text-ink">
           {state.reference}
@@ -254,14 +259,14 @@ export function NewReservationForm({
             onClick={() => router.push(`/admin/reservations/${state.id}`)}
             className="label bg-red hover:bg-red-hover inline-flex h-11 items-center px-6 text-xs text-white transition-colors"
           >
-            Otwórz rezerwację
+            {t("openBooking")}
           </button>
           <button
             type="button"
             onClick={() => router.refresh()}
             className="label border-line-strong inline-flex h-11 items-center border px-6 text-xs text-ink transition-colors hover:border-ink hover:bg-ink/5"
           >
-            Kolejna rezerwacja
+            {t("nextBooking")}
           </button>
         </div>
       </div>
@@ -279,10 +284,10 @@ export function NewReservationForm({
       {/* 1. KLIENT — the number first: it is what identifies a returning
              customer, and what the operator already has in hand. */}
       <section className="border-line bg-void border p-5">
-        <p className="label text-[10px] text-ink">1 · Klient</p>
+        <p className="label text-[10px] text-ink">{t("sectionClient")}</p>
         <div className="mt-4 grid gap-4 sm:grid-cols-3">
           <label className="flex flex-col gap-1">
-            <span className={labelCls}>Telefon *</span>
+            <span className={labelCls}>{t("phone")}</span>
             <input
               name="customerPhone"
               value={phone}
@@ -300,7 +305,7 @@ export function NewReservationForm({
             )}
           </label>
           <label className="flex flex-col gap-1">
-            <span className={labelCls}>Imię i nazwisko *</span>
+            <span className={labelCls}>{t("name")}</span>
             <input
               name="customerName"
               value={name}
@@ -315,7 +320,7 @@ export function NewReservationForm({
             )}
           </label>
           <label className="flex flex-col gap-1">
-            <span className={labelCls}>E-mail</span>
+            <span className={labelCls}>{t("email")}</span>
             <input
               name="customerEmail"
               type="email"
@@ -329,10 +334,16 @@ export function NewReservationForm({
         {found ? (
           <>
             <p className="mt-3 text-[11px] text-emerald-400">
-              Znany klient: {found.name} · {found.rentals}{" "}
-              {found.rentals === 1 ? "najem" : "najmów"}
-              {found.lastRentalOn ? ` · ostatnio ${found.lastRentalOn}` : ""}
-              {found.damagesOpen ? ` · ${found.damagesOpen} szkody w toku` : ""}
+              {t("knownCustomer", {
+                name: found.name,
+                rentals: found.rentals,
+              })}
+              {found.lastRentalOn
+                ? t("lastRental", { date: found.lastRentalOn })
+                : ""}
+              {found.damagesOpen
+                ? t("openDamages", { count: found.damagesOpen })
+                : ""}
             </p>
             {/* Flaga OSTRZEGA, nie blokuje. Decyzja „wynajmujemy czy nie"
                 należy do człowieka przy telefonie, który zna kontekst; panel
@@ -341,24 +352,22 @@ export function NewReservationForm({
               <p
                 className={`mt-2 border px-3 py-2 text-[11px] ${CUSTOMER_FLAG_TONE[found.flag]}`}
               >
-                {CUSTOMER_FLAG_LABEL[found.flag]} —{" "}
-                {CUSTOMER_FLAG_HINT[found.flag]}
+                {pickFrom(CUSTOMER_FLAG_LABEL, found.flag, locale)} —{" "}
+                {pickFrom(CUSTOMER_FLAG_HINT, found.flag, locale)}
               </p>
             )}
           </>
         ) : (
-          <p className="text-ink-faint mt-3 text-[11px]">
-            Nowy numer — po zapisaniu klient trafi do bazy automatycznie.
-          </p>
+          <p className="text-ink-faint mt-3 text-[11px]">{t("newNumber")}</p>
         )}
       </section>
 
       {/* 2. TERMIN */}
       <section className="border-line bg-void border p-5">
-        <p className="label text-[10px] text-ink">2 · Termin</p>
+        <p className="label text-[10px] text-ink">{t("sectionDates")}</p>
         <div className="mt-4 grid gap-4 sm:grid-cols-4">
           <label className="flex flex-col gap-1">
-            <span className={labelCls}>Od *</span>
+            <span className={labelCls}>{t("from")}</span>
             <input
               name="startDate"
               type="date"
@@ -368,7 +377,7 @@ export function NewReservationForm({
             />
           </label>
           <label className="flex flex-col gap-1">
-            <span className={labelCls}>Do *</span>
+            <span className={labelCls}>{t("to")}</span>
             <input
               name="endDate"
               type="date"
@@ -383,7 +392,7 @@ export function NewReservationForm({
             )}
           </label>
           <label className="flex flex-col gap-1">
-            <span className={labelCls}>Godzina wydania</span>
+            <span className={labelCls}>{t("pickupTime")}</span>
             <input
               name="pickupTime"
               type="time"
@@ -392,7 +401,7 @@ export function NewReservationForm({
             />
           </label>
           <label className="flex flex-col gap-1">
-            <span className={labelCls}>Godzina zwrotu</span>
+            <span className={labelCls}>{t("returnTime")}</span>
             <input
               name="returnTime"
               type="time"
@@ -405,10 +414,10 @@ export function NewReservationForm({
 
       {/* 3. SAMOCHÓD — annotated with what is genuinely free for those dates. */}
       <section className="border-line bg-void border p-5">
-        <p className="label text-[10px] text-ink">3 · Samochód</p>
+        <p className="label text-[10px] text-ink">{t("sectionCar")}</p>
         <div className="mt-4 grid gap-4 sm:grid-cols-2">
           <label className="flex flex-col gap-1">
-            <span className={labelCls}>Dostępne w tym terminie *</span>
+            <span className={labelCls}>{t("availableForDates")}</span>
             <select
               key={modelId}
               name="modelId"
@@ -424,20 +433,18 @@ export function NewReservationForm({
                     {free === null
                       ? ""
                       : free > 0
-                        ? ` — wolne: ${free}`
-                        : " — BRAK w tym terminie"}
+                        ? t("freeCount", { count: free })
+                        : t("noneForDates")}
                   </option>
                 );
               })}
             </select>
             {selectedFree === 0 && (
-              <span className="text-red text-[11px]">
-                Ten model nie ma wolnego egzemplarza w wybranym terminie.
-              </span>
+              <span className="text-red text-[11px]">{t("noFreeUnit")}</span>
             )}
           </label>
           <label className="flex flex-col gap-1">
-            <span className={labelCls}>Miejsce odbioru *</span>
+            <span className={labelCls}>{t("pickupLocation")}</span>
             <select
               name="locationId"
               value={locationId}
@@ -447,7 +454,11 @@ export function NewReservationForm({
               {locations.map((l) => (
                 <option key={l.id} value={l.id}>
                   {l.name}
-                  {l.feeGrosze > 0 ? ` (+${formatPln(l.feeGrosze, "pl")})` : ""}
+                  {l.feeGrosze > 0
+                    ? t("locationFee", {
+                        fee: formatPln(l.feeGrosze, locale),
+                      })
+                    : ""}
                 </option>
               ))}
             </select>
@@ -457,7 +468,7 @@ export function NewReservationForm({
 
       {/* 4. CENA */}
       <section className="border-line bg-void border p-5">
-        <p className="label text-[10px] text-ink">4 · Cena</p>
+        <p className="label text-[10px] text-ink">{t("sectionPrice")}</p>
         <div className="mt-4 flex flex-wrap items-center gap-x-8 gap-y-3">
           <label className="tap-block flex items-center gap-3 text-sm text-ink">
             <input
@@ -467,7 +478,7 @@ export function NewReservationForm({
               onChange={(e) => setExtraDriver(e.target.checked)}
               className="h-4 w-4"
             />
-            Dodatkowy kierowca
+            {t("extraDriver")}
           </label>
           <label className="tap-block flex items-center gap-3 text-sm text-ink">
             <input
@@ -477,7 +488,7 @@ export function NewReservationForm({
               onChange={(e) => setChildSeat(e.target.checked)}
               className="h-4 w-4"
             />
-            Fotelik dziecięcy
+            {t("childSeat")}
           </label>
           <label className="tap-block flex items-center gap-3 text-sm text-ink">
             <input
@@ -487,18 +498,18 @@ export function NewReservationForm({
               onChange={(e) => setProtection(e.target.checked)}
               className="h-4 w-4"
             />
-            Pakiet ochronny
+            {t("protectionPackage")}
           </label>
           <label className="flex items-center gap-3">
-            <span className={labelCls}>Kaucja</span>
+            <span className={labelCls}>{t("deposit")}</span>
             <select
               name="depositVariant"
               value={depositVariant}
               onChange={(e) => setDepositVariant(e.target.value)}
               className="border-line-strong h-9 border bg-surface-1 px-2 text-sm text-ink"
             >
-              <option value="with_deposit">Z kaucją</option>
-              <option value="no_deposit">Bez kaucji</option>
+              <option value="with_deposit">{t("withDeposit")}</option>
+              <option value="no_deposit">{t("noDeposit")}</option>
             </select>
           </label>
         </div>
@@ -507,7 +518,7 @@ export function NewReservationForm({
           <div className="border-line mt-5 border-t pt-4">
             <ul className="flex flex-col gap-1">
               <li className="text-silver flex justify-between gap-6 text-xs">
-                <span>Najem ({quote.days} × doba)</span>
+                <span>{t("rentalLine", { days: quote.days })}</span>
                 <span className="tabular-nums">
                   {formatPln(
                     quote.quote.totalGrosze -
@@ -515,7 +526,7 @@ export function NewReservationForm({
                         (sum, l) => sum + l.amountGrosze,
                         0,
                       ),
-                    "pl",
+                    locale,
                   )}
                 </span>
               </li>
@@ -526,28 +537,27 @@ export function NewReservationForm({
                 >
                   <span>{LINE_LABEL[l.code] ?? l.code}</span>
                   <span className="tabular-nums">
-                    {formatPln(l.amountGrosze, "pl")}
+                    {formatPln(l.amountGrosze, locale)}
                   </span>
                 </li>
               ))}
             </ul>
             <div className="mt-3 flex items-end justify-between gap-6">
               <span className="label-tight text-ink-faint text-[10px]">
-                Razem za {quote.days}{" "}
-                {quote.days === 1 ? "dobę" : quote.days < 5 ? "doby" : "dób"}
+                {t("totalFor", { days: quote.days })}
               </span>
               <span className="font-heading text-2xl font-bold text-ink tabular-nums">
-                {formatPln(quote.quote.totalGrosze, "pl")}
+                {formatPln(quote.quote.totalGrosze, locale)}
               </span>
             </div>
             <p className="text-ink-faint mt-1 text-right text-[11px]">
-              kaucja {formatPln(quote.quote.depositGrosze, "pl")}
+              {t("depositLine", {
+                amount: formatPln(quote.quote.depositGrosze, locale),
+              })}
             </p>
           </div>
         ) : (
-          <p className="text-ink-faint mt-4 text-[11px]">
-            Wybierz auto i termin — cena policzy się z cennika.
-          </p>
+          <p className="text-ink-faint mt-4 text-[11px]">{t("pickCar")}</p>
         )}
       </section>
 
@@ -555,37 +565,33 @@ export function NewReservationForm({
       <section className="border-line bg-void border p-5">
         <div className="grid gap-4 sm:grid-cols-2">
           <label className="flex flex-col gap-1">
-            <span className="label text-[10px] text-ink">5 · Płatność</span>
+            <span className="label text-[10px] text-ink">{t("sectionPayment")}</span>
             <select
               name="paymentMethod"
               defaultValue={kept?.paymentMethod ?? ""}
               className={`${inputCls} mt-3`}
             >
-              <option value="">Jeszcze nieustalona</option>
-              <option value="cash">Gotówka</option>
-              <option value="card">Karta</option>
-              <option value="transfer">Przelew</option>
-              <option value="online">Online</option>
+              <option value="">{t("paymentNotSet")}</option>
+              <option value="cash">{tm("cash")}</option>
+              <option value="card">{tm("card")}</option>
+              <option value="transfer">{tm("transfer")}</option>
+              <option value="online">{tm("online")}</option>
             </select>
           </label>
           <label className="flex flex-col gap-1">
-            <span className="label text-[10px] text-ink">6 · Status</span>
+            <span className="label text-[10px] text-ink">{t("sectionStatus")}</span>
             <select
               name="stage"
               defaultValue={kept?.stage ?? "confirmed"}
               className={`${inputCls} mt-3`}
             >
-              <option value="pending">Wstępna — nie blokuje auta</option>
-              <option value="confirmed">Potwierdzona — blokuje auto</option>
-              <option value="paid">Opłacona — blokuje auto</option>
+              <option value="pending">{t("stagePending")}</option>
+              <option value="confirmed">{t("stageConfirmed")}</option>
+              <option value="paid">{t("stagePaid")}</option>
             </select>
           </label>
         </div>
-        <p className="text-ink-faint mt-3 text-[11px]">
-          „Opłacona” to potwierdzona rezerwacja z odnotowaną wpłatą — płatność
-          jest osobnym faktem niż status, bo zapłacić można przy odbiorze albo
-          po zwrocie.
-        </p>
+        <p className="text-ink-faint mt-3 text-[11px]">{t("stageHint")}</p>
       </section>
 
       <div className="flex flex-wrap items-center gap-4">
@@ -594,11 +600,11 @@ export function NewReservationForm({
           disabled={pending}
           className="label bg-red hover:bg-red-hover inline-flex h-12 items-center px-8 text-sm text-white transition-colors disabled:opacity-60"
         >
-          {pending ? "Zapisywanie…" : "Zapisz rezerwację"}
+          {pending ? t("saving") : t("save")}
         </button>
         {quote && (
           <span className="text-silver text-sm tabular-nums">
-            {formatPln(quote.quote.totalGrosze, "pl")}
+            {formatPln(quote.quote.totalGrosze, locale)}
           </span>
         )}
       </div>
