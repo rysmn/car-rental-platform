@@ -25,7 +25,7 @@ import { sql } from "drizzle-orm";
  */
 
 // ── Enums ────────────────────────────────────────────────────────────────────
-export const carCategory = pgEnum("car_category", ["suv", "sedan", "van"]);
+export const carCategory = pgEnum("car_category", ["mini", "economy", "compact", "intermediate", "estate", "convertible", "suv", "van"]);
 export const gearbox = pgEnum("gearbox", ["automatic", "manual"]);
 export const fuel = pgEnum("fuel", ["petrol", "diesel", "hybrid", "electric"]);
 /**

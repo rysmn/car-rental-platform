@@ -4,7 +4,16 @@
 import type { EditableSegment } from "@/lib/fleet/segments";
 import type { Bilingual } from "@/lib/i18n-pick";
 
-export const CATEGORIES = ["suv", "sedan", "van"] as const;
+export const CATEGORIES = [
+  "mini",
+  "economy",
+  "compact",
+  "intermediate",
+  "estate",
+  "convertible",
+  "suv",
+  "van",
+] as const;
 export const GEARBOXES = ["automatic", "manual"] as const;
 export const FUELS = ["petrol", "diesel", "hybrid", "electric"] as const;
 export const CAR_STATUSES = [
@@ -34,9 +43,14 @@ export type CarStatus = (typeof CAR_STATUSES)[number];
 export type PrepStatus = (typeof PREP_STATUSES)[number];
 
 export const CATEGORY_LABEL: Record<Category, Bilingual> = {
+  mini: { pl: "Mini", en: "Mini" },
+  economy: { pl: "Ekonomiczny", en: "Economy" },
+  compact: { pl: "Kompakt", en: "Compact" },
+  intermediate: { pl: "Średni", en: "Intermediate" },
+  estate: { pl: "Kombi", en: "Estate" },
+  convertible: { pl: "Kabriolet", en: "Convertible" },
   suv: { pl: "SUV", en: "SUV" },
-  sedan: { pl: "Sedan", en: "Sedan" },
-  van: { pl: "Van", en: "Van" },
+  van: { pl: "Bus / Van", en: "Van" },
 };
 
 export const GEARBOX_LABEL: Record<Gearbox, Bilingual> = {

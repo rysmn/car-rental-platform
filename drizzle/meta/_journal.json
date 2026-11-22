@@ -372,6 +372,13 @@
       "when": 1787853918524,
       "tag": "0052_customer_phone_not_unique",
       "breakpoints": true
+    },
+    {
+      "idx": 53,
+      "version": "7",
+      "when": 1795000000000,
+      "tag": "0053_car_category_segments",
+      "breakpoints": true
     }
   ]
 }

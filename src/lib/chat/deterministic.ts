@@ -250,7 +250,12 @@ function mainMenu(locale: Locale): ChatBlock {
  */
 const SEGMENT_LABEL: Record<string, { pl: string; en: string }> = {
   suv: { pl: "SUV", en: "SUV" },
-  sedan: { pl: "Sedan", en: "Sedan" },
+  mini: { pl: "Mini", en: "Mini" },
+  economy: { pl: "Ekonomiczny", en: "Economy" },
+  compact: { pl: "Kompakt", en: "Compact" },
+  intermediate: { pl: "Średni", en: "Intermediate" },
+  estate: { pl: "Kombi", en: "Estate" },
+  convertible: { pl: "Kabriolet", en: "Convertible" },
   van: { pl: "Bus / Van", en: "Van" },
   business: { pl: "Business", en: "Business" },
   executive: { pl: "Executive", en: "Executive" },

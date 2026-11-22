@@ -32,7 +32,16 @@
  */
 
 /** Axis 1: what the car physically is. Mirrors `car_models.category`. */
-export const BODY_TYPES = ["suv", "sedan", "van"] as const;
+export const BODY_TYPES = [
+  "mini",
+  "economy",
+  "compact",
+  "intermediate",
+  "estate",
+  "convertible",
+  "suv",
+  "van",
+] as const;
 
 export type BodyType = (typeof BODY_TYPES)[number];
 
@@ -56,8 +65,13 @@ export type CommercialSegment = (typeof COMMERCIAL_SEGMENTS)[number];
  * so this list may safely be wider than any one fleet.
  */
 export const FLEET_SEGMENTS = [
+  "mini",
+  "economy",
+  "compact",
+  "intermediate",
+  "estate",
+  "convertible",
   "suv",
-  "sedan",
   "van",
   "business",
   "executive",

@@ -22,6 +22,7 @@
  */
 
 import { addDays, weekendRange } from "@/lib/dates";
+import type { CarCategory } from "@/lib/fleet/types";
 
 export const INTENTS = [
   "FIND_CAR",
@@ -221,7 +222,7 @@ export type ParsedEntities = {
    * has to survive the other. While both shared one field, the second word read
    * overwrote the first and the search silently changed subject.
    */
-  bodyType: "suv" | "sedan" | "van" | null;
+  bodyType: CarCategory | null;
   /** Axis 2 — the commercial shelf: `luxury`, `executive` or `business`. */
   segment: string | null;
   /**
@@ -2209,7 +2210,7 @@ const BODY_WORDS: { body: string; test: RegExp }[] = [
      * deliberately absent: in Polish it is a claim about luxury at least as
      * often as about a body shape, and it already reaches the `luxury` shelf.
      */
-    body: "sedan",
+    body: "intermediate",
     test: /\bsedan\w*|\bsaloon\b/,
   },
 ];

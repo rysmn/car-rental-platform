@@ -1,4 +1,4 @@
-import type { CarStatus } from "./types";
+import type { CarCategory, CarStatus } from "./types";
 import type { DriverClass } from "./driver-class";
 
 /**
@@ -26,7 +26,7 @@ export type FleetModelSeed = {
   brand: string;
   model: string;
   year: number;
-  category: "suv" | "sedan" | "van";
+  category: CarCategory;
   seats: number;
   gearbox: "automatic" | "manual";
   fuel: "petrol" | "diesel" | "hybrid" | "electric";
@@ -59,7 +59,7 @@ export const FLEET: FleetModelSeed[] = [
     brand: "BMW",
     model: "740d xDrive",
     year: 2019,
-    category: "sedan",
+    category: "intermediate",
     seats: 5,
     gearbox: "automatic",
     fuel: "diesel",
